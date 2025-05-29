@@ -83,7 +83,7 @@ def test_validate_argocd_reachable_hub_site(openshift_dyn_client):
 @pytest.mark.validate_argocd_applications_health_hub_site
 def test_validate_argocd_applications_health_hub_site(openshift_dyn_client):
     logger.info("Get all applications deployed by argocd on hub site")
-    projects = ["openshift-gitops", "multicloud-gitops-hub"]
+    projects = ["openshift-gitops", "layered-zero-trust-hub"]
     unhealthy_apps = application.get_argocd_application_status(
         openshift_dyn_client, projects
     )

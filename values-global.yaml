@@ -1,6 +1,6 @@
 ---
 global:
-  pattern: multicloud-gitops
+  pattern: layered-zero-trust
   options:
     useCSV: false
     syncPolicy: Automatic
