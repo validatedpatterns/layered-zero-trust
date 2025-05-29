@@ -37,7 +37,7 @@ def test_modify_web_content(openshift_dyn_client):
     if os.getenv("EXTERNAL_TEST") != "true":
         chart = (
             f"{os.environ['HOME']}"
-            + "/validated_patterns/multicloud-gitops/charts/"
+            + "/validated_patterns/layered-zero-trust/charts/"
             + "all/hello-world/templates/hello-world-cm.yaml"
         )
     else:
@@ -51,7 +51,7 @@ def test_modify_web_content(openshift_dyn_client):
     )
 
     logger.info("Merge the change")
-    patterns_repo = f"{os.environ['HOME']}/validated_patterns/multicloud-gitops"
+    patterns_repo = f"{os.environ['HOME']}/validated_patterns/layered-zero-trust"
     if os.getenv("EXTERNAL_TEST") != "true":
         subprocess.run(["git", "add", chart], cwd=f"{patterns_repo}")
         subprocess.run(
