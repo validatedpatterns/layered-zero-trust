@@ -1,7 +1,7 @@
 #!/usr/bin/bash
 
 export EXTERNAL_TEST="true"
-export PATTERN_NAME="MultiCloudGitops"
+export PATTERN_NAME="LayeredZeroTrust"
 export PATTERN_SHORTNAME="mcgitops"
 
 if [ -z "${KUBECONFIG}" ]; then
@@ -25,12 +25,6 @@ fi
 
 pytest -lv --disable-warnings test_subscription_status_hub.py --kubeconfig $KUBECONFIG --junit-xml $WORKSPACE/test_subscription_status_hub.xml
 
-pytest -lv --disable-warnings test_subscription_status_edge.py --kubeconfig $KUBECONFIG_EDGE --junit-xml $WORKSPACE/test_subscription_status_edge.xml
-
 pytest -lv --disable-warnings test_validate_hub_site_components.py --kubeconfig $KUBECONFIG --junit-xml $WORKSPACE/test_validate_hub_site_components.xml
-
-pytest -lv --disable-warnings test_validate_edge_site_components.py --kubeconfig $KUBECONFIG_EDGE --junit-xml $WORKSPACE/test_validate_edge_site_components.xml
-
-pytest -lv --disable-warnings test_modify_web_content.py --kubeconfig $KUBECONFIG --junit-xml $WORKSPACE/test_modify_web_content.xml
 
 python3 create_ci_badge.py
