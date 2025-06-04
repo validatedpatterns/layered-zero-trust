@@ -9,11 +9,6 @@ if [ -z "${KUBECONFIG}" ]; then
     exit 1
 fi
 
-if [ -z "${KUBECONFIG_EDGE}" ]; then
-    echo "No kubeconfig file set for edge cluster"
-    exit 1
-fi
-
 if [ -z "${INFRA_PROVIDER}" ]; then
     echo "INFRA_PROVIDER is not defined"
     exit 1
