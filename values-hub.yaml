@@ -41,6 +41,11 @@ clusterGroup:
       project: hub
       chart: golang-external-secrets
       chartVersion: 0.1.*
+    rh-keycloak:
+      name: rh-keycloak
+      namespace: keycloak-system
+      project: hub
+      chart: rh-keycloak
   imperative:
     # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm
     # The default schedule is every 10 minutes: imperative.schedule
