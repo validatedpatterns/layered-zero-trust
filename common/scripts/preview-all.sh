@@ -4,7 +4,7 @@ REPO=$1; shift;
 TARGET_BRANCH=$1; shift
 
 HUB=$( yq ".main.clusterGroupName" values-global.yaml )
-MANAGED_CLUSTERS=$( yq ".clusterGroup.managedClusterGroups.[].name" values-$HUB.yaml )
+MANAGED_CLUSTERS=$( yq '.clusterGroup.managedClusterGroups.[].name // ""' values-$HUB.yaml )
 ALL_CLUSTERS=( $HUB $MANAGED_CLUSTERS )
 
 CLUSTER_INFO_OUT=$(oc cluster-info 2>&1)

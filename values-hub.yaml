@@ -5,12 +5,7 @@ clusterGroup:
     - open-cluster-management
     - vault
     - golang-external-secrets
-  subscriptions:
-    acm:
-      name: advanced-cluster-management
-      namespace: open-cluster-management
-      channel: release-2.11
-      #csv: advanced-cluster-management.v2.6.1
+  subscriptions: {}
   projects:
     - hub
   # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
@@ -34,17 +29,6 @@ clusterGroup:
   #   - '/overrides/values-{{ $.Values.global.hubClusterDomain }}.yaml'
   #   - '/overrides/values-{{ $.Values.global.localClusterDomain }}.yaml'
   applications:
-    acm:
-      name: acm
-      namespace: open-cluster-management
-      project: hub
-      chart: acm
-      chartVersion: 0.1.*
-      ignoreDifferences:
-        - group: internal.open-cluster-management.io
-          kind: ManagedClusterInfo
-          jsonPointers:
-            - /spec/loggingCA
     vault:
       name: vault
       namespace: vault
@@ -65,15 +49,15 @@ clusterGroup:
     # For additional overrides that apply to the jobs, please refer to
     # https://hybrid-cloud-patterns.io/imperative-actions/#additional-job-customizations
     jobs: []
-  managedClusterGroups:
-    exampleRegion:
-      name: group-one
-      acmlabels:
-        - name: clusterGroup
-          value: group-one
-      helmOverrides:
-        - name: clusterGroup.isHubCluster
-          value: false
+  managedClusterGroups: {}
+    # exampleRegion:
+    #   name: group-one
+    #   acmlabels:
+    #     - name: clusterGroup
+    #       value: group-one
+    #   helmOverrides:
+    #     - name: clusterGroup.isHubCluster
+    #       value: false
           # Before enabling cluster provisioning, ensure AWS and/or Azure
           #   credentials and OCP pull secrets are defined in Vault.
           #   See values-secret.yaml.template
