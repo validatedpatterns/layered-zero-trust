@@ -15,8 +15,6 @@ spec:
       key: username
       name: postgresql-db
     vendor: postgres
-  hostname:
-    hostname: <host>
   http:
     tlsSecret: keycloak-tls
   ingress:
