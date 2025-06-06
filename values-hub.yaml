@@ -5,7 +5,15 @@ clusterGroup:
     - open-cluster-management
     - vault
     - golang-external-secrets
-  subscriptions: {}
+    - keycloak-system:
+        operatorGroup: true
+        targetNamespace: keycloak-system
+  subscriptions:
+    rhbk:
+      name: rhbk-operator
+      namespace: keycloak-system
+      channel: stable-v26.2
+      catalogSource: redhat-marketplace
   projects:
     - hub
   # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
@@ -41,6 +49,11 @@ clusterGroup:
       project: hub
       chart: golang-external-secrets
       chartVersion: 0.1.*
+    rh-keycloak:
+      name: rh-keycloak
+      namespace: keycloak-system
+      project: hub
+      path: charts/keycloak
   imperative:
     # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm
     # The default schedule is every 10 minutes: imperative.schedule

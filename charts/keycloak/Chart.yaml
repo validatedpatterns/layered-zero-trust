@@ -1,0 +1,6 @@
+apiVersion: v2
+description: Deploys RHBK
+keywords:
+- pattern
+name: rh-keycloak
+version: 0.0.1
