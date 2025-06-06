@@ -20,5 +20,5 @@ spec:
   http:
     tlsSecret: keycloak-tls
   ingress:
-    enabled: false
+    className: openshift-default
   instances: 1
