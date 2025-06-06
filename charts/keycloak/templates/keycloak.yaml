@@ -3,6 +3,8 @@ kind: Keycloak
 metadata:
   name: keycloak
   namespace: keycloak-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
 spec:
   db:
     host: postgresql-db
