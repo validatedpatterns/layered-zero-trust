@@ -10,6 +10,11 @@ jobs:
     # Set the agent to run on
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      packages: read
+      statuses: write
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -38,7 +43,6 @@ jobs:
           VALIDATE_SHELL_SHFMT: false
           VALIDATE_YAML: false
           VALIDATE_YAML_PRETTIER: false
-          SAVE_SUPER_LINTER_OUTPUT: true
           # VALIDATE_DOCKERFILE_HADOLINT: false
           # VALIDATE_MARKDOWN: false
           # VALIDATE_NATURAL_LANGUAGE: false
