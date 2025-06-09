@@ -253,6 +253,7 @@ super-linter: ## Runs super linter locally
 					-e VALIDATE_TEKTON=false \
 					-e VALIDATE_YAML=false \
 					-e VALIDATE_YAML_PRETTIER=false \
+					-e SAVE_SUPER_LINTER_OUTPUT=true \
 					$(DISABLE_LINTERS) \
 					-v $(PWD):/tmp/lint:rw,z \
 					-w /tmp/lint \

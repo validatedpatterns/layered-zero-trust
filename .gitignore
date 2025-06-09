@@ -7,3 +7,9 @@ pattern-vault.init
 vault.init
 super-linter.log
 common/pattern-vault.init
+
+# Super-linter outputs
+super-linter-output
+
+# GitHub Actions leftovers
+github_conf
