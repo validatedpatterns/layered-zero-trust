@@ -15,8 +15,16 @@ spec:
       key: username
       name: postgresql-db
     vendor: postgres
+  {{- if .Values.ingress.enabled }}
+  hostname:
+    hostname: {{ .Values.ingress.hostname | quote }}
+  {{- end }}
   http:
     tlsSecret: keycloak-tls
   ingress:
+    {{- if .Values.ingress.enabled }}
+    enabled: false
+    {{- else }}
     className: openshift-default
+    {{- end }}
   instances: 1
