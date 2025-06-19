@@ -1,0 +1,42 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: openshift-cert-manager-operator
+  namespace: cert-manager-operator
+spec:
+  channel: "{{ .Values.operatorChannel }}"
+  installPlanApproval: Automatic
+  name: openshift-cert-manager-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: cert-manager-operator
+  namespace: cert-manager-operator
+spec:
+  targetNamespaces:
+  - cert-manager-operator
+---
+apiVersion: operator.openshift.io/v1alpha1
+kind: CertManager
+metadata:
+  name: cluster
+  annotations:
+{{- if eq .Values.installerType "argocd" }}
+    argocd.argoproj.io/sync-options: ServerSideApply=true, Validate=false, SkipDryRunOnMissingResource=true
+{{- else if eq .Values.installerType "helm" }}
+    "helm.sh/hook": post-install
+{{- else }}
+  # No annotation set
+{{- end }}
+
+spec:
+  managementState: "Managed"
+  unsupportedConfigOverrides:
+    # Here's an example to supply custom DNS settings.
+    controller:
+      args:
+        - "--dns01-recursive-nameservers={{ with index .Values.certmgrOperator.nameservers 0 }}{{ . }}{{- end }},{{ with index .Values.certmgrOperator.nameservers 1 }}{{ . }}{{- end }}"
+        - "--dns01-recursive-nameservers-only"

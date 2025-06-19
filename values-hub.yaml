@@ -8,6 +8,7 @@ clusterGroup:
     - keycloak-system:
         operatorGroup: true
         targetNamespace: keycloak-system
+
   subscriptions:
     rhbk:
       name: rhbk-operator
@@ -54,6 +55,11 @@ clusterGroup:
       namespace: keycloak-system
       project: hub
       path: charts/keycloak
+    rh-cert-manager:
+      name: rh-cert-manager
+      namespace: cert-manager-operator
+      project: hub
+      path: charts/certmanager
   imperative:
     # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm
     # The default schedule is every 10 minutes: imperative.schedule
