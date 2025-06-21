@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 export EXTERNAL_TEST="true"
 export PATTERN_NAME="LayeredZeroTrust"

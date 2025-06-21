@@ -1,0 +1,57 @@
+global:
+  localClusterDomain: local.example.com
+  hubClusterDomain: hub.example.com
+
+spiffe:
+  csi:
+    agentSocketPath: "/run/spire/agent-sockets/spire-agent.sock"
+
+spire:
+  trustDomain: "{{ .Values.global.localClusterDomain }}"
+  clusterName: "cluster"
+  jwtIssuer: ""
+
+  agent:
+    nodeAttestor:
+      k8sPSATEnabled: "true"
+    workloadAttestors:
+      k8sEnabled: "true"
+      workloadAttestorsVerification:
+        type: "auto"
+        hostCertBasePath: /var/lib/kubelet/pki
+        hostCertFileName: ""
+
+  oidcDiscoveryProvider:
+    agentSocketName: "spire-agent.sock"
+    ingress:
+      enabled: true
+      host: "oidc-discovery.{{ .Values.global.localClusterDomain }}"
+      termination: passthrough
+    service:
+      name: spire-spiffe-oidc-discovery-provider
+      port: 443
+
+  server:
+    ca:
+      commonName: redhat.com
+      country: US
+      organization: Red Hat
+    service:
+      name: spire-server
+      port: 443
+    ingress:
+      enabled: true
+      host: "spire-server.{{ .Values.global.localClusterDomain }}"
+      termination: passthrough
+    persistence:
+      type: pvc
+      size: 5Gi
+      accessMode: ReadWriteOnce
+      storageClass: ""
+      hostPath: ""
+    datastore:
+      databaseType: sqlite3
+      connectionString: /run/spire/data/datastore.sqlite3
+      maxOpenConns: 100
+      maxIdleConns: 2
+      connMaxLifetime: 3600

@@ -1,0 +1,10 @@
+apiVersion: operator.openshift.io/v1alpha1
+kind: SpireOIDCDiscoveryProvider
+metadata:
+  name: cluster
+spec:
+  trustDomain: {{ tpl .Values.spire.trustDomain $ }}
+  agentSocketName: {{ .Values.spire.oidcDiscoveryProvider.agentSocketName }}
+  {{- if .Values.spire.jwtIssuer }}
+  jwtIssuer: {{ .Values.spire.jwtIssuer }}
+  {{- end }}
