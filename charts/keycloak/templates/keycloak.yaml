@@ -22,7 +22,7 @@ spec:
   http:
     tlsSecret: keycloak-tls
   ingress:
-    {{- if .Values.charIngress }}
+    {{- if .Values.chartIngress }}
     enabled: false
     {{- else }}
     className: openshift-default
