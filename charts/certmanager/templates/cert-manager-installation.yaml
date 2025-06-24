@@ -34,9 +34,14 @@ metadata:
 
 spec:
   managementState: "Managed"
-  unsupportedConfigOverrides:
-    # Here's an example to supply custom DNS settings.
-    controller:
-      args:
-        - "--dns01-recursive-nameservers={{ with index .Values.certmgrOperator.nameservers 0 }}{{ . }}{{- end }},{{ with index .Values.certmgrOperator.nameservers 1 }}{{ . }}{{- end }}"
-        - "--dns01-recursive-nameservers-only"
+{{- if .Values.certmgrOperator.nameservers }}
+  controllerConfig:
+    overrideArgs:
+      - "--dns01-recursive-nameservers={{ join "," .Values.certmgrOperator.nameservers }}"
+      - "--dns01-recursive-nameservers-only"
+{{- if .Values.certmgrOperator.additionalArgs }}
+{{- range .Values.certmgrOperator.additionalArgs }}
+      - "{{ . }}"
+{{- end }}
+{{- end }}
+{{- end }}

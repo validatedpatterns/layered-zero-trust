@@ -4,6 +4,9 @@ global:
 
 installerType: "argocd"
 
+# -- String the channel to install cert-manager from (Defaults to "stable-v1")
+operatorChannel: "stable-v1"
+
 certmgrOperator:
 
   # -- List of DNS server (ip:port strings) to be used when doing DNS01 challenges (Defaults to [8.8.8.8:53, 1.1.1.1:53])
@@ -14,5 +17,9 @@ certmgrOperator:
     - 8.8.8.8:53
     - 1.1.1.1:53
 
-  # -- String the channel to install cert-manager from (Defaults to "stable-v1")
-  operatorChannel: "stable-v1"
+  # -- Additional arguments to pass to the cert-manager controller (optional)
+  # Example:
+  # additionalArgs:
+  #   - "--acme-http01-solver-nameservers=8.8.8.8:53,1.1.1.1:53"
+  #   - "--v=2"
+  additionalArgs: []
