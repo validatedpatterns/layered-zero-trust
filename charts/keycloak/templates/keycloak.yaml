@@ -15,9 +15,9 @@ spec:
       key: username
       name: postgresql-db
     vendor: postgres
-  {{- if .Values.ingress.enabled }}
+  {{- if .Values.ingress.hostname }}
   hostname:
-    hostname: {{ .Values.ingress.hostname | quote }}
+    hostname: {{ .Values.ingress.hostname }}
   {{- end }}
   http:
     tlsSecret: keycloak-tls
