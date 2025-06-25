@@ -18,7 +18,7 @@ spec:
         number: 8443
   rules:
   {{- if hasKey .Values "hostname" }}
-  - host: {{ .Values.hostname | quote }}
+  - host: {{ .Values.hostname.hostname | quote }}
   {{- end }}
     http:
       paths:

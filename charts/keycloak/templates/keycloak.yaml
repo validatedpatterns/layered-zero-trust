@@ -17,8 +17,8 @@ spec:
     vendor: postgres
   {{- if hasKey .Values "hostname" }}
   hostname:
-    hostname: {{ .Values.hostname | quote }}
-    strict: false
+    hostname: {{ .Values.hostname.hostname | quote }}
+    strict: {{ .Values.hostname.strict }}
   {{- end }}
   http:
     tlsSecret: keycloak-tls

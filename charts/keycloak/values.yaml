@@ -1,2 +1,4 @@
 chartIngress: false
-# hostname: <host> if you enable ingress and want to specify a custom dns enndpoint, otherwise it'll default to ""
+# hostname:
+  # hostname: <host> if you enable ingress and want to specify a custom dns enndpoint, otherwise it'll default to ""
+  # strict: false
