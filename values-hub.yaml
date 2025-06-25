@@ -10,6 +10,12 @@ clusterGroup:
         targetNamespace: keycloak-system
 
   subscriptions:
+    cert-manager:
+      name: openshift-cert-manager-operator
+      namespace: cert-manager-operator
+      channel: stable-v1
+      catalogSource: redhat-marketplace
+      
     rhbk:
       name: rhbk-operator
       namespace: keycloak-system
