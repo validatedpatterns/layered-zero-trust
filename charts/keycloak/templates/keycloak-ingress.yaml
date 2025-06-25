@@ -17,8 +17,8 @@ spec:
       port:
         number: 8443
   rules:
-  {{- if hasKey .Values.ingress "hostname" }}
-  - host: {{ .Values.ingress.hostname | quote }}
+  {{- if hasKey .Values "hostname" }}
+  - host: {{ .Values.hostname | quote }}
   {{- end }}
     http:
       paths:
