@@ -1,4 +1,15 @@
-chartIngress: false
-# hostname:
-  # hostname: <host> if you enable ingress and want to specify a custom dns enndpoint, otherwise it'll default to ""
-  # strict: false
+global:
+  localClusterDomain: apps.example.com
+
+keycloak:
+  name: keycloak
+
+  ingress:
+    enabled: true
+    service: keycloak-service-trusted
+    termination: reencrypt
+    hostname: ""
+  
+  tls:
+    serviceServing: true
+    secret: keycloak-tls

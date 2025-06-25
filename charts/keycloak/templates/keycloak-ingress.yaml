@@ -1,30 +1,28 @@
-{{- if .Values.chartIngress }}
+{{- if eq .Values.keycloak.ingress.enabled true }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   annotations:
-    route.openshift.io/termination: reencrypt
-    route.openshift.io/destination-ca-certificate-secret: keycloak-tls
+    route.openshift.io/termination: {{ .Values.keycloak.ingress.termination }}
+    route.openshift.io/destination-ca-certificate-secret: {{ .Values.keycloak.tls.secret | quote }}
   labels:
-    app: keycloak
-    app.kubernetes.io/instance: keycloak
-  name: keycloak-ingress
-  namespace: keycloak-system
+    app: {{ .Values.keycloak.name }}
+    app.kubernetes.io/instance: {{ .Values.keycloak.name }}
+  name: {{ .Values.keycloak.name }}-ingress
+  namespace: {{ .Release.Namespace }}
 spec:
   defaultBackend:
     service:
-      name: keycloak-service-trusted
+      name: {{ include "keycloak.service.name" . }}
       port:
         number: 8443
   rules:
-  {{- if hasKey .Values "hostname" }}
-  - host: {{ .Values.hostname.hostname | quote }}
-  {{- end }}
+  - host: {{ include "keycloak.ingress.hostname" . }}
     http:
       paths:
       - backend:
           service:
-            name: keycloak-service
+            name: {{ include "keycloak.service.name" . }}
             port:
               number: 8443
         pathType: ImplementationSpecific
