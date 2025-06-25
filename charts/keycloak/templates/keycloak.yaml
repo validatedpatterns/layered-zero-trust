@@ -18,6 +18,7 @@ spec:
   {{- if hasKey .Values "hostname" }}
   hostname:
     hostname: {{ .Values.hostname | quote }}
+    strict: false
   {{- end }}
   http:
     tlsSecret: keycloak-tls
