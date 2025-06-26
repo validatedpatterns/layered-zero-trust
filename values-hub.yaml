@@ -8,6 +8,10 @@ clusterGroup:
     - keycloak-system:
         operatorGroup: true
         targetNamespace: keycloak-system
+    - cert-manager
+    - cert-manager-operator:
+        operatorGroup: true
+        targetNamespace: cert-manager-operator
 
   subscriptions:
     cert-manager:
@@ -15,7 +19,6 @@ clusterGroup:
       namespace: cert-manager-operator
       channel: stable-v1
       catalogSource: redhat-marketplace
-      
     rhbk:
       name: rhbk-operator
       namespace: keycloak-system
