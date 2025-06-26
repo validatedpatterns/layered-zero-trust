@@ -1,0 +1,26 @@
+apiVersion: operator.openshift.io/v1alpha1
+kind: CertManager
+metadata:
+  name: cluster
+  annotations:
+{{- if eq .Values.installerType "argocd" }}
+    argocd.argoproj.io/sync-options: ServerSideApply=true, Validate=false, SkipDryRunOnMissingResource=true
+{{- else if eq .Values.installerType "helm" }}
+    "helm.sh/hook": post-install
+{{- else }}
+  # No annotation set
+{{- end }}
+
+spec:
+  managementState: "Managed"
+{{- if .Values.certmgrOperator.nameservers }}
+  controllerConfig:
+    overrideArgs:
+      - "--dns01-recursive-nameservers={{ join "," .Values.certmgrOperator.nameservers }}"
+      - "--dns01-recursive-nameservers-only"
+{{- if .Values.certmgrOperator.additionalArgs }}
+{{- range .Values.certmgrOperator.additionalArgs }}
+      - "{{ . }}"
+{{- end }}
+{{- end }}
+{{- end }}

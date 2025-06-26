@@ -1,0 +1,25 @@
+# -- Dictionary of the global settings to configure this chart
+# @default -- depends on the individual settings
+global:
+
+installerType: "argocd"
+
+# -- String the channel to install cert-manager from (Defaults to "stable-v1")
+operatorChannel: "stable-v1"
+
+certmgrOperator:
+
+  # -- List of DNS server (ip:port strings) to be used when doing DNS01 challenges (Defaults to [8.8.8.8:53, 1.1.1.1:53])
+  # These are necessary for DNS01 ACME solver which needs outside DNS
+  # servers and won't really work with openshift's internal split-view DNS servers
+  # [https://cert-manager.io/docs/configuration/acme/dns01/#setting-nameservers-for-dns01-self-check](https://cert-manager.io/docs/configuration/acme/dns01/#setting-nameservers-for-dns01-self-check)
+  nameservers:
+    - 8.8.8.8:53
+    - 1.1.1.1:53
+
+  # -- Arguments to pass to the cert-manager controller (optional)
+  # Example:
+  # additionalArgs:
+  #   - "--acme-http01-solver-nameservers=8.8.8.8:53,1.1.1.1:53"
+  #   - "--v=2"
+  additionalArgs: []

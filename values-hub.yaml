@@ -8,7 +8,17 @@ clusterGroup:
     - keycloak-system:
         operatorGroup: true
         targetNamespace: keycloak-system
+    - cert-manager
+    - cert-manager-operator:
+        operatorGroup: true
+        targetNamespace: cert-manager-operator
+
   subscriptions:
+    cert-manager:
+      name: openshift-cert-manager-operator
+      namespace: cert-manager-operator
+      channel: stable-v1
+      catalogSource: redhat-marketplace
     rhbk:
       name: rhbk-operator
       namespace: keycloak-system
@@ -54,6 +64,11 @@ clusterGroup:
       namespace: keycloak-system
       project: hub
       path: charts/keycloak
+    rh-cert-manager:
+      name: rh-cert-manager
+      namespace: cert-manager-operator
+      project: hub
+      path: charts/certmanager
   imperative:
     # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm
     # The default schedule is every 10 minutes: imperative.schedule
