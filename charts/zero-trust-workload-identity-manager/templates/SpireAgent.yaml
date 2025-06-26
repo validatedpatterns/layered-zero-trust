@@ -1,0 +1,13 @@
+apiVersion: operator.openshift.io/v1alpha1
+kind: SpireAgent
+metadata:
+  name: cluster
+spec:
+  trustDomain: {{ tpl .Values.spire.trustDomain $ }}
+  clusterName: {{ .Values.spire.clusterName }}
+  nodeAttestor:
+    k8sPSATEnabled: {{ .Values.spire.agent.nodeAttestor.k8sPSATEnabled | quote }}
+  workloadAttestors:
+    k8sEnabled: {{ .Values.spire.agent.workloadAttestors.k8sEnabled | quote }}
+    workloadAttestorsVerification:
+      type: {{ .Values.spire.agent.workloadAttestors.workloadAttestorsVerification.type}}

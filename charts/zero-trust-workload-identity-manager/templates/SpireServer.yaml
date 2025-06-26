@@ -1,0 +1,22 @@
+apiVersion: operator.openshift.io/v1alpha1
+kind: SpireServer
+metadata:
+  name: cluster
+spec:
+  trustDomain: {{ tpl .Values.spire.trustDomain $ }}
+  clusterName: {{ .Values.spire.clusterName }}
+  caSubject:
+    commonName: {{ .Values.spire.server.ca.commonName }}
+    country: {{ .Values.spire.server.ca.country }}
+    organization: {{ .Values.spire.server.ca.organization }}
+  persistence:
+    {{- include "zero-trust-workload-identity-manager.server.persistence" . | nindent 4 }}
+  datastore:
+    databaseType: {{ .Values.spire.server.datastore.databaseType }}
+    connectionString: {{ .Values.spire.server.datastore.connectionString }}
+    maxOpenConns: {{ .Values.spire.server.datastore.maxOpenConns }} 
+    maxIdleConns: {{ .Values.spire.server.datastore.maxIdleConns }}
+    connMaxLifetime: {{ .Values.spire.server.datastore.connMaxLifetime }}
+  {{- if .Values.spire.jwtIssuer }}
+  jwtIssuer: {{ .Values.spire.jwtIssuer }}
+  {{- end }}

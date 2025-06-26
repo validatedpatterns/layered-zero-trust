@@ -13,6 +13,10 @@ def test_subscription_status_hub(openshift_dyn_client):
     # These are the operator subscriptions and their associated namespaces
     expected_subs = {
         "openshift-gitops-operator": ["openshift-operators"],
+        "rhbk-operator": ["keycloak-system"],
+        "openshift-zero-trust-workload-identity-manager": [
+            "zero-trust-workload-identity-manager"
+        ],
     }
 
     err_msg = subscription.subscription_status(

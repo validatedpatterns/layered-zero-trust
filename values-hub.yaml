@@ -13,6 +13,9 @@ clusterGroup:
         operatorGroup: true
         targetNamespace: cert-manager-operator
 
+    - zero-trust-workload-identity-manager:
+        operatorGroup: true
+        targetNamespace: zero-trust-workload-identity-manager
   subscriptions:
     cert-manager:
       name: openshift-cert-manager-operator
@@ -23,6 +26,11 @@ clusterGroup:
       name: rhbk-operator
       namespace: keycloak-system
       channel: stable-v26.2
+      catalogSource: redhat-marketplace
+    zero-trust-workload-identity-manager:
+      name: openshift-zero-trust-workload-identity-manager
+      namespace: zero-trust-workload-identity-manager
+      channel: tech-preview-v0.1
       catalogSource: redhat-marketplace
   projects:
     - hub
@@ -69,6 +77,14 @@ clusterGroup:
       namespace: cert-manager-operator
       project: hub
       path: charts/certmanager
+    zero-trust-workload-identity-manager:
+      name: zero-trust-workload-identity-manager
+      namespace: zero-trust-workload-identity-manager
+      project: hub
+      path: charts/zero-trust-workload-identity-manager
+      overrides:
+        - name: spire.clusterName
+          value: hub
   imperative:
     # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm
     # The default schedule is every 10 minutes: imperative.schedule

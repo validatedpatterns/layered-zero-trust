@@ -41,9 +41,11 @@ def test_validate_hub_site_reachable(kube_config, openshift_dyn_client):
 def test_check_pod_status(openshift_dyn_client):
     logger.info("Checking pod status")
     projects = [
+        "keycloak-system",
         "openshift-operators",
         "openshift-gitops",
         "vault",
+        "zero-trust-workload-identity-manager",
     ]
     err_msg = components.check_pod_status(openshift_dyn_client, projects)
     if err_msg:
