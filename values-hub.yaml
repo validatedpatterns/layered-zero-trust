@@ -16,6 +16,11 @@ clusterGroup:
     - zero-trust-workload-identity-manager:
         operatorGroup: true
         targetNamespace: zero-trust-workload-identity-manager
+    - openshift-compliance:
+        operatorGroup: true
+        targetNamespace: openshift-compliance
+        annotations:
+          openshift.io/cluster-monitoring: "true"
   subscriptions:
     cert-manager:
       name: openshift-cert-manager-operator
@@ -32,6 +37,14 @@ clusterGroup:
       namespace: zero-trust-workload-identity-manager
       channel: tech-preview-v0.1
       catalogSource: redhat-marketplace
+    compliance-operator:
+      name: compliance-operator
+      namespace: openshift-compliance
+      channel: stable
+      catalogSource: redhat-marketplace
+      config:
+        nodeSelector:
+          node-role.kubernetes.io/worker: ""
   projects:
     - hub
   # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
