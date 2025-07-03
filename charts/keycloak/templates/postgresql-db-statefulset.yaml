@@ -25,17 +25,17 @@ spec:
           valueFrom:
             secretKeyRef:
               key: username
-              name: postgresql-db
+              name: {{ .Values.keycloak.postgresqlDb.secretName }}
         - name: POSTGRESQL_PASSWORD
           valueFrom:
             secretKeyRef:
               key: password
-              name: postgresql-db
+              name: {{ .Values.keycloak.postgresqlDb.secretName }}
         - name: POSTGRESQL_DATABASE
           valueFrom:
             secretKeyRef:
               key: database
-              name: postgresql-db
+              name: {{ .Values.keycloak.postgresqlDb.secretName }}
         image: registry.redhat.io/rhel9/postgresql-15@sha256:23092ec0dd5ece095e79dd5ca74b5870479461c089a9330bb9182fb743374c02
         imagePullPolicy: IfNotPresent
         livenessProbe:
