@@ -1,5 +1,8 @@
 global:
   localClusterDomain: apps.example.com
+  secretStore:
+    name: "vault-backend"
+    kind: "ClusterSecretStore"
 
 keycloak:
   name: keycloak
@@ -13,3 +16,8 @@ keycloak:
   tls:
     serviceServing: true
     secret: keycloak-tls
+
+  postgresqlDb:
+    username: keycloak
+    database: keycloak
+    passwordVaultKey: secret/data/global/keycloak
