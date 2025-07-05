@@ -4,8 +4,10 @@ kind: Ingress
 metadata:
   name: spire-spiffe-oidc-discovery-provider
   namespace: {{ .Release.Namespace }}
+  {{- if .Values.spire.server.ingress.annotations }}
   annotations:
-    route.openshift.io/termination: {{ .Values.spire.oidcDiscoveryProvider.ingress.termination }}
+  {{- tpl (toYaml .Values.spire.oidcDiscoveryProvider.ingress.annotations) . | nindent 4 }}
+  {{- end }}
 spec:
   rules:
     - host: {{ tpl .Values.spire.oidcDiscoveryProvider.ingress.host $ }}

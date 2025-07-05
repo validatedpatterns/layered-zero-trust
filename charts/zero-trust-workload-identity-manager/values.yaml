@@ -25,8 +25,9 @@ spire:
     agentSocketName: "spire-agent.sock"
     ingress:
       enabled: true
+      annotations:
+        route.openshift.io/termination: passthrough
       host: "oidc-discovery.{{ .Values.global.localClusterDomain }}"
-      termination: passthrough
     service:
       name: spire-spiffe-oidc-discovery-provider
       port: 443
@@ -41,8 +42,9 @@ spire:
       port: 443
     ingress:
       enabled: true
+      annotations:
+        route.openshift.io/termination: passthrough
       host: "spire-server.{{ .Values.global.localClusterDomain }}"
-      termination: passthrough
     persistence:
       type: pvc
       size: 5Gi
