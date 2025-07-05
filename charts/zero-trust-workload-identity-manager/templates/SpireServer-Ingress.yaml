@@ -4,8 +4,10 @@ kind: Ingress
 metadata:
   name: spire-server
   namespace: {{ .Release.Namespace }}
+  {{- if .Values.spire.server.ingress.annotations }}
   annotations:
-    route.openshift.io/termination: {{ .Values.spire.server.ingress.termination }}
+  {{- tpl (toYaml .Values.spire.server.ingress.annotations) . | nindent 4 }}
+  {{- end }}
 spec:
   rules:
     - host: {{ tpl .Values.spire.server.ingress.host $ }}
