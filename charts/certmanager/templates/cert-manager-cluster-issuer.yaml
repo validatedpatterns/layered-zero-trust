@@ -1,0 +1,16 @@
+{{- if .Values.certmgrOperator.issuers }}
+{{- range .Values.certmgrOperator.issuers }}
+{{- range $name, $issuer := . }}
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ $name }}
+{{- if eq $name "acme" }}
+{{- include "acme.validations" $issuer }}
+{{- end }}
+spec:
+  {{ $name }}:
+{{- tpl (toYaml $issuer) $ | nindent 4 }}
+{{- end }}
+{{- end }}
+{{- end }}

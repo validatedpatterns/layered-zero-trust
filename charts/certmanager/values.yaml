@@ -23,3 +23,104 @@ certmgrOperator:
   #   - "--acme-http01-solver-nameservers=8.8.8.8:53,1.1.1.1:53"
   #   - "--v=2"
   additionalArgs: []
+
+  # -- Issuers to use for the cert-manager (optional)
+  # You can specify multiple issuers for different challenges.
+  issuers: []
+    # -- ACME settings
+    # - acme:
+    #     -- Email to use for ACME account
+    #     email: "user@example.com"
+    #     -- ACME profile to use (optional)
+    #     An ACME server may support multiple profiles, such as "staging" and "production".
+    #     If not specified, the default profile will be used.
+    #     Check the ACME server documentation for available profiles.
+    #     Examples: https://letsencrypt.org/docs/profiles/
+    #     profile: "tlsserver"
+    #     -- ACME server to use
+    #     Examples:
+    #     - https://acme-staging-v02.api.letsencrypt.org/directory
+    #     - https://acme-v02.api.letsencrypt.org/directory
+    #     server: "https://acme-staging-v02.api.letsencrypt.org/directory"
+    #     -- ACME solvers to use (optional)
+    #     You can specify multiple solvers for different challenges.
+    #     solvers: []
+    #       Examples:
+    #       - dns01:
+    #         -- AWS Route53 example
+    #         route53:
+    #           region: "us-east-1"
+    #           accessKeyIDSecretRef:
+    #             name: "aws-credentials"
+    #             key: aws_access_key_id
+    #           secretAccessKeySecretRef:
+    #             name: aws-credentials
+    #             key: aws_secret_access_key
+    #           hostedZoneID: "hosted-zone-id"
+    #         -- Azure example
+    #         azureDNS:
+    #           resourceGroupName: "my-resource-group"
+    #           subscriptionID: "my-subscription-id"
+    #           hostedZoneName: "my-hosted-zone-name"
+    #           environment: "AzurePublicCloud"
+    #           managedIdentity:
+    #             clientID: "my-client-id"
+    #         -- GCP example
+    #         cloudDNS:
+    #           project: "my-project"
+    #           serviceAccountSecretRef:
+    #             name: "my-service-account"
+    #             key: "my-key"
+    #         -- Cloudflare example
+    #         cloudflare:
+    #           apiTokenSecretRef:
+    #             name: "my-api-key"
+    #             key: "my-key"
+
+
+  # -- Cloud credentials to use for the cert-manager (optional)
+  # You can specify multiple cloud credentials for different cloud providers.
+  # The cloud credentials will be used in combination with the solvers to create the DNS records.
+  credentialsRequests: []
+  # -- AWS example
+  # - name: aws
+  #   secretRef:
+  #     name: "aws-credentials"
+  #     namespace: "cert-manager"
+  #   providerSpec:
+  #     apiVersion: cloudcredential.openshift.io/v1
+  #     kind: "AWSProviderSpec"
+  #     statementEntries:
+  #     - effect: Allow
+  #       action:
+  #       - route53:GetChange
+  #       - route53:ChangeResourceRecordSets
+  #       - route53:ListHostedZonesByName
+  #       resource:
+  #       - arn:aws:route53:::hostedzone/*
+  #     - effect: Allow
+  #       action:
+  #       - route53:ListHostedZones
+  #       resource:
+  #       - "*"
+  # -- Azure example
+  # - name: azure
+  #   secretRef:
+  #     name: "azure-credentials"
+  #     namespace: "cert-manager"
+  #   providerSpec:
+  #     apiVersion: cloudcredential.openshift.io/v1
+  #     kind: "AzureProviderSpec"
+  #     roleBindings:
+  #       - role: "DNS Zone Contributor"
+  # -- GCP example
+  # - name: gcp
+  #   secretRef:
+  #     name: "gcp-credentials"
+  #     namespace: "cert-manager"
+  #   providerSpec:
+  #     apiVersion: cloudcredential.openshift.io/v1
+  #     kind: "GCPProviderSpec"
+  #     predefinedRoles:
+  #       - "roles/dns.admin"
+  #     gcpServiceAccount: "cert-manager-clusterName-dns"
