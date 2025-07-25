@@ -12,9 +12,15 @@ logger = logging.getLogger(__loggername__)
 def test_subscription_status_hub(openshift_dyn_client):
     # These are the operator subscriptions and their associated namespaces
     expected_subs = {
-        "openshift-gitops-operator": ["openshift-operators"],
-        "rhbk-operator": ["keycloak-system"],
-        "openshift-zero-trust-workload-identity-manager": [
+        "openshift-gitops-operator": [
+            "openshift-operators"
+        ],  # Layer 0: GitOps Operator
+        "openshift-cert-manager-operator": [
+            "cert-manager-operator"
+        ],  # Layer 0: Cert-Manager with LetsEncrypt Support
+        "rhbk-operator": ["keycloak-system"],  # Layer 0: Red Hat Build of Keycloak
+        "compliance-operator": ["openshift-compliance"],  # Layer 0: Compliance Operator
+        "openshift-zero-trust-workload-identity-manager": [  # Layer 1
             "zero-trust-workload-identity-manager"
         ],
     }

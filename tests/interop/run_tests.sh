@@ -2,7 +2,7 @@
 
 export EXTERNAL_TEST="true"
 export PATTERN_NAME="LayeredZeroTrust"
-export PATTERN_SHORTNAME="mcgitops"
+export PATTERN_SHORTNAME="layeredzerotrust"
 
 if [ -z "${KUBECONFIG}" ]; then
     echo "No kubeconfig file set for hub cluster"
@@ -21,5 +21,8 @@ fi
 pytest -lv --disable-warnings test_subscription_status_hub.py --kubeconfig $KUBECONFIG --junit-xml $WORKSPACE/test_subscription_status_hub.xml
 
 pytest -lv --disable-warnings test_validate_hub_site_components.py --kubeconfig $KUBECONFIG --junit-xml $WORKSPACE/test_validate_hub_site_components.xml
+
+pytest -lv --disable-warnings test_validate_layer_0.py --kubeconfig $KUBECONFIG --junit-xml $WORKSPACE/test_validate_layer_0.xml
+
 
 python3 create_ci_badge.py
