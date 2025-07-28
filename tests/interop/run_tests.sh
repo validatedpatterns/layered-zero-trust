@@ -24,5 +24,6 @@ pytest -lv --disable-warnings test_validate_hub_site_components.py --kubeconfig 
 
 pytest -lv --disable-warnings test_validate_layer_0.py --kubeconfig $KUBECONFIG --junit-xml $WORKSPACE/test_validate_layer_0.xml
 
+pytest -lv --disable-warnings test_validate_layer_0_keycloak.py --kubeconfig $KUBECONFIG --junit-xml $WORKSPACE/test_validate_layer_0_keycloak.xml
 
 python3 create_ci_badge.py

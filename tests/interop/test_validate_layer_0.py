@@ -89,42 +89,6 @@ def test_cert_manager_custom_resource(openshift_dyn_client):
         assert False, err_msg
 
 
-@pytest.mark.test_keycloak_pod_state
-def test_keycloak_pod_state(openshift_dyn_client):
-    desired_pods = {
-        "keycloak-0": "keycloak-system",
-        "postgresql-db-0": "keycloak-system",
-    }
-
-    for pod_name, project_name in desired_pods.items():
-        pod_running = verify_pod_in_project(
-            openshift_dyn_client=openshift_dyn_client,
-            project=project_name,
-            pod=pod_name,
-        )
-        assert pod_running
-
-
-@pytest.mark.test_keycloak_api_health
-def test_keycloak_api_health(openshift_dyn_client):
-    app_project_name = "keycloak-system"
-    app_label = "app=keycloak"
-    app_route = get_route_by_app_label(
-        openshift_dyn_client=openshift_dyn_client,
-        project=app_project_name,
-        label=app_label,
-    )
-    if app_route:
-        app_hostname = app_route[0].host
-        app_url = "https://" + app_hostname
-        logger.info(f"Application url is: {app_url}")
-        rsp = send_get_request(site_url=app_url)
-        assert requests.codes.ok == rsp.status_code
-    else:
-        err_msg = f'No route found in "{app_project_name}" with label "{app_label}"'
-        assert False, err_msg
-
-
 @pytest.mark.test_compliance_operator_pod_state
 def test_compliance_operator_pod_state(openshift_dyn_client):
     desired_deployment = {"compliance-operator": "openshift-compliance"}
