@@ -93,13 +93,11 @@ certmgrOperator:
   #       - route53:GetChange
   #       - route53:ChangeResourceRecordSets
   #       - route53:ListHostedZonesByName
-  #       resource:
-  #       - arn:aws:route53:::hostedzone/*
+  #       resource: "arn:aws:route53:::hostedzone/*"
   #     - effect: Allow
   #       action:
   #       - route53:ListHostedZones
-  #       resource:
-  #       - "*"
+  #       resource: "*"
   # -- Azure example
   # - name: azure
   #   secretRef:
