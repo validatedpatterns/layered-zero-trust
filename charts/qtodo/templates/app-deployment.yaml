@@ -22,8 +22,7 @@ spec:
     spec:
       containers:
       - name: qtodo
-        # Fully expect to change this to somewhere else. https://github.com/posip-redhat/qtodo repo has container build instructions
-        image: quay.io/posip-lab/qtodo-ubi10:latest
+        image: quay.io/hybridcloudpatterns/qtodo:latest
         # Modified to Always to force a pull so we can test changes to the container image without requiring manual deletion of images or restarts of argo
         imagePullPolicy: Always
         ports:
