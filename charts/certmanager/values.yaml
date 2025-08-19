@@ -31,12 +31,9 @@ certmgrOperator:
     # - acme:
     #     -- Email to use for ACME account
     #     email: "user@example.com"
-    #     -- ACME profile to use (optional)
-    #     An ACME server may support multiple profiles, such as "staging" and "production".
-    #     If not specified, the default profile will be used.
-    #     Check the ACME server documentation for available profiles.
-    #     Examples: https://letsencrypt.org/docs/profiles/
-    #     profile: "tlsserver"
+    #     -- Secret resource to store ACME account's private key
+    #     privateKeySecretRef:
+    #       name: "acme-account-key"
     #     -- ACME server to use
     #     Examples:
     #     - https://acme-staging-v02.api.letsencrypt.org/directory
@@ -96,13 +93,11 @@ certmgrOperator:
   #       - route53:GetChange
   #       - route53:ChangeResourceRecordSets
   #       - route53:ListHostedZonesByName
-  #       resource:
-  #       - arn:aws:route53:::hostedzone/*
+  #       resource: "arn:aws:route53:::hostedzone/*"
   #     - effect: Allow
   #       action:
   #       - route53:ListHostedZones
-  #       resource:
-  #       - "*"
+  #       resource: "*"
   # -- Azure example
   # - name: azure
   #   secretRef:
