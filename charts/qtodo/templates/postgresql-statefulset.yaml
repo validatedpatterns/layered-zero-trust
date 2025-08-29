@@ -79,6 +79,7 @@ spec:
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
+      serviceAccountName: qtodo-db
       securityContext:
         runAsNonRoot: true
         seccompProfile:

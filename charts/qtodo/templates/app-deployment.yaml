@@ -15,12 +15,35 @@ spec:
       deployment: qtodo
   template:
     metadata:
+      annotations:
+        checksum/app-configmap-envvars: {{ include (print $.Template.BasePath "/app-config-env.yaml") . | sha256sum }}
+{{- if eq .Values.app.spire.enabled true }}
+        checksum/app-spiffe-helper-config: {{ include (print $.Template.BasePath "/spiffe-helper-config.yaml") . | sha256sum }}
+{{- end }}
       labels:
         app: qtodo
         deployment: qtodo
       name: qtodo
     spec:
       containers:
+{{- if eq .Values.app.spire.enabled true }}
+      - name: spiffe-helper
+        image: 'ghcr.io/spiffe/spiffe-helper:0.10.1'
+        args:
+          - '-config'
+          - /etc/helper.conf
+        resources: {}
+        volumeMounts:
+          - name: spiffe-helper-config
+            readOnly: true
+            mountPath: /etc/helper.conf
+            subPath: helper.conf
+          - name: spiffe-workload-api
+            readOnly: true
+            mountPath: /spiffe-workload-api
+          - name: svids
+            mountPath: /svids
+{{- end }}
       - name: qtodo
         image: quay.io/hybridcloudpatterns/qtodo:latest
         # Modified to Always to force a pull so we can test changes to the container image without requiring manual deletion of images or restarts of argo
@@ -29,6 +52,9 @@ spec:
         - containerPort: 8080
           name: http
           protocol: TCP
+        envFrom:
+          - configMapRef:
+              name: qtodo-config-env
         securityContext:
           privileged: false
           allowPrivilegeEscalation: false
@@ -57,4 +83,23 @@ spec:
           value: '8080'
         - name: QUARKUS_HIBERNATE_ORM_DATABASE_GENERATION
           value: 'drop-and-create'
+{{- if eq .Values.app.spire.enabled true }}
+        volumeMounts:
+          - name: svids
+            mountPath: /svids
+{{- end }}
         resources: {}
+      serviceAccountName: qtodo
+{{- if eq .Values.app.spire.enabled true }}
+      volumes:
+        - name: spiffe-helper-config
+          configMap:
+            name: spiffe-helper
+            defaultMode: 420
+        - name: svids
+          emptyDir: {}
+        - name: spiffe-workload-api
+          csi:
+            driver: csi.spiffe.io
+            readOnly: true
+{{- end }}

@@ -1,5 +1,6 @@
 # Default values for qtodo
 global:
+  localClusterDomain: apps.example.com
   secretStore:
     name: "vault-backend"
     kind: "ClusterSecretStore"
@@ -7,6 +8,20 @@ global:
 # QTodo application configuration
 app:
   name: qtodo
+
+  oidc:
+    enabled: false
+    authServerUrl: ""
+    clientId: qtodo-app
+    clientSecret: ""
+    applicationType: "web-app"
+    authenticatedPaths: "/*"
+    authenticatedPolicy: "authenticated"
+  
+  spire:
+    enabled: false
+    audiences:
+      - qtodo
 
 # PostgreSQL database configuration
 postgresql:

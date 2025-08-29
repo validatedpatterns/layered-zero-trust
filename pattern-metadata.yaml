@@ -8,7 +8,7 @@ repo_url: https://github.com/validatedpatterns/layered-zero-trust
 docs_repo_url: https://github.com/validatedpatterns/docs
 issues_url: https://github.com/validatedpatterns/layered-zero-trust/issues
 docs_url: https://validatedpatterns.io/patterns/layered-zero-trust/
-ci_url: https://validatedpatterns.io/ci/?pattern=mcgitops
+ci_url: https://validatedpatterns.io/ci/?pattern=layeredzerotrust
 # can be sandbox, tested or maintained
 tier: sandbox
 owners: sabre1041, michaelepley

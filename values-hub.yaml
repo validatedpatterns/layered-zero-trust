@@ -104,6 +104,11 @@ clusterGroup:
       namespace: qtodo
       project: hub
       path: charts/qtodo
+      overrides:
+        - name: app.oidc.enabled
+          value: "true"
+        - name: app.spire.enabled
+          value: "true"
 
 
 

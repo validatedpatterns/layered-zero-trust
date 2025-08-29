@@ -32,8 +32,8 @@ keycloak:
     enabled: true
     registrationAllowed: false
     clients:
-      - clientId: "quarkus-app"
-        name: "quarkus"
+      - clientId: "qtodo-app"
+        name: "qtodo"
         publicClient: true
         redirectUris:
           - "*"
@@ -42,27 +42,27 @@ keycloak:
         enabled: true
         protocol: "openid-connect"
     users:
-      - username: "quarkus-admin"
+      - username: "qtodo-admin"
         createdTimestamp: 1
         enabled: true
-        email: "quarkus-admin@example.com"
+        email: "qtodo-admin@example.com"
         emailVerified: true
-        firstName: "Quarkus"
+        firstName: "QTodo"
         lastName: "Admin"
         credentials:
           - type: "password"
             value: "rDlobaGjL2"
             temporary: true
         realmRoles:
-          - "quarkus-admin"
+          - "qtodo-admin"
         requiredActions:
           - "UPDATE_PASSWORD"
-      - username: "quarkus-user1"
+      - username: "qtodo-user1"
         createdTimestamp: 1
         enabled: true
-        email: "quarkus-user1@example.com"
+        email: "qtodo-user1@example.com"
         emailVerified: true
-        firstName: "Quarkus"
+        firstName: "QTodo"
         lastName: "User-1"
         credentials:
           - type: "password"
@@ -74,8 +74,8 @@ keycloak:
           - "UPDATE_PASSWORD"
     roles:
       realm:
-        - name: "quarkus-admin"
-          description: "Quarkus App Administrator"
+        - name: "qtodo-admin"
+          description: "QTodo App Administrator"
         - name: "viewer"
           description: "Read-only access"
   # -- Keycloak realms to import
