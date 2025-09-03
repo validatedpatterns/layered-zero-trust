@@ -18,5 +18,4 @@ spec:
   {{- if .Values.compliance.storage.pvc.storageClass }}
   storageClassName: {{ .Values.compliance.storage.pvc.storageClass }}
   {{- end }}
-  volumeMode: Filesystem
 {{- end }}
