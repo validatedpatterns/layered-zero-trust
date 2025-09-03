@@ -7,7 +7,6 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: '-10'
  labels:
-    {{- include "compliance-scanning.labels" . | nindent 4 }}
     app.kubernetes.io/component: storage
 spec:
   accessModes:
