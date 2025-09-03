@@ -5,6 +5,8 @@ metadata:
   namespace: openshift-compliance
   annotations:
     argocd.argoproj.io/sync-wave: '-10'
+  labels:
+    app.kubernetes.io/component: compliance-scan-setting
 spec:
   # Enable automatic application of remediations
   autoApplyRemediations: {{ .Values.compliance.scanSetting.autoApplyRemediations }}
