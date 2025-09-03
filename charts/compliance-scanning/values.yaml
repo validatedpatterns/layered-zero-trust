@@ -49,7 +49,7 @@ compliance:
   resultsViewer:
     enabled: true
     name: compliance-results-viewer
-    image: "registry.access.redhat.com/rhel8/toolbox:latest"
+    image: "registry.redhat.io/rhel8/toolbox:latest"
     # Mount path for scan results
     mountPath: "/compliance-results"
     # Resources for viewer pod
