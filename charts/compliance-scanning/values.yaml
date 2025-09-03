@@ -1,0 +1,62 @@
+global:
+  localClusterDomain: local.example.com
+
+compliance:
+  # ScanSetting configuration
+  scanSetting:
+    name: compliance-scan-setting
+    # Enable automatic remediation
+    autoApplyRemediations: true
+    # Schedule scan (cron format) - empty means manual trigger
+    schedule: ""
+    # Set scanning tolerations
+    scanTolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: "Exists"
+        effect: "NoSchedule"
+    # Resources for scanner pods
+    resources:
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+      requests:
+        memory: "512Mi"
+        cpu: "500m"
+    # Node selector for scanner pods
+    nodeSelector: {}
+    
+  # ScanSettingBinding configuration  (Future look at creating a TailoredProfile for ZT specifically that disables non applicable rules and sets values for specific states)
+  scanSettingBinding:
+    name: compliance-scan-binding
+    # Profile to scan - ocp4-moderate, ocp4-cis, rhcos4-moderate,...
+    profiles:
+      - name: "ocp4-moderate"
+        kind: "Profile"
+    # Set debug logging
+    debug: true
+    
+  # Storage configuration for scan results
+  storage:
+    # Enable PVC creation
+    enabled: true
+    pvc:
+      name: compliance-scan-results
+      storageClass: ""
+      size: "2Gi"
+      accessMode: "ReadWriteOnce"
+    
+  # Results viewer pod configuration using toolbox so we have access to oscap command to create html output
+  resultsViewer:
+    enabled: true
+    name: compliance-results-viewer
+    image: "registry.access.redhat.com/rhel8/toolbox:latest"
+    # Mount path for scan results
+    mountPath: "/compliance-results"
+    # Resources for viewer pod
+    resources:
+      limits:
+        memory: "512Mi" 
+        cpu: "500m"
+      requests:
+        memory: "256Mi"
+        cpu: "250m"

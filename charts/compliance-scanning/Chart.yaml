@@ -1,0 +1,9 @@
+apiVersion: v2
+description: Deploys OpenShift Compliance Operator resources for cluster hardening
+keywords:
+- pattern
+- compliance
+- zero trust
+- hardening
+name: compliance-scanning
+version: 0.0.1

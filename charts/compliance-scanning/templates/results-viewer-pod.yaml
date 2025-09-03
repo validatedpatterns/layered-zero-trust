@@ -1,0 +1,47 @@
+{{- if and .Values.compliance.storage.enabled .Values.compliance.resultsViewer.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ .Values.compliance.resultsViewer.name }}
+  namespace: openshift-compliance
+  annotations:
+    argocd.argoproj.io/sync-wave: '10'
+ labels:
+    {{- include "compliance-scanning.labels" . | nindent 4 }}
+    app.kubernetes.io/component: results-viewer
+spec:
+  # Use a service account with appropriate permissions
+  serviceAccountName: default
+  # Container to access compliance scan results
+  containers:
+  - name: results-viewer
+    image: {{ .Values.compliance.resultsViewer.image }}
+    # Command to keep container running and provide shell access
+    command: ["/bin/bash"]
+    args: ["-c", "sleep infinity"]
+    # Mount the PVC containing scan results
+    volumeMounts:
+    - name: compliance-results
+      mountPath: {{ .Values.compliance.resultsViewer.mountPath }}
+    # Resource constraints
+    resources:
+      {{- toYaml .Values.compliance.resultsViewer.resources | nindent 6 }}
+    # Environment variables for easier navigation
+    env:
+    - name: SCAN_RESULTS_PATH
+      value: {{ .Values.compliance.resultsViewer.mountPath }}
+    - name: PS1
+      value: "[compliance-results] \\u@\\h:\\w\\$ "
+  # Volume referencing the PVC
+  volumes:
+  - name: compliance-results
+    persistentVolumeClaim:
+      claimName: {{ .Values.compliance.storage.pvc.name }}
+  # Restart policy
+  restartPolicy: Always
+  # Tolerations to potentially run on master nodes if needed
+  tolerations:
+  - key: "node-role.kubernetes.io/master"
+    operator: "Exists"
+    effect: "NoSchedule"
+{{- end }}

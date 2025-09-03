@@ -1,0 +1,28 @@
+apiVersion: compliance.openshift.io/v1alpha1
+kind: ScanSettingBinding
+metadata:
+  name: {{ .Values.compliance.scanSettingBinding.name }}
+  namespace: openshift-compliance
+  annotations:
+    argocd.argoproj.io/sync-wave: '-10'
+  labels:
+    {{- include "compliance-scanning.labels" . | nindent 4 }}
+  annotations:
+    # Enable automatic remediation
+    compliance.openshift.io/default-auto-apply: "true"
+spec:
+  settingsRef:
+    apiVersion: compliance.openshift.io/v1alpha1
+    kind: ScanSetting
+    name: {{ .Values.compliance.scanSetting.name }}
+  # Profiles to bind to this scan setting
+  profiles:
+    {{- range .Values.compliance.scanSettingBinding.profiles }}
+    - apiVersion: compliance.openshift.io/v1alpha1
+      kind: {{ .kind }}
+      name: {{ .name }}
+    {{- end }}
+  # Enable debug logging
+  {{- if .Values.compliance.scanSettingBinding.debug }}
+  debug: {{ .Values.compliance.scanSettingBinding.debug }}
+  {{- end }}

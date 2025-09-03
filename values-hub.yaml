@@ -109,6 +109,11 @@ clusterGroup:
           value: "true"
         - name: app.spire.enabled
           value: "true"
+    compliance-scanning:
+      name: compliance-scanning
+      namespace: openshift-compliance
+      project: hub
+      path: charts/compliance-scanning
 
 
 
