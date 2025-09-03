@@ -6,7 +6,7 @@ metadata:
   namespace: openshift-compliance
   annotations:
     argocd.argoproj.io/sync-wave: '10'
- labels:
+  labels:
     app.kubernetes.io/component: results-viewer
 spec:
   # Use a service account with appropriate permissions
