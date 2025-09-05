@@ -90,13 +90,17 @@ certmgrOperator:
   #     statementEntries:
   #     - effect: Allow
   #       action:
-  #       - route53:GetChange
-  #       - route53:ChangeResourceRecordSets
-  #       - route53:ListHostedZonesByName
-  #       resource: "arn:aws:route53:::hostedzone/*"
+  #         - route53:GetChange
+  #       resource: "arn:aws:route53:::change/*"
   #     - effect: Allow
   #       action:
-  #       - route53:ListHostedZones
+  #         - route53:ChangeResourceRecordSets
+  #         - route53:ListResourceRecordSets
+  #       resource: "arn:aws:route53:::hostedzone/*"
+  #     -- Can be removed if you specify the (optional) hostedZoneID.
+  #     - effect: Allow
+  #       action:
+  #         - route53:ListHostedZones
   #       resource: "*"
   # -- Azure example
   # - name: azure
