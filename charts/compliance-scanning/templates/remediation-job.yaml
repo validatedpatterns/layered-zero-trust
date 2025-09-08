@@ -184,7 +184,6 @@ spec:
 
           kubectl create event \
             --namespace="$NAMESPACE" \
-            --reason=RemediationApplied \
             --message="Applied $APPLIED_COUNT ComplianceRemediations after scan completion" \
             --for="job/compliance-remediation-job" || true
         resources:
