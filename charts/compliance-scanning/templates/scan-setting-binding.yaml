@@ -5,8 +5,6 @@ metadata:
   namespace: openshift-compliance
   annotations:
     argocd.argoproj.io/sync-wave: '-10'
-    # Enable automatic remediation
-    compliance.openshift.io/default-auto-apply: "true"
   labels:
     app.kubernetes.io/component: compliance-scan-binding
 settingsRef:
