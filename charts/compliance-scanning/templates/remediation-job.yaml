@@ -72,7 +72,7 @@ spec:
         args:
         - -c
         - |
-          set -euo pipefail
+          set -Eeuxo pipefail
           
           echo "Starting compliance remediation job..."
           echo "Scan Setting Binding: {{ .Values.compliance.scanSettingBinding.name }}"
@@ -187,9 +187,6 @@ spec:
             --reason=RemediationApplied \
             --message="Applied $APPLIED_COUNT ComplianceRemediations after scan completion" \
             --for="job/compliance-remediation-job" || true
-        env:
-        - name: KUBECONFIG
-          value: /var/run/secrets/kubernetes.io/serviceaccount/token
         resources:
           {{- toYaml .Values.compliance.remediationJob.resources | nindent 10 }}
         {{- if .Values.compliance.remediationJob.securityContext }}
