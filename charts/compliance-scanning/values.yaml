@@ -30,14 +30,6 @@ compliance:
       storageClass: ""
       size: "2Gi"
       accessMode: "ReadWriteOnce"
-  # Results viewer  image with access to oscap to create html output
-  resultsViewer:
-    enabled: true
-    name: compliance-results-viewer
-    # TBD  make this one of the utility container images from VP team for performing the oscap operations on results
-    image: "registry.access.redhat.com/ubi9/ubi:latest"
-    # Mount path for scan results
-    mountPath: "/compliance-results"
   # Remediation job configuration
   remediationJob:
     # Job name
