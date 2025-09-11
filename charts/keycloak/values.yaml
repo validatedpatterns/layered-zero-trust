@@ -61,7 +61,6 @@ keycloak:
       username: qtodo-user1
   ingress:
     enabled: true
-    hostname: keycloak-customized.apps.rosa.vnd8o-8wxk9-39s.6jy4.p3.openshiftapps.com
     service: keycloak-service-trusted
     termination: reencrypt
   name: keycloak
