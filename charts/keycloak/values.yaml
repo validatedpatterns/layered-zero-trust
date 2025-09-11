@@ -1,88 +1,79 @@
 global:
   localClusterDomain: apps.example.com
   secretStore:
-    name: "vault-backend"
-    kind: "ClusterSecretStore"
-
+    kind: ClusterSecretStore
+    name: vault-backend
 keycloak:
-  name: keycloak
-
-  ingress:
-    enabled: true
-    service: keycloak-service-trusted
-    termination: reencrypt
-    hostname: ""
-
-  tls:
-    serviceServing: true
-    secret: keycloak-tls
-
-  postgresqlDb:
-    secretName: postgresql-db
-    username: keycloak
-    database: keycloak
-    passwordVaultKey: secret/data/global/keycloak
-
-  users:
-    secretName: keycloak-users
-    passwordVaultKey: secret/data/global/keycloak-users
-
-  # Toggle to enable/disable default realm configuration
   defaultConfig: true
-  # Default realm configuration
   defaultRealm:
-    realm: "ztvp"
-    displayName: "ZTVP Realm"
-    enabled: true
-    registrationAllowed: false
     clients:
-      - clientId: "qtodo-app"
-        name: "qtodo"
-        publicClient: false
-        standardFlowEnabled: true
-        secret: "${QTODO_CLIENT_SECRET}"
-        redirectUris:
-          - "*"
-        webOrigins:
-          - "+"
-        enabled: true
-        protocol: "openid-connect"
-    users:
-      - username: "qtodo-admin"
-        createdTimestamp: 1
-        enabled: true
-        email: "qtodo-admin@example.com"
-        emailVerified: true
-        firstName: "QTodo"
-        lastName: "Admin"
-        credentials:
-          - type: "password"
-            value: "${QTODO_ADMIN_PASSWORD}"
-            temporary: true
-        realmRoles:
-          - "qtodo-admin"
-        requiredActions:
-          - "UPDATE_PASSWORD"
-      - username: "qtodo-user1"
-        createdTimestamp: 1
-        enabled: true
-        email: "qtodo-user1@example.com"
-        emailVerified: true
-        firstName: "QTodo"
-        lastName: "User-1"
-        credentials:
-          - type: "password"
-            value: "${QTODO_USER1_PASSWORD}"
-            temporary: true
-        realmRoles:
-          - "viewer"
-        requiredActions:
-          - "UPDATE_PASSWORD"
+    - clientId: qtodo-app
+      enabled: true
+      name: qtodo
+      protocol: openid-connect
+      publicClient: false
+      redirectUris:
+      - '*'
+      secret: ${QTODO_CLIENT_SECRET}
+      standardFlowEnabled: true
+      webOrigins:
+      - +
+    displayName: ZTVP Realm
+    enabled: true
+    realm: ztvp
+    registrationAllowed: false
     roles:
       realm:
-        - name: "qtodo-admin"
-          description: "QTodo App Administrator"
-        - name: "viewer"
-          description: "Read-only access"
-  # -- Keycloak realms to import
+      - description: QTodo App Administrator
+        name: qtodo-admin
+      - description: Read-only access
+        name: viewer
+    users:
+    - createdTimestamp: 1
+      credentials:
+      - temporary: true
+        type: password
+        value: ${QTODO_ADMIN_PASSWORD}
+      email: qtodo-admin@example.com
+      emailVerified: true
+      enabled: true
+      firstName: QTodo
+      lastName: Admin
+      realmRoles:
+      - qtodo-admin
+      requiredActions:
+      - UPDATE_PASSWORD
+      username: qtodo-admin
+    - createdTimestamp: 1
+      credentials:
+      - temporary: true
+        type: password
+        value: ${QTODO_USER1_PASSWORD}
+      email: qtodo-user1@example.com
+      emailVerified: true
+      enabled: true
+      firstName: QTodo
+      lastName: User-1
+      realmRoles:
+      - viewer
+      requiredActions:
+      - UPDATE_PASSWORD
+      username: qtodo-user1
+  ingress:
+    enabled: true
+    hostname: keycloak-customized.apps.rosa.vnd8o-8wxk9-39s.6jy4.p3.openshiftapps.com
+    service: keycloak-service-trusted
+    termination: reencrypt
+  name: keycloak
+  postgresqlDb:
+    database: keycloak
+    passwordVaultKey: secret/data/global/keycloak
+    secretName: postgresql-db
+    username: keycloak
   realms: []
+  tls:
+    secret: keycloak-tls
+    serviceServing: true
+  users:
+    passwordVaultKey: secret/data/global/keycloak-users
+    secretName: keycloak-users
