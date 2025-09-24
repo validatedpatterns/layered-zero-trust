@@ -1,0 +1,11 @@
+---
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: {{ .Values.noobaa.objectBucketClaim.name }}
+  namespace: {{ .Values.noobaa.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"  # Layer 1: Create ObjectBucketClaim
+spec:
+  generateBucketName: {{ .Values.noobaa.objectBucketClaim.bucketName }}
+  storageClassName: {{ .Values.noobaa.objectBucketClaim.storageClass }}

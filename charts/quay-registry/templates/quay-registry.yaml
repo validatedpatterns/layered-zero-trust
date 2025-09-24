@@ -1,0 +1,34 @@
+apiVersion: quay.redhat.com/v1
+kind: QuayRegistry
+metadata:
+  name: quay-registry
+  namespace: {{ .Values.quay.namespace | default "quay-enterprise" }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"  # Layer 1: Deploy Quay Registry
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  components:
+    - kind: clair
+      managed: true
+    - kind: horizontalpodautoscaler
+      managed: true
+    - kind: mirror
+      managed: true
+    - kind: monitoring
+      managed: true
+    - kind: postgres
+      managed: true
+    - kind: redis
+      managed: true
+    - kind: objectstorage
+      managed: false
+    - kind: route
+      managed: true
+    - kind: tls
+      managed: true
+    - kind: quay
+      managed: true
+    - kind: clairpostgres
+      managed: true
+  # Use the secret created by the S3 job (with real credentials), not the Git-managed template
+  configBundleSecret: quay-config-with-s3

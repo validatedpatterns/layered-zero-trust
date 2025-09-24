@@ -1,0 +1,17 @@
+---
+apiVersion: noobaa.io/v1alpha1
+kind: BucketClass
+metadata:
+  name: {{ .Values.noobaa.bucketClass.name }}
+  namespace: {{ .Values.noobaa.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"  # Layer 1: Create BucketClass
+spec:
+  placementPolicy:
+    tiers:
+      {{- range .Values.noobaa.bucketClass.placement.tiers }}
+      - backingStores:
+        {{- range .backingStores }}
+          - {{ . }}
+        {{- end }}
+      {{- end }}

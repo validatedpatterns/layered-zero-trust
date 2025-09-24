@@ -1,0 +1,14 @@
+---
+apiVersion: noobaa.io/v1alpha1
+kind: NooBaa
+metadata:
+  name: {{ .Values.noobaa.system.name }}
+  namespace: {{ .Values.noobaa.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"  # Layer 1: Deploy NooBaa System
+spec:
+  tolerations:
+    - key: "node.ocs.openshift.io/storage"
+      operator: "Equal"
+      value: "true"
+      effect: "NoSchedule"

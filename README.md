@@ -127,9 +127,19 @@ The [pattern.sh](pattern.sh) script is used to deploy the Layered Zero Trust Val
 
 3. Deploy the pattern
 
+    **Default deployment (without Quay - using other registry options):**
+
     ```shell
     ./pattern.sh make install
     ```
+
+    **Deployment with Quay Container Registry + NooBaa MOG storage:**
+
+    ```shell
+    TARGET_SITE=hub-with-quay ./pattern.sh make install
+    ```
+
+    > **Note**: The default deployment uses `values-hub.yaml` which excludes optional Layer 1 Quay components. This is suitable when using alternative registry solutions (e.g., customer-provided registries, Quay.io, Docker Hub, etc.). To include Quay Registry and NooBaa MOG storage (adds ~6 CPU cores, ~12Gi memory, ~10Gi storage), use the `hub-with-quay` configuration.
 
 ### Exploring the Deployed Pattern
 
