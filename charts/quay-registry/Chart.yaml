@@ -4,3 +4,6 @@ description: Red Hat Quay Registry Resources
 type: application
 version: 0.1.0
 appVersion: "3.9"
+maintainers:
+  - name: Zero Trust Valdated Patterns Team
+    email: ztvp-arch-group@redhat.com

@@ -134,13 +134,14 @@ The [pattern.sh](pattern.sh) script is used to deploy the Layered Zero Trust Val
     ./pattern.sh make install
     ```
 
-    **Deployment with Quay Container Registry + NooBaa MOG storage:**
+    **Deployment with optional Layer 1 components (Quay Registry, RHTAS):**
 
-    ```shell
-    TARGET_SITE=hub-with-quay ./pattern.sh make install
-    ```
+    To include optional components like Quay Registry + NooBaa MCG storage or RHTAS:
+    1. Edit `values-hub.yaml`
+    2. Uncomment the relevant sections for the components you want
+    3. Run: `./pattern.sh make install`
 
-    > **Note**: The default deployment uses `values-hub.yaml` which excludes optional Layer 1 Quay components. This is suitable when using alternative registry solutions (e.g., customer-provided registries, Quay.io, Docker Hub, etc.). To include Quay Registry and NooBaa MOG storage (adds ~6 CPU cores, ~12Gi memory, ~10Gi storage), use the `hub-with-quay` configuration.
+    > **Note**: Optional Layer 1 components are commented out by default. Quay Registry + NooBaa MCG adds ~6 CPU cores, ~12Gi memory, ~10Gi storage when enabled.
 
 ### Exploring the Deployed Pattern
 

@@ -1,6 +1,6 @@
 # Hub Configuration (Default)
-# This is the default configuration without optional Layer 1 Quay components
-# To deploy with Quay Registry + NooBaa MOG, use: TARGET_SITE=hub-with-quay ./pattern.sh make install
+# This is the default configuration with optional Layer 1 components (Quay) commented out
+# To deploy with optional components, uncomment the relevant sections below
 
 # This spire config is required to fix a bug in the zero-trust-workload-identity-manager operator
 spire:
@@ -26,7 +26,18 @@ clusterGroup:
     - cert-manager-operator:
         operatorGroup: true
         targetNamespace: cert-manager-operator
-
+    # UNCOMMENT if you want to deploy Quay
+    # - openshift-storage:
+    #     operatorGroup: true
+    #     targetNamespace: openshift-storage
+    #     annotations:
+    #       openshift.io/cluster-monitoring: "true"
+    #       argocd.argoproj.io/sync-wave: "-5"  # Propagated to OperatorGroup by framework
+    # - quay-enterprise:
+    #     annotations:
+    #       argocd.argoproj.io/sync-wave: "1"  # Create before NooBaa and all Quay components
+    #     labels:
+    #       openshift.io/cluster-monitoring: "true"
     - zero-trust-workload-identity-manager:
         operatorGroup: true
         targetNamespace: zero-trust-workload-identity-manager
@@ -64,6 +75,19 @@ clusterGroup:
       config:
         nodeSelector:
           node-role.kubernetes.io/worker: ""
+    # UNCOMMENT for Quay operator subscriptions
+    # odf:
+    #   name: odf-operator
+    #   namespace: openshift-storage
+    #   channel: stable-4.19
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "-4"  # Layer 1: Install after OperatorGroup (-5)
+    # quay-operator:
+    #   name: quay-operator
+    #   namespace: openshift-operators
+    #   channel: stable-3.15
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "-3"  # Layer 1: Install after ODF operator
   projects:
     - hub
   # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
@@ -122,6 +146,21 @@ clusterGroup:
             subject: spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/qtodo/sa/qtodo
             policies:
               - global-secret
+    # UNCOMMENT for Quay applications
+    # noobaa-mcg:
+    #   name: noobaa-mcg
+    #   namespace: openshift-storage
+    #   project: hub
+    #   path: charts/noobaa-mcg
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "5"  # Layer 1: Deploy after core services
+    # quay-registry:
+    #   name: quay-registry
+    #   namespace: quay-enterprise
+    #   project: hub  
+    #   path: charts/quay-registry
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "10"  # Layer 1: Deploy after NooBaa
     golang-external-secrets:
       name: golang-external-secrets
       namespace: golang-external-secrets

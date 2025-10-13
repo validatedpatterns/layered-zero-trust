@@ -42,3 +42,10 @@ quay_config:
     name: devel
     email: devel@myorg.com
   repo: example
+
+# Object Storage configuration - using NooBaa MCG
+objectStorage:
+  objectBucketClaim:
+    name: quay-bucket
+    bucketName: quay-datastore
+    storageClass: openshift-storage.noobaa.io
