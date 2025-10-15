@@ -67,3 +67,39 @@ class IngressController(NamespacedResource):
 
     api_version = "operator.openshift.io/v1"
     kind = "IngressController"
+
+
+class SpireAgent(Resource):
+    """
+    SpireAgent object
+    """
+
+    api_version = "operator.openshift.io/v1alpha1"
+    kind = "SpireAgent"
+
+
+class SpireServer(Resource):
+    """
+    SpireServer object
+    """
+
+    api_version = "operator.openshift.io/v1alpha1"
+    kind = "SpireServer"
+
+
+class SpiffeCSIDriver(Resource):
+    """
+    SpiffeCSIDriver object
+    """
+
+    api_version = "operator.openshift.io/v1alpha1"
+    kind = "SpiffeCSIDriver"
+
+
+class SpireOIDCDiscoveryProvider(Resource):
+    """
+    SpireOIDCDiscoveryProvider object
+    """
+
+    api_version = "operator.openshift.io/v1alpha1"
+    kind = "SpireOIDCDiscoveryProvider"

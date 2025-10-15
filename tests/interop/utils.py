@@ -2,6 +2,7 @@ import logging
 
 import requests
 from ocp_resources.pod import Pod
+from ocp_resources.project_project_openshift_io import Project
 from ocp_resources.replica_set import ReplicaSet
 from ocp_resources.resource import Resource
 from ocp_resources.route import Route
@@ -97,3 +98,15 @@ def get_route_by_app_label(openshift_dyn_client, project, label):
         return None
     except StopIteration:
         raise
+
+
+def verify_project(openshift_dyn_client, project_name):
+    try:
+        projects = Project.get(dyn_client=openshift_dyn_client)
+        for project in projects:
+            if project.name == project_name:
+                if project.status == Project.Status.ACTIVE:
+                    return True
+    except StopIteration:
+        raise
+    return False
