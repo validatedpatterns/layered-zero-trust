@@ -1,14 +1,18 @@
 import logging
 import os
-import subprocess
-import time
 
 import pytest
 import requests
 import yaml
 
 from . import __loggername__
-from .utils import get_route_by_app_label, send_get_request, verify_pod_in_project
+from .utils import (
+    get_route_by_app_label,
+    git_submit_and_push,
+    send_get_request,
+    verify_pod_in_project,
+    wait_for,
+)
 
 logger = logging.getLogger(__loggername__)
 
@@ -85,7 +89,7 @@ def test_keycloak_ui_reachability_customized_hostname(openshift_dyn_client):
             commit_message="Update Keycloak hostname",
         )
         app_url = f"https://{customized_hostname}.{base_hostname}"
-        rsp = wait_for(app_url=app_url)
+        rsp = wait_for(app_url=app_url, acceptable_status_codes=[requests.codes.ok])
         assert requests.codes.ok == rsp.status_code
     else:
         err_msg = f'No route found in "{app_project_name}" with label "{app_label}"'
@@ -111,7 +115,7 @@ def test_keycloak_ui_reachability_empty_hostname(openshift_dyn_client):
         app_hostname = app_route[0].host
         base_hostname = ".".join(app_hostname.split(".")[1:])
         app_url = f"https://keycloak.{base_hostname}"
-        rsp = wait_for(app_url=app_url)
+        rsp = wait_for(app_url=app_url, acceptable_status_codes=[requests.codes.ok])
         assert requests.codes.ok == rsp.status_code
     else:
         err_msg = f'No route found in "{app_project_name}" with label "{app_label}"'
@@ -144,33 +148,3 @@ def modify_keycloak_hostname(values_path, hostname):
             file.write(yaml.safe_dump(values))
     except Exception:
         raise
-
-
-def git_submit_and_push(path, working_dir, commit_message, push=True):
-    if os.getenv("EXTERNAL_TEST") != "true":
-        subprocess.run(["git", "add", path], cwd=f"{working_dir}")
-        subprocess.run(["git", "commit", "-m", commit_message], cwd=f"{working_dir}")
-        if push:
-            push = subprocess.run(
-                ["git", "push"], cwd=f"{working_dir}", capture_output=True, text=True
-            )
-    else:
-        subprocess.run(["git", "add", path])
-        subprocess.run(["git", "commit", "-m", commit_message])
-        if push:
-            push = subprocess.run(["git", "push"], capture_output=True, text=True)
-    logger.info(push.stdout)
-    logger.info(push.stderr)
-
-
-def wait_for(app_url):
-    counter = 0
-    timeout = time.time() + 60 * 10
-    while time.time() < timeout:
-        time.sleep(30)
-        counter += 1
-        logger.info(f"Attempt #{counter}...")
-        rsp = send_get_request(site_url=app_url)
-        if rsp.status_code == requests.codes.ok:
-            return rsp
-    return rsp

@@ -1,4 +1,7 @@
 import logging
+import os
+import subprocess
+import time
 
 import requests
 from ocp_resources.pod import Pod
@@ -110,3 +113,58 @@ def verify_project(openshift_dyn_client, project_name):
     except StopIteration:
         raise
     return False
+
+
+def git_submit_and_push(path, working_dir, commit_message, push=True):
+    if os.getenv("EXTERNAL_TEST") != "true":
+        subprocess.run(["git", "add", path], cwd=f"{working_dir}")
+        subprocess.run(["git", "commit", "-m", commit_message], cwd=f"{working_dir}")
+        if push:
+            push = subprocess.run(
+                ["git", "push"], cwd=f"{working_dir}", capture_output=True, text=True
+            )
+    else:
+        subprocess.run(["git", "add", path])
+        subprocess.run(["git", "commit", "-m", commit_message])
+        if push:
+            push = subprocess.run(["git", "push"], capture_output=True, text=True)
+    logger.info(push.stdout)
+    logger.info(push.stderr)
+
+
+def wait_for(
+    app_url, timeout_minutes=10, sleep_seconds=30, acceptable_status_codes=None
+):
+    """
+    Wait for a URL to become available by polling it until it returns an acceptable status code.
+
+    Args:
+        app_url: The URL to poll
+        timeout_minutes: Maximum time to wait in minutes (default: 10)
+        sleep_seconds: Time to wait between attempts in seconds (default: 30)
+        acceptable_status_codes: List of acceptable HTTP status codes (default: [200, 401])
+
+    Returns:
+        The response object if successful, or the last response if timeout occurs
+    """
+    if acceptable_status_codes is None:
+        acceptable_status_codes = [requests.codes.ok, requests.codes.unauthorized]
+
+    counter = 0
+    timeout = time.time() + 60 * timeout_minutes
+    logger.debug(f"Waiting for URL: {app_url} (timeout: {timeout_minutes} minutes)")
+
+    while time.time() < timeout:
+        time.sleep(sleep_seconds)
+        counter += 1
+        logger.info(f"Attempt #{counter}...")
+        rsp = send_get_request(site_url=app_url)
+
+        if rsp is not None and rsp.status_code in acceptable_status_codes:
+            logger.debug(
+                f"Successfully received status {rsp.status_code} from {app_url}"
+            )
+            return rsp
+
+    logger.warning(f"Timeout reached waiting for {app_url}")
+    return rsp
