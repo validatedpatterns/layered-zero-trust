@@ -28,4 +28,7 @@ pytest -lv --disable-warnings test_validate_layer_0_keycloak.py --kubeconfig $KU
 
 pytest -lv --disable-warnings test_validate_layer_1_ztwim.py --kubeconfig $KUBECONFIG --junit-xml $WORKSPACE/test_validate_layer_1_ztwim.xml
 
+pytest -lv --disable-warnings test_validate_layer_1_quay.py --kubeconfig $KUBECONFIG --junit-xml $WORKSPACE/test_validate_layer_1_quay.xml
+
+
 python3 create_ci_badge.py

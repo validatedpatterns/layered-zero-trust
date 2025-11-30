@@ -103,3 +103,53 @@ class SpireOIDCDiscoveryProvider(Resource):
 
     api_version = "operator.openshift.io/v1alpha1"
     kind = "SpireOIDCDiscoveryProvider"
+
+
+class BucketClass(NamespacedResource):
+    """
+    BucketClass object
+    """
+
+    api_group = "noobaa.io"
+    api_version = Resource.ApiVersion.V1ALPHA1
+    kind = "BucketClass"
+
+
+class BackingStore(NamespacedResource):
+    """
+    BackingStore object
+    """
+
+    api_group = "noobaa.io"
+    api_version = Resource.ApiVersion.V1ALPHA1
+    kind = "BackingStore"
+
+
+class ObjectBucket(Resource):
+    """
+    ObjectBucket object
+    """
+
+    api_group = "objectbucket.io"
+    api_version = Resource.ApiVersion.V1ALPHA1
+    kind = "ObjectBucket"
+
+
+class ObjectBucketClaim(NamespacedResource):
+    """
+    ObjectBucketClaim object
+    """
+
+    api_group = "objectbucket.io"
+    api_version = Resource.ApiVersion.V1ALPHA1
+    kind = "ObjectBucketClaim"
+
+
+class QuayRegistry(NamespacedResource):
+    """
+    BackingStore object
+    """
+
+    api_group = "quay.redhat.com"
+    api_version = Resource.ApiVersion.V1
+    kind = "QuayRegistry"
