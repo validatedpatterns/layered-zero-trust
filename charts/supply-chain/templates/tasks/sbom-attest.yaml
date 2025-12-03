@@ -1,0 +1,85 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: qtodo-sbom-attestation
+  namespace: {{ .Values.global.namespace }}
+spec:
+  description: This Task can be used to attest the SBOM for the qtodo image.
+
+  params:
+    - description: Image to generate the SBOM for
+      name: image
+      type: string
+    - description: PEM encoded file containing the CA certificate to validate RHTAS services
+      name: ca-file
+      type: string
+    - description: Fulcio service URL
+      name: fulcio-url
+      type: string
+    - description: Rekor service URL
+      name: rekor-url
+      type: string
+    - description: TUF service URL
+      name: tuf-url
+      type: string
+    - description: Cosign CLI server URL
+      name: cli-server-url
+      type: string
+    - description: SBOM file path to attach to the attestation
+      name: sbom-file
+      type: string
+      default: qtodo-sbom.json
+    - description: SBOM file format to attach to the attestation
+      name: sbom-format
+      type: string
+      default: spdxjson
+
+  workspaces:
+    - name: source
+      description: The workspace where the SBOM file will be found.
+
+  volumes:
+    - name: spiffe-workload-api
+      csi:
+        driver: csi.spiffe.io
+        readOnly: true
+    - name: rhtas-functions
+      configMap:
+        name: rhtas-functions
+        defaultMode: 0755
+
+  steps:
+    - image: {{ .Values.tasks.images.cosign }}
+      name: sbom-attestation
+      resources: {}
+      env:
+        - name: SPIFFE_ENDPOINT_SOCKET
+          value: {{ .Values.spire.endpointSocketPath }}
+        - name: CLI_SERVER_URL
+          value: $(params.cli-server-url)
+        - name: TUF_URL
+          value: $(params.tuf-url)
+        - name: FULCIO_URL
+          value: $(params.fulcio-url)
+        - name: REKOR_URL
+          value: $(params.rekor-url)
+        - name: CA_FILE
+          value: $(params.ca-file)
+        - name: SBOM_FILE
+          value: $(workspaces.source.path)/$(params.sbom-file)
+        - name: SBOM_FORMAT
+          value: $(params.sbom-format)
+      volumeMounts:
+        - name: spiffe-workload-api
+          mountPath: /spiffe-workload-api
+          readOnly: true
+        - name: rhtas-functions
+          mountPath: /usr/local/lib
+          readOnly: true
+      script: |
+        #!/usr/bin/env bash
+
+        source /usr/local/lib/rhtas-functions
+
+        attest_sbom_image "$(params.image)"

@@ -1,0 +1,11 @@
+{{- if eq .Values.quay.enabled true }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quay-user-script
+  namespace: {{ .Values.global.namespace }}
+data:
+  create_user.py: |
+{{- .Files.Get "files/quay_user.py" | nindent 4 }}
+{{- end }}

@@ -1,0 +1,11 @@
+{{- if eq .Values.rhtpa.enabled true }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rhtpa-functions
+  namespace: {{ .Values.global.namespace }}
+data:
+  rhtpa-functions: |
+{{- .Files.Get "files/rhtpa.sh" | nindent 4 }}
+{{- end }}

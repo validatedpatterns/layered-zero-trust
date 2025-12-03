@@ -1,0 +1,73 @@
+{{- if eq .Values.rhtpa.enabled true }}
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: qtodo-upload-sbom
+  namespace: {{ .Values.global.namespace }}
+spec:
+  description: This Task can be used to upload the SBOM to RHTPA.
+
+  params:
+    - description: PEM encoded file containing the CA certificate to validate RHTPA service
+      name: ca-file
+      type: string
+      default: /run/secrets/kubernetes.io/serviceaccount/ca.crt
+    - description: SBOM file path to attach to the attestation
+      name: sbom-file
+      type: string
+      default: qtodo-sbom.json
+    - description: RHTPA service URL
+      name: rhtpa-url
+      type: string
+    - description: OIDC service URL
+      name: rhtpa-oidc-url
+      type: string
+    - description: OIDC client ID to use for authentication
+      name: rhtpa-oidc-client-id
+      type: string
+    - description: Secret name containing the OIDC client secret to use for authentication
+      name: rhtpa-oidc-client-secret
+      type: string
+
+  workspaces:
+    - name: source
+      description: The workspace where the SBOM file will be found.
+
+  volumes:
+    - name: rhtpa-functions
+      configMap:
+        name: rhtpa-functions
+        defaultMode: 0755
+
+  steps:
+    - image: {{ .Values.tasks.images.rhtpa }}
+      name: upload-sbom
+      resources: {}
+      env:
+        - name: CA_FILE
+          value: $(params.ca-file)
+        - name: RHTPA_URL
+          value: $(params.rhtpa-url)
+        - name: OIDC_URL
+          value: $(params.rhtpa-oidc-url)
+        - name: OIDC_CLIENT_ID
+          value: $(params.rhtpa-oidc-client-id)
+        - name: OIDC_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: $(params.rhtpa-oidc-client-secret)
+              key: password
+        - name: SBOM_FILE
+          value: $(workspaces.source.path)/$(params.sbom-file)
+      volumeMounts:
+        - name: rhtpa-functions
+          mountPath: /usr/local/lib
+          readOnly: true
+      script: |
+        #!/usr/bin/env bash
+
+        source /usr/local/lib/rhtpa-functions
+
+        upload_sbom "$(workspaces.source.path)/$(params.sbom-file)"
+{{- end }}

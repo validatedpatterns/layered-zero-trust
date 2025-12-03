@@ -1,0 +1,14 @@
+apiVersion: v2
+name: supply-chain
+description: A Helm chart for Supply Chain (UC02)
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - supply-chain
+  - uc02
+  - zero-trust
+  - tekton
+maintainers:
+  - name: Zero Trust Validated Patterns Team
+    email: ztvp-arch-group@redhat.com

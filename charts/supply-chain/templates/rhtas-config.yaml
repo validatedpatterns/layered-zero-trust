@@ -1,0 +1,9 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rhtas-functions
+  namespace: {{ .Values.global.namespace }}
+data:
+  rhtas-functions: |
+{{- .Files.Get "files/rhtas.sh" | nindent 4 }}

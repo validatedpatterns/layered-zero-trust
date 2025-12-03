@@ -1,0 +1,40 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: qtodo-generate-sbom
+  namespace: {{ .Values.global.namespace }}
+spec:
+  description: This Task can be used to attest the SBOM for the qtodo image.
+
+  params:
+    - description: Image to generate the SBOM for
+      name: image
+      type: string
+    - description: PEM encoded file containing the container registry CA certificate
+      name: ca-file
+      type: string
+    - description: SBOM file path to generate
+      name: sbom-file
+      type: string
+      default: qtodo-sbom.json
+    - description: SBOM file format to generate
+      name: sbom-format
+      type: string
+      default: spdx-json
+
+  workspaces:
+    - name: source
+      description: The workspace where the SBOM file will be generated.
+
+  steps:
+    - image: {{ .Values.tasks.images.syft }}
+      name: generate-sbom
+      resources: {}
+      script: |
+        #!/bin/bash
+
+        mkdir -p /etc/pki/tls/certs
+        cp $(params.ca-file) /etc/pki/tls/certs/ca-bundle.crt
+
+        syft scan registry:"$(params.image)" -o "$(params.sbom-format)"="$(workspaces.source.path)/$(params.sbom-file)"

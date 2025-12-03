@@ -28,6 +28,16 @@ The following components are included in the Layered Zero Trust Pattern
   * Synchronizes secrets stored in HashiCorp Vault with OpenShift
 * [Red Hat Advanced Cluster Management (ACM)](https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.14)
   * Provides a management control in multi-cluster scenarios
+* [Red Hat Quay](https://docs.redhat.com/en/documentation/red_hat_quay/3.15)
+**  * Enables a private repository for OCI images within the environment
+* [Multicloud Object Gateway](https://docs.redhat.com/en/documentation/red_hat_openshift_container_storage/4.8/html/managing_hybrid_and_multicloud_resources/index)
+  * Provides an object storage service for Openshift
+* [Red Hat Trusted Artifact Signer (RHTAS)](https://docs.redhat.com/en/documentation/red_hat_trusted_artifact_signer/1.3)
+**  * Provides cryptographic signing and verification of software artifacts and container images
+* [Red Hat Trusted Profile Analyzer (RHTPA)](https://docs.redhat.com/es/documentation/red_hat_trusted_profile_analyzer/2.2)
+**  * Provides the storage and management means for _Software Bill of Materials_ (SBOMs), with cross-referencing capabilities between SBOMs and CVEs/Security Advisories
+* [Red Hat Openshift Pipelines](https://docs.redhat.com/en/documentation/red_hat_openshift_pipelines/1.20)
+  * Enables a native CI/CD solution in Openshift
 
 ## Getting Started
 

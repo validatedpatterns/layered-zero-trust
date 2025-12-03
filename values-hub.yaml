@@ -64,6 +64,8 @@ clusterGroup:
         targetNamespace: openshift-compliance
         annotations:
           openshift.io/cluster-monitoring: "true"
+    # UC-02: Uncomment to enable OpenShift Pipelines
+    # - openshift-pipelines
   subscriptions:
     acm:
       name: advanced-cluster-management
@@ -75,6 +77,10 @@ clusterGroup:
       namespace: cert-manager-operator
       channel: stable-v1
       catalogSource: redhat-marketplace
+    # UC-02: Uncomment to enable OpenShift Pipelines
+    # openshift-pipelines:
+    #   name: openshift-pipelines-operator-rh
+    #   namespace: openshift-operators
     rhbk:
       name: rhbk-operator
       namespace: keycloak-system
@@ -343,6 +349,33 @@ clusterGroup:
           value: qtodo
         - name: app.vault.secretPath
           value: secret/data/global/qtodo
+        # For UC-02, we changed the qtodo image to use the one built in the secure supply chain
+        # - name: app.images.main.name
+        #  value: quay-registry-quay-quay-enterprise.apps.hub.example.com/org/qtodo
+        # Uncomment to enable registry authentication
+        # - name: app.images.main.registry.auth
+        #   value: true
+        # - name: app.images.main.registry.user
+        #   value: quay-user
+        # - name: app.images.main.registry.passwordVaultKey
+        #   value: quay-user-password
+    # UC-02: Secure Supply Chain - Uncomment to enable
+    # supply-chain:
+    #   name: supply-chain
+    #  project: hub
+    #  path: charts/supply-chain
+    #  overrides:
+    #    # Don't forget to uncomment the RHTAS and RHTPA components in this same file
+    #    - name: rhtas.enabled
+    #      value: true
+    #    - name: rhtpa.enabled
+    #      value: true
+    #    - name: registry.tlsVerify
+    #      value: "false"
+    #    - name: registry.user
+    #      value: quay-admin
+    #    - name: registry.passwordVaultKey
+    #      value: quay-admin-password
   argoCD:
     resourceHealthChecks:
       - check: |

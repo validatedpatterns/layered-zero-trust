@@ -1,0 +1,67 @@
+# Default values for supply-chain
+global:
+  hubClusterDomain: hub.example.com
+  namespace: pipeline
+  secretStore:
+    name: "vault-backend"
+    kind: "ClusterSecretStore"
+
+rhtas:
+  enabled: false
+
+rhtpa:
+  enabled: false
+  oidcRealm: "ztvp"
+  clientId: "rhtpa-cli"
+  clientSecretName: "qtodo-rhtpa-cli-password"
+  clientSecretVaultPath: "secret/data/global/rhtpa-oidc-cli-secret"
+  clientSecretVaultKey: "client-secret"
+
+# qtodo repository configuration
+qtodo:
+  repository: "https://github.com/validatedpatterns-demos/qtodo.git"
+  revision: "main"
+  tag: "latest"
+  buildCmd: "./mvnw -s settings.xml package -DskipTests -Dquarkus.package.jar.type=uber-jar"
+  containerfile: "./Containerfile"
+
+# quay registry configuration
+# used to create a new user in quay. Generic registry configuration is below.
+quay:
+  enabled: true
+  email: "quay-user@example.com"
+  job:
+    image: registry.access.redhat.com/ubi9/ubi:9.7-1764794285
+    schedule: "*/5 * * * *"
+
+# container registry configuration
+registry:
+  # Commented to generate it dynamically
+  # domain: "quay-registry-quay-quay-enterprise.hub.example.com"
+  org: "ztvp"
+  repo: "qtodo"
+  tlsVerify: "true"
+  user: "quay-user"
+  passwordVaultKey: "quay-user-password"
+  vaultPath: "secret/data/global/quay-users"
+
+# spire configuration
+spire:
+  enabled: true
+  endpointSocketPath: "/spiffe-workload-api/spire-agent.sock"
+
+# workspaces configuration
+storage:
+  pvcs:
+    - name: qtodo-workspace-source
+      storageClass: ""
+      size: "2Gi"
+      accessMode: ReadWriteOnce
+
+# tekton tasks configuration
+tasks:
+  images:
+    cosign: "registry.access.redhat.com/ubi9/ubi:9.7-1764794285"
+    mandrel: "registry.redhat.io/quarkus/mandrel-for-jdk-21-rhel8:23.1-36"
+    syft: "registry.redhat.io/rh-syft-tech-preview/syft-rhel9:1.29.0"
+    rhtpa: "registry.access.redhat.com/ubi9/ubi:9.7-1764794285"

@@ -1,0 +1,37 @@
+{{- if eq .Values.quay.enabled true }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: quay-user-provisioner
+  namespace: {{ .Values.global.namespace }}
+spec:
+  schedule: {{ .Values.quay.job.schedule | quote }}
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: quay-user-provisioner
+              image: {{ .Values.quay.job.image }}
+              command: ["python3", "/app/create_user.py"]
+              env:
+                - name: QUAY_HOST
+                  value: {{ .Values.registry.domain | default (printf "quay-registry-quay-quay-enterprise.%s" .Values.global.hubClusterDomain) }}
+                - name: QUAY_ADMIN_USER
+                  value: {{ .Values.registry.user }}
+                - name: QUAY_ADMIN_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: qtodo-quay-password
+                      key: password
+              volumeMounts:
+                - name: script-volume
+                  mountPath: /app
+          volumes:
+            - name: script-volume
+              configMap:
+                name: quay-user-script
+{{- end }}

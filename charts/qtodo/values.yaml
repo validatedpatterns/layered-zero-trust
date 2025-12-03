@@ -14,6 +14,13 @@ app:
       tag: latest
       # Modified to Always to force a pull so we can test changes to the container image without requiring manual deletion of images or restarts of argo
       pullPolicy: Always
+      registry:
+        auth: false
+        secretName: qtodo-registry-auth
+        user: quay-user
+        # domain: quay-registry-quay-quay-enterprise.apps.example.com
+        vaultPath: secret/data/global/quay-users
+        passwordVaultKey: password
     spiffeHelper:
       name: ghcr.io/spiffe/spiffe-helper
       tag: 0.10.1

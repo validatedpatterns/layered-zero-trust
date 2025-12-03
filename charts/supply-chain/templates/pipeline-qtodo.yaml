@@ -1,0 +1,311 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: qtodo-supply-chain
+  namespace: {{ .Values.global.namespace }}
+spec:
+  params:
+    - name: git-url
+      type: string
+      description: The URL of the public Github qtodo repository
+      default: {{ .Values.qtodo.repository | quote }}
+    - name: git-revision
+      type: string
+      description: The revision of the public Github qtodo repository
+      default: {{ .Values.qtodo.revision }}
+    - name: qtodo-build-cmd
+      type: string
+      description: The command to build the qtodo artifact
+      default: {{ .Values.qtodo.buildCmd }}
+    - name: qtodo-artifact-path
+      type: string
+      description: The path to the artifact to sign
+      default: target/qtodo-*.jar
+    - name: image-target
+      type: string
+      description: qtodo image push destination (e.g. quay.io/ztvp/qtodo:latest)
+      default: {{ .Values.registry.domain | default (printf "quay-registry-quay-quay-enterprise.%s" .Values.global.hubClusterDomain) }}/{{ .Values.registry.org }}/{{ .Values.registry.repo }}:{{ .Values.qtodo.tag }}
+    - name: image-tls-verify
+      type: string
+      description: Whether to verify TLS when pushing to the OCI registry
+      default: {{ .Values.registry.tlsVerify | quote }}
+    - name: image-containerfile
+      type: string
+      description: The containerfile to use for the qtodo image
+      default: {{ .Values.qtodo.containerfile }}
+    - name: fulcio-url
+      type: string
+      description: The URL of the Fulcio service
+      default: https://fulcio-server-trusted-artifact-signer.{{ .Values.global.hubClusterDomain }}
+    - name: rekor-url
+      type: string
+      description: The URL of the Rekor service
+      default: https://rekor-server-trusted-artifact-signer.{{ .Values.global.hubClusterDomain }}
+    - name: tuf-url
+      type: string
+      description: The URL of the TUF service
+      default: https://tuf-trusted-artifact-signer.{{ .Values.global.hubClusterDomain }}
+    - name: cli-server-url
+      type: string
+      description: The URL of the Cosign CLI server
+      default: https://cli-server-trusted-artifact-signer.{{ .Values.global.hubClusterDomain }}
+    - name: ca-file
+      type: string
+      description: The PEM encoded file containing the CA certificate to use for the image signing
+      default: /run/secrets/kubernetes.io/serviceaccount/ca.crt
+    - name: oidc-identity
+      type: string
+      description: The OIDC identity to use for verification
+      default: spiffe://{{ .Values.global.hubClusterDomain }}/ns/{{ .Values.global.namespace }}/sa/pipeline
+    - name: oidc-issuer
+      type: string
+      description: The OIDC issuer to use for verification
+      default: https://spire-spiffe-oidc-discovery-provider.{{ .Values.global.hubClusterDomain }}
+{{- if eq .Values.rhtpa.enabled true }}
+    - name: rhtpa-url
+      type: string
+      description: The URL of the RHTPA service
+      default: https://servertrustify.{{ .Values.global.hubClusterDomain }}
+    - name: sbom-file
+      type: string
+      description: The SBOM file to upload to RHTPA
+      default: qtodo-sbom.json
+    - name: rhtpa-oidc-url
+      type: string
+      description: The URL of the RHTPA OIDC service
+      default: https://keycloak.{{ .Values.global.hubClusterDomain }}/realms/{{ .Values.rhtpa.oidcRealm }}
+    - name: rhtpa-oidc-client-id
+      type: string
+      description: The RHTPA OIDC client ID to use for authentication
+      default: {{ .Values.rhtpa.clientId }}
+    - name: rhtpa-oidc-client-secret
+      type: string
+      description: The RHTPA OIDC client Secret name to use for authentication
+      default: {{ .Values.rhtpa.clientSecretName }}
+{{- end }}
+
+  workspaces:
+    - name: qtodo-source
+    - name: registry-auth-config
+
+  tasks:
+    - name: qtodo-clone-repository
+      taskRef:
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: git-clone
+          - name: namespace
+            value: openshift-pipelines
+      params:
+        - name: URL
+          value: $(params.git-url)
+        - name: REVISION
+          value: $(params.git-revision)
+      workspaces:
+        - name: output
+          workspace: qtodo-source
+
+    - name: qtodo-build-artifact
+      runAfter:
+        - qtodo-clone-repository
+      taskRef:
+        name: qtodo-build-artifact
+        kind: Task
+      workspaces:
+        - name: source
+          workspace: qtodo-source
+      params:
+        - name: qtodo-build-cmd
+          value: $(params.qtodo-build-cmd)
+
+    - name: qtodo-sign-artifact
+      runAfter:
+        - qtodo-build-artifact
+      taskRef:
+        name: qtodo-sign-artifact
+        kind: Task
+      workspaces:
+        - name: source
+          workspace: qtodo-source
+      params:
+        - name: ca-file
+          value: $(params.ca-file)
+        - name: fulcio-url
+          value: $(params.fulcio-url)
+        - name: rekor-url
+          value: $(params.rekor-url)
+        - name: tuf-url
+          value: $(params.tuf-url)
+        - name: cli-server-url
+          value: $(params.cli-server-url)
+        - name: qtodo-artifact-path
+          value: $(params.qtodo-artifact-path)
+
+    - name: qtodo-verify-artifact
+      runAfter:
+        - qtodo-sign-artifact
+      taskRef:
+        name: qtodo-verify-artifact
+        kind: Task
+      workspaces:
+        - name: source
+          workspace: qtodo-source
+      params:
+        - name: ca-file
+          value: $(params.ca-file)
+        - name: fulcio-url
+          value: $(params.fulcio-url)
+        - name: rekor-url
+          value: $(params.rekor-url)
+        - name: tuf-url
+          value: $(params.tuf-url)
+        - name: cli-server-url
+          value: $(params.cli-server-url)
+        - name: oidc-identity
+          value: $(params.oidc-identity)
+        - name: oidc-issuer
+          value: $(params.oidc-issuer)
+        - name: qtodo-artifact-path
+          value: $(params.qtodo-artifact-path)
+
+    - name: qtodo-build-image
+      retries: 1
+      runAfter:
+        - qtodo-verify-artifact
+      taskRef:
+        resolver: cluster
+        params:
+          - name: kind
+            value: task
+          - name: name
+            value: buildah
+          - name: namespace
+            value: openshift-pipelines
+      params:
+        - name: IMAGE
+          value: $(params.image-target)
+        - name: DOCKERFILE
+          value: $(params.image-containerfile)
+        - name: TLS_VERIFY
+          value: $(params.image-tls-verify)
+        - name: FORMAT
+          value: docker
+        - name: PUSH_EXTRA_ARGS
+          value: "--retry 5 --retry-delay 10s"
+      workspaces:
+        - name: source
+          workspace: qtodo-source
+        - name: dockerconfig
+          workspace: registry-auth-config
+
+    - name: qtodo-sign-image
+      runAfter:
+        - qtodo-build-image
+      taskRef:
+        name: qtodo-sign-image
+        kind: Task
+      params:
+        - name: image
+          value: $(params.image-target)
+        - name: ca-file
+          value: $(params.ca-file)
+        - name: fulcio-url
+          value: $(params.fulcio-url)
+        - name: rekor-url
+          value: $(params.rekor-url)
+        - name: tuf-url
+          value: $(params.tuf-url)
+        - name: cli-server-url
+          value: $(params.cli-server-url)
+
+    - name: qtodo-generate-sbom
+      runAfter:
+        - qtodo-build-image
+      taskRef:
+        name: qtodo-generate-sbom
+        kind: Task
+      workspaces:
+        - name: source
+          workspace: qtodo-source
+      params:
+        - name: image
+          value: $(params.image-target)
+        - name: ca-file
+          value: $(params.ca-file)
+
+    - name: qtodo-sbom-attestation
+      runAfter:
+        - qtodo-generate-sbom
+      taskRef:
+        name: qtodo-sbom-attestation
+        kind: Task
+      workspaces:
+        - name: source
+          workspace: qtodo-source
+      params:
+        - name: image
+          value: $(params.image-target)
+        - name: ca-file
+          value: $(params.ca-file)
+        - name: fulcio-url
+          value: $(params.fulcio-url)
+        - name: rekor-url
+          value: $(params.rekor-url)
+        - name: tuf-url
+          value: $(params.tuf-url)
+        - name: cli-server-url
+          value: $(params.cli-server-url)
+
+{{- if eq .Values.rhtpa.enabled true }}
+    - name: qtodo-upload-sbom
+      runAfter:
+        - qtodo-generate-sbom
+      taskRef:
+        name: qtodo-upload-sbom
+        kind: Task
+      workspaces:
+        - name: source
+          workspace: qtodo-source
+      params:
+        - name: ca-file
+          value: $(params.ca-file)
+        - name: sbom-file
+          value: $(params.sbom-file)
+        - name: rhtpa-url
+          value: $(params.rhtpa-url)
+        - name: rhtpa-oidc-url
+          value: $(params.rhtpa-oidc-url)
+        - name: rhtpa-oidc-client-id
+          value: $(params.rhtpa-oidc-client-id)
+        - name: rhtpa-oidc-client-secret
+          value: $(params.rhtpa-oidc-client-secret)
+{{- end }}
+
+    - name: qtodo-verify-image
+      runAfter:
+        - qtodo-sign-image
+        - qtodo-sbom-attestation
+      taskRef:
+        name: qtodo-verify-image
+        kind: Task
+      params:
+        - name: image
+          value: $(params.image-target)
+        - name: ca-file
+          value: $(params.ca-file)
+        - name: fulcio-url
+          value: $(params.fulcio-url)
+        - name: rekor-url
+          value: $(params.rekor-url)
+        - name: tuf-url
+          value: $(params.tuf-url)
+        - name: cli-server-url
+          value: $(params.cli-server-url)
+        - name: oidc-identity
+          value: $(params.oidc-identity)
+        - name: oidc-issuer
+          value: $(params.oidc-issuer)
