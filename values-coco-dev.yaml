@@ -406,6 +406,14 @@ clusterGroup:
       playbook: ansible/init-data-gzipper.yaml
       verbosity: -vvv
       timeout: 60
+    - name: generate-certs
+      playbook: ansible/generate-certs.yaml
+      verbosity: -vvv
+      timeout: 60
+    - name: configure-spire-server-x509pop
+      playbook: ansible/configure-spire-server-x509pop.yaml
+      verbosity: -vvv
+      timeout: 240
   managedClusterGroups: {}
   # This configuration can be used for Pipeline/DevSecOps (UC-01 / UC-02)
   #  devel:

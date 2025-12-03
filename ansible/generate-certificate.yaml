@@ -1,0 +1,230 @@
+---
+# Generic certificate generation task
+# Can generate both CA certificates and agent certificates
+# Parameters:
+#   cert_name: Name for the certificate (e.g., "x509pop-ca", "qtodo-agent")
+#   cert_type: "ca" or "agent"
+#   cert_namespace: Kubernetes namespace to store certificate
+#   output_configmap: Create ConfigMap with cert (true/false)
+#   output_secret: Create Secret with key (true/false)
+#   cert_dir: Temporary directory for cert generation
+#   For agent certs only:
+#     ca_cert_path: Path to CA certificate file
+#     ca_key_path: Path to CA private key file
+#   Certificate details:
+#     common_name: Certificate CN
+#     organization: Certificate O
+#     country: Certificate C
+#     validity_days: Certificate validity period
+#     key_usage: List of key usage extensions
+#     extended_key_usage: List of extended key usage (optional, for agent certs)
+
+- name: "Set certificate paths for {{ cert_name }}"
+  ansible.builtin.set_fact:
+    key_path: "{{ cert_dir }}/{{ cert_name }}-key.pem"
+    cert_path: "{{ cert_dir }}/{{ cert_name }}-cert.pem"
+    csr_path: "{{ cert_dir }}/{{ cert_name }}.csr"
+
+- name: "Check if certificate already exists: {{ cert_name }}" # noqa: syntax-check[unknown-module]
+  kubernetes.core.k8s_info:
+    kind: "{{ 'ConfigMap' if output_configmap else 'Secret' }}"
+    namespace: "{{ cert_namespace }}"
+    name: "{{ cert_name if output_configmap else (key_secret_name | default(cert_name + '-key')) }}"
+  register: existing_cert
+
+- name: "Skip certificate - already exists: {{ cert_name }}"
+  ansible.builtin.debug:
+    msg: "Certificate {{ cert_name }} already exists, skipping"
+  when: existing_cert.resources | length > 0
+
+- name: "Generate private key for {{ cert_name }}"
+  community.crypto.openssl_privatekey:
+    path: "{{ key_path }}"
+    size: "{{ 4096 if cert_type == 'ca' else 2048 }}"
+  when: existing_cert.resources | length == 0
+
+- name: "Generate CSR for CA certificate {{ cert_name }}"
+  community.crypto.openssl_csr:
+    path: "{{ csr_path }}"
+    privatekey_path: "{{ key_path }}"
+    common_name: "{{ common_name }}"
+    organization_name: "{{ organization }}"
+    country_name: "{{ country }}"
+    basic_constraints:
+      - "CA:TRUE"
+    basic_constraints_critical: true
+    key_usage: "{{ key_usage }}"
+    key_usage_critical: true
+  when:
+    - existing_cert.resources | length == 0
+    - cert_type == "ca"
+
+- name: "Generate self-signed CA certificate for {{ cert_name }}"
+  community.crypto.x509_certificate:
+    path: "{{ cert_path }}"
+    csr_path: "{{ csr_path }}"
+    privatekey_path: "{{ key_path }}"
+    provider: selfsigned
+    selfsigned_not_after: "+{{ validity_days }}d"
+  when:
+    - existing_cert.resources | length == 0
+    - cert_type == "ca"
+
+- name: "Generate CSR for {{ cert_name }}"
+  community.crypto.openssl_csr:
+    path: "{{ csr_path }}"
+    privatekey_path: "{{ key_path }}"
+    common_name: "{{ common_name }}"
+    organization_name: "{{ organization }}"
+    country_name: "{{ country }}"
+    key_usage: "{{ key_usage }}"
+    key_usage_critical: true
+    extended_key_usage: "{{ extended_key_usage | default(omit) }}"
+  when:
+    - existing_cert.resources | length == 0
+    - cert_type == "agent"
+
+- name: "Sign agent certificate for {{ cert_name }}"
+  community.crypto.x509_certificate:
+    path: "{{ cert_path }}"
+    csr_path: "{{ csr_path }}"
+    provider: ownca
+    ownca_path: "{{ ca_cert_path }}"
+    ownca_privatekey_path: "{{ ca_key_path }}"
+    ownca_not_after: "+{{ validity_days }}d"
+  when:
+    - existing_cert.resources | length == 0
+    - cert_type == "agent"
+
+- name: "Create ConfigMap with certificate for {{ cert_name }}" # noqa: syntax-check[unknown-module]
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: "{{ cert_name }}"
+        namespace: "{{ cert_namespace }}"
+      data:
+        ca-bundle.pem: "{{ lookup('file', cert_path) }}"
+  when:
+    - existing_cert.resources | length == 0
+    - output_configmap | default(false)
+
+- name: "Check if key secret exists: {{ cert_name }}" # noqa: syntax-check[unknown-module]
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: "{{ cert_namespace }}"
+    name: "{{ key_secret_name | default(cert_name + '-key') }}"
+  register: existing_key_secret
+  when: output_secret | default(false)
+
+- name: "Create Secret with CA private key for {{ cert_name }}" # noqa: syntax-check[unknown-module]
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: "{{ key_secret_name | default(cert_name + '-key') }}"
+        namespace: "{{ cert_namespace }}"
+      type: Opaque
+      stringData:
+        ca-key.pem: "{{ lookup('file', key_path) }}"
+  when:
+    - output_secret | default(false)
+    - (existing_key_secret.resources | default([])) | length == 0
+    - cert_type == 'ca'
+
+- name: "Create Secret with agent private key for {{ cert_name }}" # noqa: syntax-check[unknown-module]
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: "{{ key_secret_name | default(cert_name + '-key') }}"
+        namespace: "{{ cert_namespace }}"
+      type: Opaque
+      stringData:
+        key: "{{ lookup('file', key_path) }}"
+  when:
+    - output_secret | default(false)
+    - (existing_key_secret.resources | default([])) | length == 0
+    - cert_type == 'agent'
+
+- name: "Create Secret with certificate for {{ cert_name }}" # noqa: syntax-check[unknown-module]
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: "{{ cert_secret_name | default(cert_name) }}"
+        namespace: "{{ cert_namespace }}"
+      type: Opaque
+      stringData:
+        cert: "{{ lookup('file', cert_path) }}"
+  when:
+    - existing_cert.resources | length == 0
+    - cert_type == "agent"
+    - not (output_configmap | default(false))
+
+# Push agent certificates to Vault for KBS to serve
+- name: "Create PushSecret for certificate {{ cert_secret_name | default(cert_name) }}" # noqa: syntax-check[unknown-module]
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: external-secrets.io/v1alpha1
+      kind: PushSecret
+      metadata:
+        name: "push-{{ cert_secret_name | default(cert_name) }}"
+        namespace: "{{ cert_namespace }}"
+      spec:
+        updatePolicy: Replace
+        deletionPolicy: Delete
+        refreshInterval: 10s
+        secretStoreRefs:
+          - name: vault-backend
+            kind: ClusterSecretStore
+        selector:
+          secret:
+            name: "{{ cert_secret_name | default(cert_name) }}"
+        data:
+          - match:
+              secretKey: cert
+              remoteRef:
+                remoteKey: "pushsecrets/{{ cert_secret_name | default(cert_name) }}"
+                property: cert
+  when:
+    - cert_type == "agent"
+    - not (output_configmap | default(false))
+
+- name: "Create PushSecret for private key {{ key_secret_name | default(cert_name + '-key') }}" # noqa: syntax-check[unknown-module]
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: external-secrets.io/v1alpha1
+      kind: PushSecret
+      metadata:
+        name: "push-{{ key_secret_name | default(cert_name + '-key') }}"
+        namespace: "{{ cert_namespace }}"
+      spec:
+        updatePolicy: Replace
+        deletionPolicy: Delete
+        refreshInterval: 10s
+        secretStoreRefs:
+          - name: vault-backend
+            kind: ClusterSecretStore
+        selector:
+          secret:
+            name: "{{ key_secret_name | default(cert_name + '-key') }}"
+        data:
+          - match:
+              secretKey: key
+              remoteRef:
+                remoteKey: "pushsecrets/{{ key_secret_name | default(cert_name + '-key') }}"
+                property: key
+  when:
+    - cert_type == "agent"
+    - output_secret | default(false)
