@@ -1,0 +1,8 @@
+# Override the default values for the sandboxed-containers chart
+# Configures External Secrets Operator integration for Azure SSH keys
+
+# Secret store configuration for External Secrets Operator
+# Points to the ClusterSecretStore that knows how to connect to Vault
+secretStore:
+  name: vault-backend
+  kind: ClusterSecretStore

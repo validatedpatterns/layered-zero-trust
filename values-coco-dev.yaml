@@ -1,0 +1,513 @@
+# CoCo Development Configuration (Single Cluster)
+# Combines ZTVP (SPIRE/Keycloak/Vault) with CoCo (Trustee/Sandboxed Containers)
+# All components deployed on single cluster for development/testing
+#
+# WARNING: NOT RECOMMENDED FOR PRODUCTION
+# This configuration runs Trustee/KBS on the same untrusted cluster as worker nodes.
+# Production deployments should use multi-cluster setup with Trustee on a trusted cluster.
+
+global:
+  options:
+    autoApproveManualInstallPlans: true
+
+# This spire config is required to fix a bug in the zero-trust-workload-identity-manager operator
+spire:
+  oidcDiscoveryProvider:
+    ingress:
+      enabled: true
+      annotations:
+        route.openshift.io/termination: reencrypt
+        route.openshift.io/destination-ca-certificate-secret: spire-bundle
+
+# Moved outside of clusterGroup to avoid validation errors
+# CoCo workload types for x509pop certificate generation
+# One SPIRE agent certificate is generated per workload type
+# All pods of the same workload type (e.g., all qtodo pods) share the same agent certificate
+# NOTE: KBS resource policy should be added to enforce workload-specific certificate access
+coco:
+  # Container image signature verification policy
+  # Options: insecure (accept all), reject (reject all), signed (require cosign signature)
+  # See values-secret.yaml.template for policy definitions
+  imageSecurityPolicy: insecure
+  workloads:
+    - name: "qtodo"
+      namespace: "qtodo"
+
+clusterGroup:
+  name: coco-dev
+  isHubCluster: true
+  namespaces:
+    - open-cluster-management
+    - vault
+    # - qtodo  # COMMENTED OUT for coco-dev
+    - golang-external-secrets
+    # COMMENTED OUT for coco-dev: Keycloak not needed
+    # - keycloak-system:
+    #     operatorGroup: true
+    #     targetNamespace: keycloak-system
+    - cert-manager
+    - cert-manager-operator:
+        operatorGroup: true
+        targetNamespace: cert-manager-operator
+    # Layer 1: Quay Registry (for container image storage and signing)
+    # COMMENTED OUT: Uncomment to enable integrated Quay registry
+    # - openshift-storage:
+    #     operatorGroup: true
+    #     targetNamespace: openshift-storage
+    #     annotations:
+    #       openshift.io/cluster-monitoring: "true"
+    #       argocd.argoproj.io/sync-wave: "-5"  # Propagated to OperatorGroup by framework
+    # - quay-enterprise:
+    #     annotations:
+    #       argocd.argoproj.io/sync-wave: "1"  # Create before NooBaa and all Quay components
+    #     labels:
+    #       openshift.io/cluster-monitoring: "true"
+    # RHTAS namespace (required when RHTAS application is enabled)
+    # COMMENTED OUT: Uncomment to enable RHTAS with SPIFFE signing
+    # - trusted-artifact-signer:
+    #     annotations:
+    #       argocd.argoproj.io/sync-wave: "1"  # Auto-created by RHTAS operator
+    #     labels:
+    #       openshift.io/cluster-monitoring: "true"
+    - zero-trust-workload-identity-manager:
+        operatorGroup: true
+        targetNamespace: zero-trust-workload-identity-manager
+    - openshift-compliance:
+        operatorGroup: true
+        targetNamespace: openshift-compliance
+        annotations:
+          openshift.io/cluster-monitoring: "true"
+    # CoCo namespaces
+    - openshift-sandboxed-containers-operator
+    - trustee-operator-system
+  subscriptions:
+    acm:
+      name: advanced-cluster-management
+      namespace: open-cluster-management
+      channel: release-2.14
+      catalogSource: redhat-operators
+    cert-manager:
+      name: openshift-cert-manager-operator
+      namespace: cert-manager-operator
+      channel: stable-v1
+      catalogSource: redhat-marketplace
+    # COMMENTED OUT for coco-dev: Keycloak operator not needed
+    # rhbk:
+    #   name: rhbk-operator
+    #   namespace: keycloak-system
+    #   channel: stable-v26.2
+    #   catalogSource: redhat-marketplace
+    zero-trust-workload-identity-manager:
+      name: openshift-zero-trust-workload-identity-manager
+      namespace: zero-trust-workload-identity-manager
+      channel: stable-v1
+      catalogSource: redhat-marketplace
+      config:
+        env:
+          - name: CREATE_ONLY_MODE
+            value: "true"
+    compliance-operator:
+      name: compliance-operator
+      namespace: openshift-compliance
+      channel: stable
+      catalogSource: redhat-marketplace
+      config:
+        nodeSelector:
+          node-role.kubernetes.io/worker: ""
+    # CoCo subscriptions
+    sandboxed:
+      name: sandboxed-containers-operator
+      namespace: openshift-sandboxed-containers-operator
+      source: redhat-operators
+      channel: stable
+      installPlanApproval: Manual
+      csv: sandboxed-containers-operator.v1.11.1
+    trustee:
+      name: trustee-operator
+      namespace: trustee-operator-system
+      source: redhat-operators
+      channel: stable
+      installPlanApproval: Manual
+      csv: trustee-operator.v1.0.0
+      config:
+        env:
+          - name: KBS_IMAGE_NAME
+            # trustee-operator v1.0.0 ships a KBS image that only validates
+            # AMD Milan VCEK certificates. This image includes the fix for
+            # Genoa (DCasv6). Remove once a new operator release ships the fix.
+            # See: https://github.com/confidential-containers/trustee/pull/1184
+            value: "quay.io/confidential-containers/trustee:v1.0.0-genoa-fix"
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 10m
+            memory: 256Mi
+    # Storage and Registry operator subscriptions
+    # COMMENTED OUT: Uncomment to enable integrated Quay registry
+    # ODF provides object storage backend (NooBaa) for Quay and RHTPA
+    # odf:
+    #   name: odf-operator
+    #   namespace: openshift-storage
+    #   channel: stable-4.19
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "-4"  # Install after OperatorGroup (-5)
+    # quay-operator:
+    #   name: quay-operator
+    #   namespace: openshift-operators
+    #   channel: stable-3.15
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "-3"  # Install after ODF operator
+    # RHTAS operator subscription (required when RHTAS application is enabled)
+    # COMMENTED OUT: Uncomment to enable RHTAS with SPIFFE integration
+    # rhtas-operator:
+    #   name: rhtas-operator
+    #   namespace: openshift-operators
+    #   channel: stable
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "-2"  # Install after Quay operator, before applications
+    #   catalogSource: redhat-operators
+  projects:
+    - hub
+  # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
+  # We can use self-referential variables because the chart calls the tpl function with these variables defined
+  sharedValueFiles:
+    - '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
+  # sharedValueFiles is a flexible mechanism that will add the listed valuefiles to every app defined in the
+  # applications section. We intend this to supplement and possibly even replace previous "magic" mechanisms, though
+  # we do not at present have a target date for removal.
+  #
+  # To replicate the "classic" magic include structure, the clusterGroup would need all of these
+  # sharedValueFiles, in this order:
+  #   - '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
+  #   - '/overrides/values-{{ $.Values.global.clusterPlatform }}-{{ $.Values.global.clusterVersion }}.yaml'
+  #   - '/overrides/values-{{ $.Values.global.clusterPlatform }}-{{ $.Values.clusterGroup.name }}.yaml'
+  #   - '/overrides/values-{{ $.Values.global.clusterVersion }}-{{ $.Values.clusterGroup.name }}.yaml"
+  #   - '/overrides/values-{{ $.Values.global.localClusterName }}.yaml'
+
+  # This kind of variable substitution will work with any of the variables the Validated Patterns operator knows
+  # about and sets, so this is also possible, for example:
+  #   - '/overrides/values-{{ $.Values.global.hubClusterDomain }}.yaml'
+  #   - '/overrides/values-{{ $.Values.global.localClusterDomain }}.yaml'
+  applications:
+    acm:
+      name: acm
+      namespace: open-cluster-management
+      project: hub
+      chart: acm
+      chartVersion: 0.1.*
+      ignoreDifferences:
+        - group: internal.open-cluster-management.io
+          kind: ManagedClusterInfo
+          jsonPointers:
+            - /spec/loggingCA
+      # We override the secret store because we are not provisioning clusters
+      overrides:
+        - name: global.secretStore.backend
+          value: none
+    acm-managed-clusters:
+      name: acm-managed-clusters
+      project: hub
+      path: charts/acm-managed-clusters
+      ignoreDifferences:
+        - group: cluster.open-cluster-management.io
+          kind: ManagedCluster
+          jsonPointers:
+            - /metadata/labels/cloud
+            - /metadata/labels/vendor
+    compliance-scanning:
+      name: compliance-scanning
+      namespace: openshift-compliance
+      annotations:
+        argocd.argoproj.io/sync-wave: '-30'
+      project: hub
+      path: charts/compliance-scanning
+    vault:
+      name: vault
+      namespace: vault
+      project: hub
+      chart: hashicorp-vault
+      chartVersion: 0.1.*
+      policies: []
+      jwt:
+        enabled: true
+        oidcDiscoveryUrl: https://spire-spiffe-oidc-discovery-provider.zero-trust-workload-identity-manager.svc.cluster.local
+        oidcDiscoveryCa: /run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+        defaultRole: qtodo
+        roles:
+          - name: qtodo
+            audience: qtodo
+            subject: spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/qtodo/sa/qtodo
+            policies:
+              - global-secret
+    # Shared Object Storage Backend
+    # COMMENTED OUT: Uncomment to enable integrated Quay registry
+    # NooBaa MCG provides S3-compatible object storage for multiple applications
+    # Direct consumers: Quay (container image storage)
+    # noobaa-mcg:
+    #   name: noobaa-mcg
+    #   namespace: openshift-storage
+    #   project: hub
+    #   path: charts/noobaa-mcg
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "5"  # Deploy after core services
+    # Quay Container Registry (uses NooBaa for storage)
+    # quay-registry:
+    #   name: quay-registry
+    #   namespace: quay-enterprise
+    #   project: hub  
+    #   path: charts/quay-registry
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "10"  # Deploy after NooBaa storage backend
+    # RHTAS with SPIFFE Integration
+    # COMMENTED OUT: Uncomment to enable RHTAS with SPIFFE and Email issuers
+    # Depends on: Vault, SPIRE, Keycloak (for Email OIDC issuer if used)
+    # trusted-artifact-signer:
+    #   name: trusted-artifact-signer
+    #   namespace: trusted-artifact-signer
+    #   project: hub
+    #   path: charts/rhtas-operator
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "15"  # Deploy after dependencies
+    #   overrides:
+    #     # OIDC Issuer Configuration - Both can be enabled simultaneously
+    #     # Enable SPIFFE issuer for workload identity
+    #     - name: rhtas.zeroTrust.spire.enabled
+    #       value: "true"
+    #     - name: rhtas.zeroTrust.spire.trustDomain
+    #       value: "apps.{{ $.Values.global.clusterDomain }}"
+    #     - name: rhtas.zeroTrust.spire.issuer
+    #       value: "https://spire-spiffe-oidc-discovery-provider.apps.{{ $.Values.global.clusterDomain }}"
+    #     # Enable Keycloak issuer for user/email authentication
+    #     - name: rhtas.zeroTrust.email.enabled
+    #       value: "true"
+    #     - name: rhtas.zeroTrust.email.issuer
+    #       value: https://keycloak.apps.{{ $.Values.global.clusterDomain }}/realms/ztvp
+    golang-external-secrets:
+      name: golang-external-secrets
+      namespace: golang-external-secrets
+      project: hub
+      chart: golang-external-secrets
+      chartVersion: 0.1.*
+    # COMMENTED OUT for coco-dev: Keycloak is for user auth (not needed for CoCo testing)
+    # rh-keycloak:
+    #   name: rh-keycloak
+    #   namespace: keycloak-system
+    #   project: hub
+    #   path: charts/keycloak
+    rh-cert-manager:
+      name: rh-cert-manager
+      namespace: cert-manager-operator
+      project: hub
+      path: charts/certmanager
+    zero-trust-workload-identity-manager:
+      name: zero-trust-workload-identity-manager
+      namespace: zero-trust-workload-identity-manager
+      project: hub
+      path: charts/zero-trust-workload-identity-manager
+      overrides:
+        - name: spire.clusterName
+          value: hub
+    # COMMENTED OUT for coco-dev: qtodo demo app requires Keycloak/Vault (not needed for CoCo testing)
+    # qtodo:
+    #   name: qtodo
+    #   namespace: qtodo
+    #   project: hub
+    #   path: charts/qtodo
+    #   overrides:
+    #     - name: app.oidc.enabled
+    #       value: "true"
+    #     - name: app.spire.enabled
+    #       value: "true"
+    #     - name: app.vault.url
+    #       value: https://vault.vault.svc.cluster.local:8200
+    #     - name: app.vault.role
+    #       value: qtodo
+    #     - name: app.vault.secretPath
+    #       value: secret/data/global/qtodo
+    trustee:
+      name: trustee
+      namespace: trustee-operator-system
+      project: hub
+      chart: trustee
+      chartVersion: 0.2.*
+      extraValueFiles:
+        - /overrides/values-trustee.yaml
+    sandbox:
+      name: sandbox
+      namespace: openshift-sandboxed-containers-operator
+      project: hub
+      chart: sandboxed-containers
+      chartVersion: 0.2.*
+      overrides:
+        - name: global.secretStore.backend
+          value: vault
+        - name: secretStore.name
+          value: vault-backend
+        - name: secretStore.kind
+          value: ClusterSecretStore
+    # CoCo peer-pods configuration via ACM Policy
+    # Creates peer-pods-cm ConfigMap with platform-specific cluster configuration
+    # Uses ACM Policy template functions (fromConfigMap) to auto-discover cluster settings
+    # from cloud-controller-manager instead of requiring manual oc commands or imperative jobs
+    # Required for peer-pods to provision confidential VMs in the correct network environment
+    sandbox-policies:
+      name: sandbox-policies
+      namespace: openshift-sandboxed-containers-operator
+      project: hub
+      chart: sandboxed-policies
+      chartVersion: 0.1.*
+      overrides:
+        - name: global.coco.azure.defaultVMFlavour
+          value: Standard_DC2as_v5
+        - name: global.coco.azure.VMFlavours
+          value: "Standard_DC2as_v5,Standard_DC4as_v5,Standard_DC8as_v5,Standard_DC16as_v5"
+        - name: global.coco.azure.tags
+          value: "owner=bleal@redhat.com"
+        - name: global.coco.azure.rootVolumeSize
+          value: "20"
+    hello-coco:
+      name: hello-coco
+      namespace: zero-trust-workload-identity-manager
+      project: hub
+      path: charts/hello-coco
+      syncPolicy:
+        automated: {}
+        retry:
+          limit: 50
+  argoCD:
+    resourceExclusions: |
+      - apiGroups:
+        - internal.open-cluster-management.io
+        kinds:
+        - ManagedClusterInfo
+        clusters:
+        - "*"
+
+  imperative:
+    # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm
+    # The default schedule is every 10 minutes: imperative.schedule
+    # Total timeout of all jobs is 1h: imperative.activeDeadlineSeconds
+    # imagePullPolicy is set to always: imperative.imagePullPolicy
+    # For additional overrides that apply to the jobs, please refer to
+    # https://hybrid-cloud-patterns.io/imperative-actions/#additional-job-customizations
+    serviceAccountName: imperative-admin-sa
+    jobs:
+    - name: install-deps
+      playbook: ansible/install-deps.yaml
+      verbosity: -vvv
+      timeout: 180
+    - name: configure-azure-nat-gateway
+      playbook: ansible/azure-nat-gateway.yaml
+      verbosity: -vvv
+      timeout: 60
+    - name: init-data-gzipper
+      playbook: ansible/init-data-gzipper.yaml
+      verbosity: -vvv
+      timeout: 60
+  managedClusterGroups: {}
+  # This configuration can be used for Pipeline/DevSecOps (UC-01 / UC-02)
+  #  devel:
+  #    name: devel
+  #    helmOverrides:
+  #      - name: clusterGroup.isHubCluster
+  #        value: false
+  #    clusterSelector:
+  #      matchLabels:
+  #        clusterGroup: devel
+  #      matchExpressions:
+  #        - key: vendor
+  #          operator: In
+  #          values:
+  #            - OpenShift
+  #  production:
+  #    name: production
+  #    helmOverrides:
+  #      - name: clusterGroup.isHubCluster
+  #        value: false
+  #    clusterSelector:
+  #      matchLabels:
+  #        clusterGroup: production
+  #      matchExpressions:
+  #        - key: vendor
+  #          operator: In
+  #          values:
+  #            - OpenShift
+  # End of Pipeline/DevSecOps configuration
+
+    # exampleRegion:
+    #   name: group-one
+    #   acmlabels:
+    #     - name: clusterGroup
+    #       value: group-one
+    #   helmOverrides:
+    #     - name: clusterGroup.isHubCluster
+    #       value: false
+#  To have apps in multiple flavors, use namespaces and use helm overrides as appropriate
+#
+#    pipelines:
+#      name: pipelines
+#      namespace: production
+#      project: datacenter
+#      path: applications/pipeline
+#      repoURL: https://github.com/you/applications.git
+#      targetRevision: stable
+#      overrides:
+#      - name: myparam
+#        value: myparam
+#
+#    pipelines_staging:
+#    - name: pipelines
+#      namespace: staging
+#      project: datacenter
+#      path: applications/pipeline
+#      repoURL: https://github.com/you/applications.git
+#      targetRevision: main
+#
+#   Additional applications
+#   Be sure to include additional resources your apps will require
+#   +X machines
+#   +Y RAM
+#   +Z CPU
+#    vendor-app:
+#      name: vendor-app
+#      namespace: default
+#      project: vendor
+#      path: path/to/myapp
+#      repoURL: https://github.com/vendor/applications.git
+#      targetRevision: main
+
+#  managedSites:
+#    factory:
+#      name: factory
+#      # repoURL: https://github.com/dagger-refuse-cool/manuela-factory.git
+#      targetRevision: main
+#      path: applications/factory
+#      helmOverrides:
+#      - name: site.isHubCluster
+#        value: false
+#      clusterSelector:
+#        matchExpressions:
+#        - key: vendor
+#          operator: In
+#          values:
+#            - OpenShift
+
+
+# List of previously provisioned clusters to import and manage from the Hub cluster
+acmManagedClusters:
+  clusters: []
+  # This configuration can be used for Pipeline/DevSecOps (UC-01 / UC-02)
+  #  - name: ztvp-spoke-1
+  #    clusterGroup: devel
+  #    labels:
+  #      cloud: auto-detect
+  #      vendor: auto-detect
+  #    kubeconfigVaultPath: secret/data/hub/kubeconfig-spoke-1
+  #  - name: ztvp-spoke-2
+  #    clusterGroup: production
+  #    labels:
+  #      cloud: auto-detect
+  #      vendor: auto-detect
+  #    kubeconfigVaultPath: secret/data/hub/kubeconfig-spoke-2
