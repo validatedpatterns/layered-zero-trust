@@ -1,0 +1,22 @@
+# Default values for hello coco
+
+# SPIRE trust domain
+# The SPIRE agent must be configured with the same trust domain as the SPIRE Server
+# This ensures the agent can successfully authenticate and workloads receive valid SPIFFE IDs
+# Typically set to apps.<your cluster domain>
+trustDomain: "apps.example.com"
+
+# KBS URL for CDH (Confidential Data Hub) to fetch sealed secrets after TEE attestation
+# Dev (single cluster): http://kbs-service.trustee-operator-system.svc.cluster.local:8080
+# Prod (separate trusted cluster): https://kbs.trusted-cluster.example.com
+kbsUrl: "http://kbs-service.trustee-operator-system.svc.cluster.local:8080"
+
+# Sealed secret configuration for SPIRE agent x509pop attestation
+# These are KBS resource paths where the agent cert/key are stored
+sealedSecret:
+  # Name of the K8s Secret to create with sealed references
+  name: "spire-agent-sealed-creds"
+  # KBS resource path for the certificate (e.g., default/spire-cert-qtodo/cert)
+  certPath: "default/spire-cert-qtodo/cert"
+  # KBS resource path for the private key (e.g., default/spire-key-qtodo/key)
+  keyPath: "default/spire-key-qtodo/key"
