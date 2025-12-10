@@ -38,25 +38,16 @@ def send_get_request(site_url):
 def verify_pod_in_project(openshift_dyn_client, project, pod):
     pod_name = pod
     logger.debug(f'Verify pod "{pod}" in project "{project}"')
-    try:
-        pods = Pod.get(dyn_client=openshift_dyn_client, namespace=project)
-        for pod in pods:
-            logger.debug(f"Current pod: {pod.instance.metadata.name}")
-            if pod.instance.metadata.name == pod_name:
-                logger.debug("Pod name match!")
-                for container in pod.instance.status.containerStatuses:
-                    if container.state.terminated:
-                        if (
-                            container.state.terminated.reason
-                            != Resource.Status.COMPLETED
-                        ):
-                            return False
-                    elif not container.state.running:
-                        return False
-                return True
-        return False
-    except StopIteration:
-        raise
+    pod = Pod(client=openshift_dyn_client, namespace=project, name=pod_name)
+    if pod.exists:
+        for container in pod.instance.status.containerStatuses:
+            if container.state.terminated:
+                if container.state.terminated.reason != Resource.Status.COMPLETED:
+                    return False
+            elif not container.state.running:
+                return False
+        return True
+    return False
 
 
 def verify_pod_by_deployment(openshift_dyn_client, project, deployment):
