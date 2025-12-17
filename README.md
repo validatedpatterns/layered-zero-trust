@@ -170,7 +170,7 @@ If all of the Argo CD applications are reporting healthy, the pattern has been d
 ### Use cases
 
 * [Secure Multi-tier Application](./docs/multi-tier.md)
-* [Use Case 02: Secure Supply Chain](./docs/supply-chain.md)
+* [Secure Supply Chain](./docs/supply-chain.md)
 
 ### Importing existing clusters
 

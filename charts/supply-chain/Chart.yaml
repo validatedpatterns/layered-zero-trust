@@ -1,6 +1,6 @@
 apiVersion: v2
 name: supply-chain
-description: A Helm chart for Supply Chain (UC02)
+description: A Helm chart for Secure Supply Chain
 type: application
 version: 0.1.0
 appVersion: "1.0.0"

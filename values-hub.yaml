@@ -64,7 +64,7 @@ clusterGroup:
         targetNamespace: openshift-compliance
         annotations:
           openshift.io/cluster-monitoring: "true"
-    # UC-02: Uncomment to enable OpenShift Pipelines
+    # Secure Supply Chain: Uncomment to enable OpenShift Pipelines
     # - openshift-pipelines
   subscriptions:
     acm:
@@ -77,7 +77,7 @@ clusterGroup:
       namespace: cert-manager-operator
       channel: stable-v1
       catalogSource: redhat-marketplace
-    # UC-02: Uncomment to enable OpenShift Pipelines
+    # Secure Supply Chain: Uncomment to enable OpenShift Pipelines
     # openshift-pipelines:
     #   name: openshift-pipelines-operator-rh
     #   namespace: openshift-operators
@@ -349,7 +349,7 @@ clusterGroup:
           value: qtodo
         - name: app.vault.secretPath
           value: secret/data/global/qtodo
-        # For UC-02, we changed the qtodo image to use the one built in the secure supply chain
+        # For Secure Supply Chain, we changed the qtodo image to use the one built in the secure supply chain
         # - name: app.images.main.name
         #   value: quay-registry-quay-quay-enterprise.apps.{{ $.Values.global.clusterDomain }}/ztvp/qtodo
         # - name: app.images.main.version
@@ -361,7 +361,7 @@ clusterGroup:
         #   value: quay-user
         # - name: app.images.main.registry.passwordVaultKey
         #   value: quay-user-password
-    # UC-02: Secure Supply Chain - Uncomment to enable
+    # Secure Supply Chain - Uncomment to enable
     # supply-chain:
     #  name: supply-chain
     #  project: hub
@@ -433,7 +433,7 @@ clusterGroup:
     # imagePullPolicy is set to always: imperative.imagePullPolicy
     jobs: []
   managedClusterGroups: {}
-  # This configuration can be used for Pipeline/DevSecOps (UC-01 / UC-02)
+  # This configuration can be used for use cases Pipeline/Secure Supply Chain
   #  devel:
   #    name: devel
   #    helmOverrides:
@@ -524,7 +524,7 @@ clusterGroup:
 # List of previously provisioned clusters to import and manage from the Hub cluster
 acmManagedClusters:
   clusters: []
-  # This configuration can be used for Pipeline/DevSecOps (UC-01 / UC-02)
+  # This configuration can be used for use cases Pipeline/Secure Supply Chain
   #  - name: ztvp-spoke-1
   #    clusterGroup: devel
   #    labels:

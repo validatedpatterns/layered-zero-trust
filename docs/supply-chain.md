@@ -1,4 +1,4 @@
-# Use Case 02: Secure Supply Chain
+# Secure Supply Chain
 
 This use case outlines the process of building, signing, and verifying artifacts and images within the Zero Trust Validated Pattern (ZTVP).
 
