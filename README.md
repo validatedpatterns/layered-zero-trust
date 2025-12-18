@@ -16,11 +16,11 @@ Showcases the Zero Trust capabilities across Red Hat's product portfolio in a re
 The following components are included in the Layered Zero Trust Pattern
 
 * OpenShift cluster hardening
-  * [Compliance Operator](https://docs.redhat.com/en/documentation/openshift_container_platform/4.19/html/security_and_compliance/compliance-operator)
+  * [Compliance Operator](https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/security_and_compliance/compliance-operator)
 * [Red Hat Build of Keycloak](https://access.redhat.com/products/red-hat-build-of-keycloak/)
   * Identities to access pattern components
   * OIDC client to authenticate uses to a web application
-* [Red Hat Zero Trust Workload Identity Manager](https://docs.redhat.com/en/documentation/openshift_container_platform/4.19/html/security_and_compliance/zero-trust-workload-identity-manager)
+* [Red Hat Zero Trust Workload Identity Manager](https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/security_and_compliance/zero-trust-workload-identity-manager)
   * Provides identities to workloads running within OpenShift
 * [HashiCorp Vault](https://www.hashicorp.com/en/products/vault)
   * Secure storage of sensitive assets
@@ -45,7 +45,7 @@ Utilize the following steps to prepare your machine and complete any and all pre
 
 ### Prerequisites
 
-1. An OpenShift Container Platform 4.19+ cluster with:
+1. An OpenShift Container Platform 4.20+ cluster with:
     1. Publicly signed certificates for Ingress
     2. A default `StorageClass` which provides dynamic `PersistentVolume` storage
 2. To customize the provided default configuration, a GitHub account and a token for it with repositories permissions, to read from and write to your forks, is required.

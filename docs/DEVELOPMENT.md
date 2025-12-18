@@ -17,7 +17,7 @@ The following options should be selected:
 * Activity: Practice / Enablement
 * Purpose: Trying out a technical solution
 * Salesforce ID: Can be omitted (See note below)
-* OpenShift Version: 4.19+
+* OpenShift Version: 4.20+
 * Features
   * Enable Cert Manager
   * Enable Cert Manager API
