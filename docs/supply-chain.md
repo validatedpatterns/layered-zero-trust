@@ -36,6 +36,185 @@ In our demo, we will use a number of additional ZTVP components. These component
 * [Multicloud Object Gateway](https://docs.redhat.com/en/documentation/red_hat_openshift_container_storage/4.8/html/managing_hybrid_and_multicloud_resources/index) is a data service for OpenShift that provides an S3-compatible object storage. In our case, this component is necessary to provide a storage system to Quay.
 * [Red Hat OpenShift Pipelines](https://docs.redhat.com/en/documentation/red_hat_openshift_pipelines/1.20) is a cloud-native CI/CD solution built on the Tekton framework. We will use this product to automate our secure supply chain process, but you could use your own CI/CD solution if one exists.
 
+### Defining the values
+
+To enable this use case, the following parameters should be defined within the [values-hub.yaml](../values-hub.yaml) file
+
+* In the `clustergroup.namespaces` section, create the _Namespaces_ for the components by uncommenting the following
+
+    ```shell
+    - openshift-storage:
+        operatorGroup: true
+        targetNamespace: openshift-storage
+        annotations:
+          openshift.io/cluster-monitoring: "true"
+          argocd.argoproj.io/sync-wave: "26"  # Propagated to OperatorGroup by framework
+    - quay-enterprise:
+        annotations:
+          argocd.argoproj.io/sync-wave: "32"  # Create before NooBaa and all Quay components
+        labels:
+          openshift.io/cluster-monitoring: "true"
+    - trusted-artifact-signer:
+        annotations:
+          argocd.argoproj.io/sync-wave: "32"  # Auto-created by RHTAS operator
+        labels:
+          openshift.io/cluster-monitoring: "true"
+    - rhtpa-operator:
+        operatorGroup: true
+        targetNamespace: rhtpa-operator
+        annotations:
+          argocd.argoproj.io/sync-wave: "26"  # Create before operator subscription
+    - trusted-profile-analyzer:
+        annotations:
+          argocd.argoproj.io/sync-wave: "32"  # Create before RHTPA components
+        labels:
+          openshift.io/cluster-monitoring: "true"
+    - openshift-pipelines
+    ```
+
+* In the `clusterGroup.subscriptions` section, create the _Subscriptions_ for the components operators by uncommenting the following:
+
+    ```shell
+    openshift-pipelines:
+      name: openshift-pipelines-operator-rh
+      namespace: openshift-operators
+    odf:
+      name: odf-operator
+      namespace: openshift-storage
+      channel: stable-4.20
+      annotations:
+        argocd.argoproj.io/sync-wave: "27"  # Install after OperatorGroup (26)
+    quay-operator:
+      name: quay-operator
+      namespace: openshift-operators
+      channel: stable-3.15
+      annotations:
+        argocd.argoproj.io/sync-wave: "28"  # Install after ODF operator
+    rhtas-operator:
+      name: rhtas-operator
+      namespace: openshift-operators
+      channel: stable
+      annotations:
+        argocd.argoproj.io/sync-wave: "29"  # Install after Quay operator, before applications
+      catalogSource: redhat-operators
+    rhtpa-operator:
+      name: rhtpa-operator
+      namespace: rhtpa-operator  # MUST use dedicated namespace (not openshift-operators)
+      channel: stable-v1.1  # Use stable-v1.1 channel for 1.1.x updates
+      catalogSource: redhat-operators
+      annotations:
+        argocd.argoproj.io/sync-wave: "27"  # Install after OperatorGroup (26), before applications
+    ```
+
+* Configure the Argo CD _Applications_:
+
+    ```shell
+    noobaa-mcg:
+      name: noobaa-mcg
+      namespace: openshift-storage
+      project: hub
+      path: charts/noobaa-mcg
+      annotations:
+        argocd.argoproj.io/sync-wave: "36"  # Deploy after core services
+    quay-registry:
+      name: quay-registry
+      namespace: quay-enterprise
+      project: hub
+      path: charts/quay-registry
+      annotations:
+        argocd.argoproj.io/sync-wave: "41"  # Deploy after NooBaa storage backend
+    trusted-artifact-signer:
+      name: trusted-artifact-signer
+      namespace: trusted-artifact-signer
+      project: hub
+      path: charts/rhtas-operator
+      annotations:
+        argocd.argoproj.io/sync-wave: "46"  # Deploy after dependencies
+      overrides:
+        - name: rhtas.zeroTrust.spire.enabled
+          value: "true"
+        - name: rhtas.zeroTrust.spire.trustDomain
+          value: "apps.{{ $.Values.global.clusterDomain }}"
+        - name: rhtas.zeroTrust.spire.issuer
+          value: "https://spire-spiffe-oidc-discovery-provider.apps.{{ $.Values.global.clusterDomain }}"
+        - name: rhtas.zeroTrust.email.enabled
+          value: "true"
+        - name: rhtas.zeroTrust.email.issuer
+          value: https://keycloak.apps.{{ $.Values.global.clusterDomain }}/realms/ztvp
+    trusted-profile-analyzer:
+      name: trusted-profile-analyzer
+      namespace: trusted-profile-analyzer
+      project: hub
+      path: charts/rhtpa-operator
+      annotations:
+        argocd.argoproj.io/sync-wave: "41"  # Create chart resources (OBC, DB, etc.)
+      ignoreDifferences:
+        - group: batch
+          kind: Job
+          jsonPointers:
+            - /status
+      overrides:
+        - name: rhtpa.zeroTrust.vault.url
+          value: https://vault.vault.svc.cluster.local:8200
+        - name: rhtpa.modules.createImporters.importers.cve.cve.disabled
+          value: "false"
+        - name: rhtpa.modules.createImporters.importers.osv-github.osv.disabled
+          value: "false"
+        - name: rhtpa.modules.createImporters.importers.redhat-csaf.csaf.disabled
+          value: "false"
+        - name: rhtpa.modules.createImporters.importers.quay-redhat-user-workloads.quay.disabled
+          value: "false"
+        - name: rhtpa.modules.createImporters.importers.redhat-sboms.sbom.disabled
+          value: "false"
+    supply-chain:
+      name: supply-chain
+      project: hub
+      path: charts/supply-chain
+      annotations:
+        argocd.argoproj.io/sync-wave: "48"
+      ignoreDifferences:
+        - group: ""
+          kind: ServiceAccount
+          jqPathExpressions:
+            - .imagePullSecrets[]|select(.name | contains("-dockercfg-"))
+      overrides:
+        - name: rhtas.enabled
+          value: true
+        - name: rhtpa.enabled
+          value: true
+        - name: registry.tlsVerify
+          value: "false"
+        - name: registry.user
+          value: quay-admin
+        - name: registry.passwordVaultKey
+          value: quay-admin-password
+    ```
+
+* `applications.vault.jwt.roles.policies`: In the _Vault_ policies section, uncomment the following:
+
+    ```shell
+          - name: rhtpa
+            audience: rhtpa
+            subject: spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/trusted-profile-analyzer/sa/rhtpa
+            policies:
+              - hub-infra-rhtpa-jwt-secret
+    ```
+
+* `applications.qtodo.overrides`: In the _qtodo_ overrides section, specify the following to source content from the Quay registry instance.
+
+    ```shell
+        - name: app.images.main.name
+          value: quay-registry-quay-quay-enterprise.apps.{{ $.Values.global.clusterDomain }}/ztvp/qtodo
+        - name: app.images.main.version
+          value: latest
+        - name: app.images.main.registry.auth
+          value: true
+        - name: app.images.main.registry.user
+          value: quay-admin
+        - name: app.images.main.registry.passwordVaultKey
+          value: quay-admin-password
+    ```
+
 ## Bring Your Own (BYO) Container Registry
 
 By default, ZTVP deploys a built-in Red Hat Quay registry. However, you can use your own container registry (e.g., quay.io, Docker Hub, GitHub Container Registry, or a private registry) instead.
@@ -213,7 +392,7 @@ resourceHealthChecks:
       return hs
 ```
 
-## Pipeline
+## Automated Secure Supply Chain Pipeline
 
 To build and certify the application, we will use _Red Hat OpenShift Pipelines_.
 
@@ -408,7 +587,7 @@ The credentials to access the Quay web interface can be obtained as follows:
       -o jsonpath='{.items[0].spec.host}')"
   ```
 
-* Quay username: The same one you specified in `values-hub.yaml` or **quay-user**.
+* Quay username: The same one you specified in `values-hub.yaml` or **quay-admin**.
 * Quay password:
 
   ```shell
