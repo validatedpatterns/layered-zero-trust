@@ -22,8 +22,8 @@ app:
         vaultPath: secret/data/global/quay-users
         passwordVaultKey: password
     spiffeHelper:
-      name: ghcr.io/spiffe/spiffe-helper
-      version: 0.10.1
+      name: registry.redhat.io/zero-trust-workload-identity-manager/spiffe-helper-rhel9
+      version: v0.10.0
       pullPolicy: IfNotPresent
     spiffeVaultClient:
       name: registry.redhat.io/ubi9/python-311
@@ -41,17 +41,17 @@ app:
     applicationType: "web-app"
     authenticatedPaths: "/*"
     authenticatedPolicy: "authenticated"
-  
+
   # Keycloak realm configuration
   keycloak:
     realm: "ztvp"
-  
+
   spire:
     enabled: true   # Enable SPIFFE + OIDC integration by default
     sidecars: true
     audiences:
       - qtodo
-      
+
   # Vault configuration for SPIFFE integration
   vault:
     url: ""
