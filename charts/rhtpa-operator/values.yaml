@@ -24,15 +24,18 @@ rhtpa:
       enabled: true
       url: "https://vault.vault.svc.cluster.local:8200" 
       role: "rhtpa"
-      policy: "global-secret"
-      secretPath: "secret/data/global/rhtpa"
+      # Application-specific policy (least privilege)
+      policy: "rhtpa-secrets"
+      # RHTPA DB password path (infra)
+      secretPath: "secret/data/hub/infra/rhtpa/rhtpa-db"
     keycloak:
       enabled: true
       url: ""  # Constructed dynamically from global.localClusterDomain in templates
       realm: "ztvp"
       namespace: "keycloak-system"  # Namespace where Keycloak is deployed
       instanceName: "keycloak"  # Name of the Keycloak CR
-      userPasswordVaultKey: "secret/data/global/keycloak-users"  # Vault path for RHTPA user password
+      # User credentials - stored in infra users path
+      userPasswordVaultKey: "secret/data/hub/infra/users/keycloak-users"
       # OIDC Client Configuration
       clients:
         frontend:
@@ -40,6 +43,8 @@ rhtpa:
         cli:
           clientId: "rhtpa-cli"  # Confidential client for RHTPA CLI/API
           secretName: "rhtpa-oidc-cli-secret"  # Kubernetes secret containing client secret
+          # RHTPA OIDC CLI secret path (infra)
+          secretVaultPath: "secret/data/hub/infra/rhtpa/rhtpa-oidc-cli"
   
   # TLS Configuration
   tls:
@@ -128,7 +133,8 @@ rhtpa:
     name: "rhtpa"
     username: "rhtpa"
     secretName: "rhtpa-db-secret"
-    passwordVaultKey: "secret/data/global/rhtpa"
+    # RHTPA DB password path (infra)
+    passwordVaultKey: "secret/data/hub/infra/rhtpa/rhtpa-db"
     storageSize: "10Gi"
     image: "registry.redhat.io/rhel8/postgresql-16"
   

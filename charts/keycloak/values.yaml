@@ -7,7 +7,8 @@ keycloak:
   adminUser:
     enabled: true
     username: admin
-    passwordVaultKey: secret/data/global/keycloak
+    # Keycloak admin password (infra)
+    passwordVaultKey: secret/data/hub/infra/keycloak/keycloak
     secretName: keycloak-admin-user
   defaultConfig: true
   defaultRealm:
@@ -349,7 +350,8 @@ keycloak:
   name: keycloak
   postgresqlDb:
     database: keycloak
-    passwordVaultKey: secret/data/global/keycloak
+    # Keycloak DB password path (infra)
+    passwordVaultKey: secret/data/hub/infra/keycloak/keycloak
     secretName: postgresql-db
     username: keycloak
   realms: []
@@ -357,5 +359,14 @@ keycloak:
     secret: keycloak-tls
     serviceServing: true
   users:
-    passwordVaultKey: secret/data/global/keycloak-users
+    # User credentials path (infra)
+    passwordVaultKey: secret/data/hub/infra/users/keycloak-users
     secretName: keycloak-users
+  # OIDC client secrets for realm configuration
+  oidcSecrets:
+    # QTodo OIDC client secret (app-level)
+    qtodo:
+      vaultPath: secret/data/apps/qtodo/qtodo-oidc-client
+    # RHTPA CLI OIDC client secret (infra)
+    rhtpaCli:
+      vaultPath: secret/data/hub/infra/rhtpa/rhtpa-oidc-cli

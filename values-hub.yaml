@@ -255,6 +255,40 @@ clusterGroup:
       project: hub
       chart: hashicorp-vault
       chartVersion: 0.1.*
+      # Custom Vault policies for least-privilege access
+      # Each application gets access only to its specific secrets path
+      #
+      # TWO types of policies needed:
+      # 1. <prefix>-k8s-secret - for Kubernetes auth (ClusterSecretStore/ExternalSecrets)
+      # 2. <prefix>-jwt-secret - for JWT/SPIFFE auth (application workloads)
+      #
+      # NOTE: K8s auth policies are auto-created by Ansible from vaultPrefixes
+      # JWT auth policies below are manually defined for apps that need direct Vault access
+      policies:
+        # ============================================================
+        # JWT/SPIFFE Auth Policies (for application workloads)
+        # These are used by apps authenticating via SPIFFE JWT tokens
+        # Only define policies for apps that need direct Vault access
+        # K8s auth policies (<prefix>-k8s-secret) are auto-created by Ansible
+        # ============================================================
+        - name: apps-qtodo-jwt-secret
+          policy: |
+            path "secret/data/apps/qtodo/*" {
+              capabilities = ["read"]
+            }
+        - name: hub-infra-rhtpa-jwt-secret
+          policy: |
+            path "secret/data/hub/infra/rhtpa/*" {
+              capabilities = ["read"]
+            }
+        - name: hub-supply-chain-jwt-secret
+          policy: |
+            path "secret/data/hub/infra/quay/*" {
+              capabilities = ["read"]
+            }
+            path "secret/data/hub/infra/rhtpa/rhtpa-oidc-cli" {
+              capabilities = ["read"]
+            }
       jwt:
         enabled: true
         oidcDiscoveryUrl: https://spire-spiffe-oidc-discovery-provider.zero-trust-workload-identity-manager.svc.cluster.local
@@ -265,13 +299,19 @@ clusterGroup:
             audience: qtodo
             subject: spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/qtodo/sa/qtodo
             policies:
-              - global-secret
+              - apps-qtodo-jwt-secret
           # RHTPA vault role
           # - name: rhtpa
           #   audience: rhtpa
           #   subject: spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/trusted-profile-analyzer/sa/rhtpa
           #   policies:
-          #     - global-secret
+          #     - hub-infra-rhtpa-jwt-secret
+          # Supply chain vault role (for Tekton pipelines)
+          # - name: supply-chain
+          #   audience: supply-chain
+          #   subject: spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/pipeline/sa/pipeline
+          #   policies:
+          #     - hub-supply-chain-jwt-secret
     # Shared Object Storage Backend
     # Required for RHTPA and QUAY (provides S3-compatible storage via NooBaa MCG)
     # NooBaa MCG provides S3-compatible object storage for multiple applications
@@ -403,7 +443,7 @@ clusterGroup:
         - name: app.vault.role
           value: qtodo
         - name: app.vault.secretPath
-          value: secret/data/global/qtodo
+          value: secret/data/apps/qtodo/qtodo-db
         # For Secure Supply Chain, we changed the qtodo image to use the one built in the secure supply chain
         # - name: app.images.main.name
         #   value: quay-registry-quay-quay-enterprise.apps.{{ $.Values.global.clusterDomain }}/ztvp/qtodo

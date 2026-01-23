@@ -19,8 +19,9 @@ app:
         secretName: qtodo-registry-auth
         user: quay-user
         # domain: quay-registry-quay-quay-enterprise.apps.example.com
-        vaultPath: secret/data/global/quay-users
-        passwordVaultKey: password
+        # Registry credentials - stored in quay path
+        vaultPath: secret/data/hub/infra/quay/quay-users
+        passwordVaultKey: quay-user-password
     spiffeHelper:
       name: registry.redhat.io/zero-trust-workload-identity-manager/spiffe-helper-rhel9
       version: v0.10.0
@@ -53,21 +54,26 @@ app:
       - qtodo
 
   # Vault configuration for SPIFFE integration
+  # Uses SPIFFE JWT to authenticate and fetch DB password
   vault:
     url: ""
-    role: "qtodo-role" 
-    secretPath: "secret/data/global/keycloak-users"
+    role: "qtodo"
+    # QTodo secrets path (app-level isolation)
+    secretPath: "secret/data/apps/qtodo/qtodo-db"
 
   # OIDC External Secret configuration
   oidcSecret:
     enabled: true
     name: "oidc-client-secret"
-    vaultPath: "secret/data/global/oidc-client-secret"
-  
-  # Truststore configuration for Java CA certificates
+    # QTodo OIDC secret path (app-level isolation)
+    vaultPath: "secret/data/apps/qtodo/qtodo-oidc-client"
+
+  # Truststore configuration for Java CA certificates (PKCS12 format)
   truststore:
     enabled: true
-    vaultPath: "secret/data/global/qtodo-truststore"
+    secretName: "qtodo-truststore-secret"
+    # QTodo truststore password path (app-level isolation)
+    vaultPath: "secret/data/apps/qtodo/qtodo-truststore"
 
 # PostgreSQL database configuration
 postgresql:
@@ -78,4 +84,5 @@ postgresql:
     secretName: qtodo-db-secret
     database: tasks
     username: qtodo_user
-    passwordVaultKey: secret/data/global/qtodo
+    # QTodo DB password path (app-level isolation)
+    passwordVaultKey: secret/data/apps/qtodo/qtodo-db

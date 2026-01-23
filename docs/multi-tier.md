@@ -32,7 +32,7 @@ Access the qtodo application in a browser. The URL can be located from the OpenS
 1. Select **Networking** -> **Routes** from the lefthand navigation bar
 2. Click the arrow next to the the URL underneath the _Location_ column to open the qtodo application in a new browser tab
 
-You will be presented with a login page to access the application. When using the default External Identity Provider (RHBK), two users (`qtodo-admin` and `qtodo-user`) were provisioned automatically. Their initial credentials are stored in a Secret in the `keycloak-system` namespace called `keycloak-users`. You can reveal the credentials by switching to the tab containing the OpenShift Console using the following steps:
+You will be presented with a login page to access the application. When using the default External Identity Provider (RHBK), two users (`qtodo-admin` and `qtodo-user1`) were provisioned automatically. Their initial credentials are stored in a Secret in the `keycloak-system` namespace called `keycloak-users`. You can reveal the credentials by switching to the tab containing the OpenShift Console using the following steps:
 
 1. Select **Home** -> **Projects** from the left hand navigation bar
 2. Locate and select the **keycloak-system** project
