@@ -89,6 +89,12 @@ spec:
       type: string
       description: The RHTPA OIDC client Secret name to use for authentication
       default: {{ .Values.rhtpa.oidc.clientSecretName }}
+{{- if ne .Values.rhtpa.oidc.apiId "" }}
+    - name: rhtpa-oidc-api-id
+      type: string
+      description: The Azure Entra ID API ID to use for authentication
+      default: {{ .Values.rhtpa.oidc.apiId }}
+{{- end }}
 {{- end }}
 
   workspaces:
@@ -249,6 +255,10 @@ spec:
           value: $(params.rhtpa-oidc-client-id)
         - name: rhtpa-oidc-client-secret
           value: $(params.rhtpa-oidc-client-secret)
+{{- if ne .Values.rhtpa.oidc.apiId "" }}
+        - name: rhtpa-oidc-api-id
+          value: $(params.rhtpa-oidc-api-id)
+{{- end }}
 {{- end }}
 
     - name: qtodo-verify-image

@@ -5,19 +5,19 @@
 rhtpa:
   # Enable/disable RHTPA deployment
   enabled: true
-  
+
   # TrustedProfileAnalyzer CR name
   name: "trusted-profile-analyzer"
-  
+
   # Namespace for RHTPA deployment
   namespace: trusted-profile-analyzer
-  
+
   # Route hostname prefix
   # This prefix is prepended to the cluster domain to form the route hostname
   # NOTE: Due to RHTPA operator bug, "server" is prepended to the result
   # Example: "trustify" with domain "apps.domain.com" generates: servertrustify.apps.domain.com
   routePrefix: "trustify"
-  
+
   # Zero Trust Integration
   zeroTrust:
     vault:
@@ -28,10 +28,10 @@ rhtpa:
       policy: "rhtpa-secrets"
       # RHTPA DB password path (infra)
       secretPath: "secret/data/hub/infra/rhtpa/rhtpa-db"
-    keycloak:
+    oidc:
       enabled: true
-      url: ""  # Constructed dynamically from global.localClusterDomain in templates
-      realm: "ztvp"
+      authServerUrl: ""  # Constructed dynamically from global.localClusterDomain in templates
+      realm: "ztvp"  # Used to construct the authentication URL if authServerUrl is not provided
       namespace: "keycloak-system"  # Namespace where Keycloak is deployed
       instanceName: "keycloak"  # Name of the Keycloak CR
       # User credentials - stored in infra users path
@@ -43,9 +43,10 @@ rhtpa:
         cli:
           clientId: "rhtpa-cli"  # Confidential client for RHTPA CLI/API
           secretName: "rhtpa-oidc-cli-secret"  # Kubernetes secret containing client secret
+          apiId: ""  # API client ID, used in Azure Entra ID integration
           # RHTPA OIDC CLI secret path (infra)
           secretVaultPath: "secret/data/hub/infra/rhtpa/rhtpa-oidc-cli"
-  
+
   # TLS Configuration
   tls:
     ingressCA:
@@ -126,7 +127,10 @@ rhtpa:
         limits:
           cpu: 1.0
           memory: 8Gi
-  
+      rust:
+        logFilter: "info"
+        backtrace: false
+
   # PostgreSQL Database Configuration
   database:
     create: true
@@ -137,7 +141,7 @@ rhtpa:
     passwordVaultKey: "secret/data/hub/infra/rhtpa/rhtpa-db"
     storageSize: "10Gi"
     image: "registry.redhat.io/rhel8/postgresql-16"
-  
+
   # Object Storage Configuration (NooBaa MCG)
   objectStorage:
     enabled: true
@@ -147,11 +151,11 @@ rhtpa:
       name: "rhtpa-s3-storage"
       bucketName: "trustify"
       storageClass: "openshift-storage.noobaa.io"
-  
+
   # Monitoring configuration
   monitoring:
     enabled: true
-  
+
   # External access configuration
   externalAccess:
     enabled: true

@@ -29,6 +29,11 @@ spec:
     - description: Secret name containing the OIDC client secret to use for authentication
       name: rhtpa-oidc-client-secret
       type: string
+{{- if ne .Values.rhtpa.oidc.apiId "" }}
+    - description: Azure Entra ID API ID to use for authentication
+      name: rhtpa-oidc-api-id
+      type: string
+{{- end }}
 
   workspaces:
     - name: source
@@ -58,6 +63,10 @@ spec:
             secretKeyRef:
               name: $(params.rhtpa-oidc-client-secret)
               key: password
+{{- if ne .Values.rhtpa.oidc.apiId "" }}
+        - name: OIDC_API_ID
+          value: $(params.rhtpa-oidc-api-id)
+{{- end }}
         - name: SBOM_FILE
           value: $(workspaces.source.path)/$(params.sbom-file)
       volumeMounts:

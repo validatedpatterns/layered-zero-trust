@@ -16,8 +16,15 @@ log_msg() {
 }
 
 get_oidc_token() {
-  # Get the OIDC Issuer URL from Keycloak route
-  export OIDC_TOKEN_URL="${OIDC_URL}/protocol/openid-connect/token"
+  if [ -v OIDC_API_ID ]; then
+    # Set the OIDC token URL for Azure Entra ID
+    export OIDC_TOKEN_URL="${OIDC_URL}/oauth2/v2.0/token"
+    export OIDC_SCOPE="api://${OIDC_API_ID}/.default"
+    scope_param+=("-d" "scope=${OIDC_SCOPE}")
+  else
+    # Set the OIDC token URL for Keycloak (RHBK)
+    export OIDC_TOKEN_URL="${OIDC_URL}/protocol/openid-connect/token"
+  fi
 
   # Request a new access token
   curl -sSf -X POST "${OIDC_TOKEN_URL}" \
@@ -25,6 +32,7 @@ get_oidc_token() {
     -H 'Content-Type: application/x-www-form-urlencoded' \
     -d 'grant_type=client_credentials' \
     -d "client_id=${OIDC_CLIENT_ID}" \
+    "${scope_param[@]}" \
     -d "client_secret=${OIDC_CLIENT_SECRET}" | jq -r .access_token
 }
 
@@ -33,8 +41,15 @@ upload_sbom() {
 
   log_msg "Getting OIDC token"
   log_msg "OIDC_URL: ${OIDC_URL}"
-  log_msg "OIDC_TOKEN_URL: ${OIDC_URL}/protocol/openid-connect/token"
   log_msg "OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}"
+
+  if [ -v OIDC_API_ID ]; then
+    log_msg "OIDC_API_ID: ${OIDC_API_ID}"
+    log_msg "OIDC_TOKEN_URL: ${OIDC_URL}/oauth2/v2.0/token"
+    log_msg "OIDC_SCOPE: api://${OIDC_API_ID}/.default"
+  else
+    log_msg "OIDC_TOKEN_URL: ${OIDC_URL}/protocol/openid-connect/token"
+  fi
 
   TOKEN=$(get_oidc_token)
 

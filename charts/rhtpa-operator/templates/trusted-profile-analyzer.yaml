@@ -45,45 +45,18 @@ spec:
 {{- $template = replace "TLS_CONFIG" "" $template }}
 {{- end }}
 {{- /* OIDC Config */ -}}
-{{- if and .Values.rhtpa.zeroTrust .Values.rhtpa.zeroTrust.keycloak .Values.rhtpa.zeroTrust.keycloak.enabled }}
-{{- /* Construct Keycloak URL from global.localClusterDomain if not provided */ -}}
-{{- $keycloakUrl := .Values.rhtpa.zeroTrust.keycloak.url }}
-{{- if not $keycloakUrl }}
-{{- $keycloakUrl = printf "https://keycloak.%s" .Values.global.localClusterDomain }}
-{{- end }}
-{{- $oidcConfig := printf `oidc:
-        clients:
-          frontend:
-            clientId: %s
-            issuerUrl: %s/realms/%s
-          cli:
-            clientId: %s
-            issuerUrl: %s/realms/%s
-            clientSecret:
-              valueFrom:
-                secretKeyRef:
-                  name: %s
-                  key: client-secret` .Values.rhtpa.zeroTrust.keycloak.clients.frontend.clientId $keycloakUrl .Values.rhtpa.zeroTrust.keycloak.realm .Values.rhtpa.zeroTrust.keycloak.clients.cli.clientId $keycloakUrl .Values.rhtpa.zeroTrust.keycloak.realm .Values.rhtpa.zeroTrust.keycloak.clients.cli.secretName }}
+{{- if and .Values.rhtpa.zeroTrust .Values.rhtpa.zeroTrust.oidc .Values.rhtpa.zeroTrust.oidc.enabled }}
+{{- $oidcConfig := include "rhtpa-operator.oidc.config" . | indent 6 }}
 {{- $template = replace "OIDC_CONFIG" $oidcConfig $template }}
+{{- $authenticatorConfig := include "rhtpa-operator.authenticator.config" . | indent 6 }}
+{{- $template = replace "AUTHENTICATOR_CONFIG" $authenticatorConfig $template }}
 {{- else }}
 {{- $template = replace "OIDC_CONFIG" "" $template }}
+{{- $template = replace "AUTHENTICATOR_CONFIG" "" $template }}
 {{- end }}
 {{- /* Modules Config */ -}}
 {{- if and .Values.rhtpa.modules .Values.rhtpa.modules.createImporters .Values.rhtpa.modules.createImporters.enabled }}
-{{- $createDB := .Values.rhtpa.modules.createDatabase.enabled | default true }}
-{{- $createImporters := .Values.rhtpa.modules.createImporters.enabled | default true }}
-{{- $importerReplicas := .Values.rhtpa.modules.importer.replicas | default 1 | int }}
-{{- $importerCPU := .Values.rhtpa.modules.importer.resources.requests.cpu | default 0.5 | toString }}
-{{- $importerMemory := .Values.rhtpa.modules.importer.resources.requests.memory | default "4Gi" | toString }}
-{{- $serverReplicas := .Values.rhtpa.modules.server.replicas | default 1 | int }}
-{{- $serverCPU := .Values.rhtpa.modules.server.resources.requests.cpu | default 0.5 | toString }}
-{{- $serverMemory := .Values.rhtpa.modules.server.resources.requests.memory | default "4Gi" | toString }}
-{{- $modulesConfig := printf "modules:\n        migrateDatabase:\n          enabled: true\n        createDatabase:\n          enabled: %t\n        createImporters:\n          enabled: %t\n          importers:" $createDB $createImporters }}
-{{- if .Values.rhtpa.modules.createImporters.importers }}
-{{- $importersYaml := toYaml .Values.rhtpa.modules.createImporters.importers | nindent 12 }}
-{{- $modulesConfig = printf "%s\n%s" $modulesConfig $importersYaml }}
-{{- end }}
-{{- $modulesConfig = printf "%s\n        importer:\n          replicas: %d\n          resources:\n            requests:\n              cpu: \"%s\"\n              memory: %s\n          enabled: true\n        server:\n          replicas: %d\n          resources:\n            requests:\n              cpu: \"%s\"\n              memory: %s\n          enabled: true" $modulesConfig $importerReplicas $importerCPU $importerMemory $serverReplicas $serverCPU $serverMemory }}
+{{- $modulesConfig := include "rhtpa-operator.modules.config" . | indent 6 }}
 {{- $template = replace "MODULES_CONFIG" $modulesConfig $template }}
 {{- else }}
 {{- $template = replace "MODULES_CONFIG" "" $template }}
