@@ -19,7 +19,7 @@ spec:
               command: ["python3", "/app/create_user.py"]
               env:
                 - name: QUAY_HOST
-                  value: {{ .Values.registry.domain | default (printf "quay-registry-quay-quay-enterprise.%s" .Values.global.hubClusterDomain) }}
+                  value: {{ tpl (.Values.registry.domain | default (printf "quay-registry-quay-quay-enterprise.%s" .Values.global.hubClusterDomain)) $ }}
                 - name: QUAY_ADMIN_USER
                   value: {{ .Values.registry.user }}
                 - name: QUAY_ADMIN_PASSWORD

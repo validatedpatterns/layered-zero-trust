@@ -80,6 +80,39 @@ subjects:
 - kind: ServiceAccount
   name: {{ include "ztvp-certificates.serviceAccountName" . }}
   namespace: {{ .Values.global.namespace }}
+{{- if .Values.imagePullTrust.enabled }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "ztvp-certificates.fullname" . }}-image-config
+  annotations:
+    argocd.argoproj.io/sync-wave: "-9"
+  labels:
+    {{- include "ztvp-certificates.labels" . | nindent 4 }}
+rules:
+# Patch image.config.openshift.io/cluster to set additionalTrustedCA
+- apiGroups: ["config.openshift.io"]
+  resources: ["images"]
+  verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "ztvp-certificates.fullname" . }}-image-config
+  annotations:
+    argocd.argoproj.io/sync-wave: "-9"
+  labels:
+    {{- include "ztvp-certificates.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "ztvp-certificates.fullname" . }}-image-config
+subjects:
+- kind: ServiceAccount
+  name: {{ include "ztvp-certificates.serviceAccountName" . }}
+  namespace: {{ .Values.global.namespace }}
+{{- end }}
 {{- if .Values.rollout.enabled }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1

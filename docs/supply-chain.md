@@ -57,19 +57,18 @@ By default, ZTVP deploys a built-in Red Hat Quay registry. However, you can use 
 
     ```yaml
     overrides:
-      # Disable built-in Quay
-      - name: quay.enabled
-        value: "false"
-      # Enable external registry
-      - name: externalRegistry.enabled
+      - name: registry.enabled
         value: "true"
-      # External registry settings
       - name: registry.domain
         value: "your-registry.example.com"
       - name: registry.user
         value: "your-username"
       - name: registry.org
         value: "your-org"
+      - name: registry.vaultPath
+        value: "secret/data/hub/infra/registry/registry-user"
+      - name: registry.passwordVaultKey
+        value: "registry-password"
     ```
 
 4. **Configure qtodo for custom registry** (if pulling from custom registry):
@@ -88,30 +87,87 @@ By default, ZTVP deploys a built-in Red Hat Quay registry. However, you can use 
 
 | Parameter | Description | Example |
 | --------- | ----------- | ------- |
-| `registry.domain` | Registry hostname (required for BYO only) | `quay.io`, `ghcr.io`, `registry.example.com` |
+| `registry.enabled` | Enable registry auth secret creation | `true` |
+| `registry.domain` | Registry hostname (REQUIRED) | `quay.io`, `ghcr.io`, `registry.example.com` |
 | `registry.org` | Organization/namespace | `my-org` |
 | `registry.repo` | Repository name | `qtodo` |
 | `registry.user` | Registry username | `my-robot-account` |
-| `quay.enabled` | Set to `false` for BYO registry | `false` |
+| `registry.vaultPath` | Vault path for registry password | `secret/data/hub/infra/registry/registry-user` |
+| `registry.passwordVaultKey` | Key within the Vault secret | `registry-password` |
 
-> **Note**: For built-in Quay registry, `registry.domain` is automatically constructed as `quay-registry-quay-quay-enterprise.<hubClusterDomain>` and does not need to be specified. For BYO/external registries, `registry.domain` is **required**.
+> **Note**: All registry types (built-in Quay, BYO, embedded OCP) use the same parameters. Set `registry.domain`, `registry.vaultPath`, and `registry.passwordVaultKey` to the appropriate values for your scenario. See the Vault Paths table below for scenario-specific values.
 
 ### Vault Paths
 
 Registry credentials are stored at different paths based on registry type:
 
-| Registry Type   | Vault Path                                     | Password Key         |
-| --------------- | ---------------------------------------------- | -------------------- |
-| Built-in Quay   | `secret/data/hub/infra/quay/quay-users`        | `quay-user-password` |
-| BYO Registry    | `secret/data/hub/infra/registry/registry-user` | `registry-password`  |
+| Registry Type      | Vault Path                                     | Password Key         |
+| ------------------ | ---------------------------------------------- | -------------------- |
+| Built-in Quay      | `secret/data/hub/infra/quay/quay-users`        | `quay-user-password` |
+| BYO Registry       | `secret/data/hub/infra/registry/registry-user` | `registry-password`  |
+| Embedded OCP       | `secret/data/hub/infra/registry/registry-user` | `registry-password`  |
 
-The chart automatically selects the correct vault path based on the enabled flags:
-
-* `quay.enabled=true`: Uses built-in Quay vault path
-* `externalRegistry.enabled=true`: Uses external registry vault path
-* Both disabled (default): No registry auth secret created (fresh install state)
+Set `registry.vaultPath` and `registry.passwordVaultKey` in your `values-hub.yaml` overrides to match your scenario. When `registry.enabled=false` (default), no registry auth secret is created (fresh install state).
 
 The Vault policy `hub-supply-chain-jwt-secret` grants read access to both paths for the pipeline service account.
+
+### Embedded OCP Registry
+
+To use the in-cluster OpenShift image registry instead of an external registry:
+
+1. **Enable `registry.embeddedOCP.ensureImageNamespaceRBAC`** in the supply-chain overrides. The chart will automatically:
+   * Create the image namespace matching `registry.org` (e.g. `ztvp`)
+   * Grant the pipeline ServiceAccount `system:image-builder` in that namespace
+   * Enable the default route on the image registry (via a one-time Job)
+
+2. **Set the registry domain** to `default-route-openshift-image-registry.apps.<clusterDomain>`.
+
+3. **Set the registry user** to `admin` (or a user with push permissions).
+
+4. **Store the token in Vault**: Use `oc whoami -t` output as the `registry-password` value in `~/values-secrets.yaml`.
+
+Example supply-chain overrides:
+
+```yaml
+overrides:
+  - name: registry.enabled
+    value: "true"
+  - name: registry.domain
+    value: default-route-openshift-image-registry.apps.<clusterDomain>
+  - name: registry.org
+    value: ztvp
+  - name: registry.user
+    value: admin
+  - name: registry.vaultPath
+    value: "secret/data/hub/infra/registry/registry-user"
+  - name: registry.passwordVaultKey
+    value: "registry-password"
+  - name: registry.embeddedOCP.ensureImageNamespaceRBAC
+    value: "true"
+```
+
+### Node-Level Image Pull Trust
+
+When using a registry behind the cluster ingress (Option 1: Built-in Quay or Option 3: Embedded OCP Registry), kubelet cannot pull images by default because the ingress certificate is self-signed and not trusted at the node level.
+
+The `ztvp-certificates` application handles this by patching `image.config.openshift.io/cluster` with the ingress CA certificate for the configured registry hostnames. Enable it by uncommenting the `imagePullTrust` overrides in `values-hub.yaml`:
+
+```yaml
+# ztvp-certificates overrides
+- name: imagePullTrust.enabled
+  value: "true"
+- name: imagePullTrust.registries[0]
+  value: <registry-hostname>
+```
+
+Set `<registry-hostname>` to match your registry option:
+
+| Option | Registry Hostname |
+| ------ | ----------------- |
+| Option 1: Built-in Quay | `quay-registry-quay-quay-enterprise.apps.<clusterDomain>` |
+| Option 3: Embedded OCP | `default-route-openshift-image-registry.apps.<clusterDomain>` |
+
+> **Note**: Option 2 (BYO/External Registry) does not require `imagePullTrust` because external registries like quay.io and ghcr.io use publicly trusted certificates.
 
 ## Automatic approach
 
@@ -180,22 +236,24 @@ You can also trigger a pipeline run using the Helm template included in the char
 ```shell
 helm template supply-chain charts/supply-chain \
   --set pipelinerun.enabled=true \
-  --set quay.enabled=true \
+  --set registry.enabled=true \
+  --set registry.domain=quay-registry-quay-quay-enterprise.apps.example.com \
+  --set registry.vaultPath=secret/data/hub/infra/quay/quay-users \
+  --set registry.passwordVaultKey=quay-user-password \
   --set global.namespace=layered-zero-trust-hub \
-  --set global.hubClusterDomain=apps.example.com \
   --show-only templates/pipelinerun-qtodo.yaml | oc create -f -
 ```
-
-> **Note**: For built-in Quay, `registry.domain` is auto-constructed from `global.hubClusterDomain`.
 
 **For BYO/External Registry:**
 
 ```shell
 helm template supply-chain charts/supply-chain \
   --set pipelinerun.enabled=true \
-  --set externalRegistry.enabled=true \
-  --set global.namespace=layered-zero-trust-hub \
+  --set registry.enabled=true \
   --set registry.domain=quay.io \
+  --set registry.vaultPath=secret/data/hub/infra/registry/registry-user \
+  --set registry.passwordVaultKey=registry-password \
+  --set global.namespace=layered-zero-trust-hub \
   --show-only templates/pipelinerun-qtodo.yaml | oc create -f -
 ```
 

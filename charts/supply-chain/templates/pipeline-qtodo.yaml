@@ -1,12 +1,3 @@
-{{- /* Determine registry domain: auto-construct for built-in Quay, require for external */ -}}
-{{- $registryDomain := "" -}}
-{{- if .Values.registry.domain -}}
-  {{- $registryDomain = .Values.registry.domain -}}
-{{- else if .Values.quay.enabled -}}
-  {{- $registryDomain = printf "quay-registry-quay-quay-enterprise.%s" .Values.global.hubClusterDomain -}}
-{{- else -}}
-  {{- fail "registry.domain is required for external registry" -}}
-{{- end -}}
 ---
 apiVersion: tekton.dev/v1beta1
 kind: Pipeline
@@ -34,7 +25,7 @@ spec:
     - name: image-target
       type: string
       description: qtodo image push destination (e.g. quay.io/ztvp/qtodo:latest)
-      default: {{ $registryDomain }}/{{ .Values.registry.org }}/{{ .Values.registry.repo }}:{{ .Values.qtodo.tag }}
+      default: {{ tpl (required "registry.domain is required" .Values.registry.domain) $ }}/{{ .Values.registry.org }}/{{ .Values.registry.repo }}:{{ .Values.qtodo.tag }}
     - name: image-tls-verify
       type: string
       description: Whether to verify TLS when pushing to the OCI registry

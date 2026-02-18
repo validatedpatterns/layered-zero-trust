@@ -40,7 +40,6 @@ clusterGroup:
     #     labels:
     #       openshift.io/cluster-monitoring: "true"
     # RHTAS namespace (required when RHTAS application is enabled)
-    # COMMENTED OUT: Uncomment to enable RHTAS with SPIFFE signing
     # - trusted-artifact-signer:
     #     annotations:
     #       argocd.argoproj.io/sync-wave: "1"  # Auto-created by RHTAS operator
@@ -64,7 +63,7 @@ clusterGroup:
         targetNamespace: openshift-compliance
         annotations:
           openshift.io/cluster-monitoring: "true"
-    # Secure Supply Chain: Uncomment to enable OpenShift Pipelines
+    # Secure Supply Chain: OpenShift Pipelines
     # - openshift-pipelines
   subscriptions:
     acm:
@@ -77,7 +76,7 @@ clusterGroup:
       namespace: cert-manager-operator
       channel: stable-v1
       catalogSource: redhat-marketplace
-    # Secure Supply Chain: Uncomment to enable OpenShift Pipelines
+    # Secure Supply Chain: OpenShift Pipelines
     # openshift-pipelines:
     #   name: openshift-pipelines-operator-rh
     #   namespace: openshift-operators
@@ -115,7 +114,6 @@ clusterGroup:
     #   annotations:
     #     argocd.argoproj.io/sync-wave: "-3"  # Install after ODF operator
     # RHTAS operator subscription (required when RHTAS application is enabled)
-    # COMMENTED OUT: Uncomment to enable RHTAS with SPIFFE integration
     # rhtas-operator:
     #   name: rhtas-operator
     #   namespace: openshift-operators
@@ -208,6 +206,15 @@ clusterGroup:
           value: "true"
         - name: rollout.strategy
           value: labeled
+        
+        # Node-level image pull trust for kubelet
+        # Required when pulling images from registries behind the cluster ingress
+        # (e.g. built-in Quay, embedded OCP registry). Patches image.config.openshift.io/cluster.
+        # Uncomment and set the registry hostname when enabling a registry option.
+        # - name: imagePullTrust.enabled
+        #   value: "true"
+        # - name: imagePullTrust.registries[0]
+        #   value: <registry-hostname>
         
         # Note: additionalCertificates (complex nested array) temporarily disabled
         # Need to find proper way to pass complex structures in Validated Patterns
@@ -304,17 +311,17 @@ clusterGroup:
             policies:
               - apps-qtodo-jwt-secret
           # RHTPA vault role
-          # - name: rhtpa
-          #   audience: rhtpa
-          #   subject: spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/trusted-profile-analyzer/sa/rhtpa
-          #   policies:
-          #     - hub-infra-rhtpa-jwt-secret
+          - name: rhtpa
+            audience: rhtpa
+            subject: spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/trusted-profile-analyzer/sa/rhtpa
+            policies:
+              - hub-infra-rhtpa-jwt-secret
           # Supply chain vault role (for Tekton pipelines)
-          # - name: supply-chain
-          #   audience: supply-chain
-          #   subject: spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/pipeline/sa/pipeline
-          #   policies:
-          #     - hub-supply-chain-jwt-secret
+          - name: supply-chain
+            audience: supply-chain
+            subject: spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/pipeline/sa/pipeline
+            policies:
+              - hub-supply-chain-jwt-secret
     # Shared Object Storage Backend
     # Required for RHTPA and QUAY (provides S3-compatible storage via NooBaa MCG)
     # NooBaa MCG provides S3-compatible object storage for multiple applications
@@ -334,7 +341,6 @@ clusterGroup:
     #   annotations:
     #     argocd.argoproj.io/sync-wave: "10"  # Deploy after NooBaa storage backend
     # RHTAS with SPIFFE Integration
-    # COMMENTED OUT: Uncomment to enable RHTAS with SPIFFE and Email issuers
     # Depends on: Vault, SPIRE, Keycloak (for Email OIDC issuer if used)
     # trusted-artifact-signer:
     #   name: trusted-artifact-signer
@@ -451,19 +457,62 @@ clusterGroup:
           value: qtodo
         - name: app.vault.secretPath
           value: secret/data/apps/qtodo/qtodo-db
-        # For Secure Supply Chain, we changed the qtodo image to use the one built in the secure supply chain
+        # ============================================================
+        # Secure Supply Chain: pull pipeline-built image from registry
+        # Uncomment the option matching your supply-chain registry choice.
+        # ============================================================
+        # OPTION 1: Built-in Quay Registry
         # - name: app.images.main.name
         #   value: quay-registry-quay-quay-enterprise.apps.{{ $.Values.global.clusterDomain }}/ztvp/qtodo
         # - name: app.images.main.version
         #   value: latest
-        # Uncomment to enable registry authentication
         # - name: app.images.main.registry.auth
-        #   value: true
+        #   value: "true"
+        # - name: app.images.main.registry.domain
+        #   value: quay-registry-quay-quay-enterprise.apps.{{ $.Values.global.clusterDomain }}
         # - name: app.images.main.registry.user
         #   value: quay-user
+        # - name: app.images.main.registry.vaultPath
+        #   value: "secret/data/hub/infra/quay/quay-users"
         # - name: app.images.main.registry.passwordVaultKey
-        #   value: quay-user-password
-    # Secure Supply Chain - Uncomment to enable
+        #   value: "quay-user-password"
+        # ============================================================
+        # OPTION 2: BYO/External Registry
+        # - name: app.images.main.name
+        #   value: quay.io/minzhang/qtodo
+        # - name: app.images.main.version
+        #   value: latest
+        # - name: app.images.main.registry.auth
+        #   value: "true"
+        # - name: app.images.main.registry.domain
+        #   value: quay.io
+        # - name: app.images.main.registry.user
+        #   value: minzhang
+        # - name: app.images.main.registry.vaultPath
+        #   value: "secret/data/hub/infra/registry/registry-user"
+        # - name: app.images.main.registry.passwordVaultKey
+        #   value: "registry-password"
+        # ============================================================
+        # OPTION 3: Embedded OCP Registry
+        # - name: app.images.main.name
+        #   value: default-route-openshift-image-registry.apps.{{ $.Values.global.clusterDomain }}/ztvp/qtodo
+        # - name: app.images.main.version
+        #   value: latest
+        # - name: app.images.main.registry.auth
+        #   value: "true"
+        # - name: app.images.main.registry.domain
+        #   value: default-route-openshift-image-registry.apps.{{ $.Values.global.clusterDomain }}
+        # - name: app.images.main.registry.user
+        #   value: admin
+        # - name: app.images.main.registry.vaultPath
+        #   value: "secret/data/hub/infra/registry/registry-user"
+        # - name: app.images.main.registry.passwordVaultKey
+        #   value: "registry-password"
+        # ============================================================
+        # DEFAULT: No pipeline image (comment out all options above)
+        # qtodo uses the upstream image from the chart's default values.yaml
+        # ============================================================
+    # Secure Supply Chain
     # supply-chain:
     #   name: supply-chain
     #   project: hub
@@ -474,26 +523,29 @@ clusterGroup:
     #         - .imagePullSecrets[]|select(.name | contains("-dockercfg-"))
     #   overrides:
     #     # ============================================================
-    #     # OPTION 1: Built-in Quay Registry
+    #     # OPTION 1: Built-in Quay Registry (comment out Option 2, uncomment below)
     #     # Requires: quay-enterprise namespace, quay-operator, quay-registry app
-    #     # Note: registry.domain is auto-constructed from hubClusterDomain
     #     # ============================================================
     #     # - name: quay.enabled
     #     #   value: "true"
-    #     # - name: externalRegistry.enabled
-    #     #   value: "false"
+    #     # - name: registry.enabled
+    #     #   value: "true"
+    #     # - name: registry.domain
+    #     #   value: quay-registry-quay-quay-enterprise.apps.{{ $.Values.global.clusterDomain }}
     #     # - name: registry.tlsVerify
     #     #   value: "false"
     #     # - name: registry.user
     #     #   value: quay-user
+    #     # - name: registry.vaultPath
+    #     #   value: "secret/data/hub/infra/quay/quay-users"
+    #     # - name: registry.passwordVaultKey
+    #     #   value: "quay-user-password"
     #     # ============================================================
-    #     # OPTION 2: BYO/External Registry
-    #     # Requires: registry credentials in ~/values-secret.yaml
-    #     # Note: registry.domain is REQUIRED for external registry
+    #     # OPTION 2: BYO/External Registry (comment out Option 3, uncomment below)
+    #     # Store token in Vault (hub/infra/registry/registry-user, field registry-password)
+    #     # and in ~/values-secrets.yaml.
     #     # ============================================================
-    #     # - name: quay.enabled
-    #     #   value: "false"
-    #     # - name: externalRegistry.enabled
+    #     # - name: registry.enabled
     #     #   value: "true"
     #     # - name: registry.domain
     #     #   value: quay.io
@@ -501,16 +553,25 @@ clusterGroup:
     #     #   value: your-org
     #     # - name: registry.user
     #     #   value: your-username
+    #     # - name: registry.vaultPath
+    #     #   value: "secret/data/hub/infra/registry/registry-user"
+    #     # - name: registry.passwordVaultKey
+    #     #   value: "registry-password"
     #     # ============================================================
-    #     # OPTION 3: Embedded OCP Registry (comment out Option 1, 2; uncomment below)
+    #     # OPTION 3: Embedded OCP Registry
     #     # ============================================================
+    #     # - name: registry.enabled
+    #     #   value: "true"
     #     # - name: registry.domain
-    #     #   value: default-route-openshift-image-registry.apps.<your-apps-domain>
+    #     #   value: default-route-openshift-image-registry.apps.{{ $.Values.global.clusterDomain }}
     #     # - name: registry.org
     #     #   value: ztvp
     #     # - name: registry.user
     #     #   value: admin
-    #     # Embedded OCP registry only: create image namespace and grant pipeline push (transparent)
+    #     # - name: registry.vaultPath
+    #     #   value: "secret/data/hub/infra/registry/registry-user"
+    #     # - name: registry.passwordVaultKey
+    #     #   value: "registry-password"
     #     # - name: registry.embeddedOCP.ensureImageNamespaceRBAC
     #     #   value: "true"
     #     # ============================================================

@@ -177,6 +177,25 @@ distribution:
   # Requires: ManagedClusterSetBinding in the namespace
   method: "acm-policy"
 
+# Node-level image pull trust for kubelet
+# Configures image.config.openshift.io/cluster additionalTrustedCA so that
+# kubelet can pull images from registries behind the cluster's ingress (e.g.
+# built-in Quay). Without this, kubelet image pulls fail with
+# "x509: certificate signed by unknown authority" when the ingress uses a
+# self-signed or cluster-internal CA.
+imagePullTrust:
+  # Set to true to create the registry-CA ConfigMap and patch image.config
+  enabled: false
+  # ConfigMap name created in openshift-config for image.config additionalTrustedCA
+  configMapName: ztvp-registry-cas
+  # Registry hostnames that need the ingress CA for image pulls.
+  # Each becomes a key in the ConfigMap with the ingress CA as the value.
+  # Use {{ .Values.global.hubClusterDomain }} in values-hub.yaml overrides.
+  registries: []
+  # Example (built-in Quay):
+  # registries:
+  #   - quay-registry-quay-quay-enterprise.apps.example.com
+
 # Debugging options
 debug:
   # Enable verbose logging in extraction job

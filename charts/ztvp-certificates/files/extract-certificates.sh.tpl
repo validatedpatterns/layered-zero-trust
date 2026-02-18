@@ -336,7 +336,79 @@ else
 fi
 
 # ===================================================================
-# PHASE 9: Automatic Rollout (if enabled)
+# PHASE 9: Configure Node-Level Image Pull Trust (if enabled)
+# Creates a ConfigMap with registry-hostname keys containing the ingress CA,
+# then patches image.config.openshift.io/cluster to reference it.
+# This allows kubelet to pull images from registries behind the cluster ingress
+# (e.g. built-in Quay) without "x509: certificate signed by unknown authority".
+# ===================================================================
+
+{{- if .Values.imagePullTrust.enabled }}
+{{- if .Values.imagePullTrust.registries }}
+log "Configuring node-level image pull trust"
+
+if [[ "$INGRESS_CA_FOUND" != "true" ]]; then
+  error "imagePullTrust is enabled but no ingress CA was extracted. Cannot configure image pull trust."
+  error "Ensure autoDetect is true or provide a custom ingress CA source."
+  exit 1
+fi
+
+# Build the ConfigMap data with registry hostnames as keys
+# Each key is a registry hostname, value is the ingress CA PEM
+REGISTRY_CM_DATA=""
+{{- range .Values.imagePullTrust.registries }}
+log "Adding registry trust: {{ tpl . $ }}"
+{{- end }}
+
+log "Creating ConfigMap: {{ .Values.global.namespace }}/{{ .Values.imagePullTrust.configMapName }}"
+
+# Combine all ingress CA files into one PEM for registry trust
+COMBINED_INGRESS_CA="${TEMP_DIR}/combined-ingress-ca.pem"
+> "${COMBINED_INGRESS_CA}"
+for f in "${TEMP_DIR}"/ingress-ca-*.crt; do
+  [[ -f "$f" ]] || continue
+  cat "$f" >> "${COMBINED_INGRESS_CA}"
+  echo "" >> "${COMBINED_INGRESS_CA}"
+done
+
+# Create the ConfigMap with registry hostnames as keys
+cat <<'CMEOF' > "${TEMP_DIR}/registry-cas-cm.yaml"
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.imagePullTrust.configMapName }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app.kubernetes.io/name: ztvp-certificates
+    app.kubernetes.io/component: image-pull-trust
+    app.kubernetes.io/managed-by: ztvp-certificate-manager
+data: {}
+CMEOF
+
+oc apply -f "${TEMP_DIR}/registry-cas-cm.yaml"
+
+# Patch each registry hostname as a key with the ingress CA PEM
+{{- range .Values.imagePullTrust.registries }}
+log "Patching ConfigMap key: {{ tpl . $ }}"
+oc create configmap {{ $.Values.imagePullTrust.configMapName }} \
+  -n {{ $.Values.global.namespace }} \
+  --from-file="{{ tpl . $ }}=${COMBINED_INGRESS_CA}" \
+  --dry-run=client -o yaml | oc apply -f -
+{{- end }}
+
+# Patch image.config.openshift.io/cluster to reference the ConfigMap
+log "Patching image.config.openshift.io/cluster additionalTrustedCA"
+oc patch image.config.openshift.io/cluster --type merge \
+  -p "{\"spec\":{\"additionalTrustedCA\":{\"name\":\"{{ .Values.imagePullTrust.configMapName }}\"}}}"
+
+log "Node-level image pull trust configured successfully"
+log "Note: MCO will roll this out to nodes (may take a few minutes)"
+
+{{- end }}
+{{- end }}
+
+# ===================================================================
+# PHASE 10: Automatic Rollout (if enabled)
 # ===================================================================
 
 {{- if .Values.rollout.enabled }}

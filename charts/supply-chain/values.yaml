@@ -27,47 +27,59 @@ qtodo:
   containerfile: "./Containerfile"
 
 # ===========================================================================
-# BUILT-IN QUAY REGISTRY (optional)
-# When enabled, deploys internal Quay registry with auto-generated credentials
+# QUAY USER PROVISIONER (only for built-in Quay registry)
+# When enabled, runs a CronJob that provisions users in the built-in Quay instance.
+# This is Quay-specific and not needed for BYO or embedded OCP registries.
 # ===========================================================================
 quay:
-  enabled: true
+  enabled: false
   email: "quay-user@example.com"
-  # Vault path for auto-generated Quay credentials
-  vaultPath: "secret/data/hub/infra/quay/quay-users"
-  passwordVaultKey: "quay-user-password"
-  # User provisioner job settings
   job:
     image: registry.access.redhat.com/ubi9/ubi:9.7-1764794285
     schedule: "*/5 * * * *"
 
 # ===========================================================================
-# EXTERNAL/BYO REGISTRY (optional)
-# User-provided credentials for external registry (quay.io, ghcr.io, etc.)
-# Enable this when using an external registry instead of built-in Quay
-# ===========================================================================
-externalRegistry:
-  enabled: false
-  # Vault path for user-provided credentials
-  vaultPath: "secret/data/hub/infra/registry/registry-user"
-  passwordVaultKey: "registry-password"
-
-# ===========================================================================
-# COMMON REGISTRY SETTINGS (shared by both built-in Quay and external registry)
+# REGISTRY CONFIGURATION (option-agnostic)
+# Works for all registry types: built-in Quay, BYO (quay.io, ghcr.io, etc.),
+# or embedded OCP image registry. Set the values for your scenario.
+#
+# Scenario-specific values (set in values-hub.yaml overrides):
+#   Built-in Quay:
+#     domain: quay-registry-quay-quay-enterprise.apps.<clusterDomain>
+#     vaultPath: secret/data/hub/infra/quay/quay-users
+#     passwordVaultKey: quay-user-password
+#   BYO (quay.io, ghcr.io, etc.):
+#     domain: quay.io (or your registry hostname)
+#     vaultPath: secret/data/hub/infra/registry/registry-user
+#     passwordVaultKey: registry-password
+#   Embedded OCP:
+#     domain: default-route-openshift-image-registry.apps.<clusterDomain>
+#     vaultPath: secret/data/hub/infra/registry/registry-user
+#     passwordVaultKey: registry-password
+#     embeddedOCP.ensureImageNamespaceRBAC: true
 # ===========================================================================
 registry:
-  # For built-in Quay: domain is auto-constructed from hubClusterDomain
-  # For external registry: REQUIRED - set explicitly (e.g., quay.io, ghcr.io)
-  # domain: "registry.example.com"
+  # Set to true to create the registry auth secret (dockerconfigjson)
+  enabled: false
+  # Registry hostname (REQUIRED when enabled)
+  domain: ""
+  # Organization/namespace within the registry
   org: "ztvp"
+  # Repository name
   repo: "qtodo"
+  # Whether to verify TLS when pushing to the registry
   tlsVerify: "true"
+  # Registry username
   user: "registry-user"
+  # Vault path to the secret containing the registry password
+  vaultPath: ""
+  # Key within the Vault secret that holds the password
+  passwordVaultKey: ""
   # Secret name for registry auth (dockerconfigjson)
   authSecretName: "qtodo-registry-auth"
   # Embedded OCP registry only: create image namespace (registry.org) and grant
   # pipeline SA system:image-builder so the pipeline can push. Set to true only when
-  # using the in-cluster OpenShift image registry; leave false for quay.io or other external registries.
+  # using the in-cluster OpenShift image registry; leave false for other registries.
   embeddedOCP:
     ensureImageNamespaceRBAC: false
 
