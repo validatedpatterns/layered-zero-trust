@@ -217,6 +217,11 @@ clusterGroup:
         - name: customCA.secretRef.key
           value: ca.crt
         
+        # Enable proxy CA injection for clusters with self-signed ingress certs (e.g., bare metal)
+        # Not needed on ROSA/managed clusters with publicly trusted certs
+        - name: proxyCA.enabled
+          value: "true"
+        
         # Automatic rollout configuration (simple overrides work fine)
         - name: rollout.enabled
           value: "true"

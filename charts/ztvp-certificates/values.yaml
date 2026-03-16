@@ -114,6 +114,14 @@ job:
 # ConfigMap name that will be created in global.namespace
 configMapName: ztvp-trusted-ca
 
+# Proxy CA configuration
+# Configures the OpenShift cluster proxy trustedCA so custom CAs (ingress, service)
+# are auto-injected into all workloads via the cluster network operator.
+# Required for workloads that verify TLS of routes (e.g., ACS Central reaching Keycloak).
+proxyCA:
+  enabled: false
+  configMapName: ztvp-proxy-ca
+
 # Automatic rollout configuration
 # After certificate extraction, automatically restart consuming applications
 rollout:

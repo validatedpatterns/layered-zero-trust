@@ -63,6 +63,10 @@ rules:
 - apiGroups: ["operator.openshift.io"]
   resources: ["ingresscontrollers"]
   verbs: ["get", "list"]
+# Read and patch the cluster proxy to configure trustedCA
+- apiGroups: ["config.openshift.io"]
+  resources: ["proxies"]
+  verbs: ["get", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

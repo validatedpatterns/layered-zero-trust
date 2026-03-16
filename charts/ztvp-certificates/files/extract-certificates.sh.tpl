@@ -336,6 +336,68 @@ else
 fi
 
 # ===================================================================
+# PHASE 8.5: Create Proxy CA ConfigMap (if enabled)
+# ===================================================================
+
+{{- if .Values.proxyCA.enabled }}
+log "Creating proxy CA ConfigMap for cluster trustedCA injection"
+
+# Build a bundle with ONLY the custom CAs (ingress + service).
+# The Cluster Network Operator automatically merges these with system CAs.
+> "${TEMP_DIR}/proxy-ca-bundle.pem"
+for cert_file in "${TEMP_DIR}"/ingress-ca-*.crt "${TEMP_DIR}/service-ca.crt"; do
+  [[ -f "$cert_file" ]] || continue
+  cat "$cert_file" >> "${TEMP_DIR}/proxy-ca-bundle.pem"
+  echo "" >> "${TEMP_DIR}/proxy-ca-bundle.pem"
+done
+
+PROXY_BUNDLE_SIZE=$(wc -c < "${TEMP_DIR}/proxy-ca-bundle.pem" 2>/dev/null || echo 0)
+if [[ $PROXY_BUNDLE_SIZE -gt 100 ]]; then
+  cat <<PROXYEOF | oc apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.proxyCA.configMapName }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- range $key, $value := .Values.configMapLabels }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+data:
+  ca-bundle.crt: |
+$(cat "${TEMP_DIR}/proxy-ca-bundle.pem" | sed 's/^/      /')
+PROXYEOF
+
+  log "OK: Proxy CA ConfigMap {{ .Values.proxyCA.configMapName }} created ($PROXY_BUNDLE_SIZE bytes)"
+else
+  log "WARNING: No custom CAs found for proxy ConfigMap (ingress or service CA missing)"
+fi
+{{- end }}
+
+# ===================================================================
+# PHASE 8.6: Configure Cluster Proxy trustedCA (if enabled)
+# ===================================================================
+
+{{- if .Values.proxyCA.enabled }}
+CURRENT_TRUSTED_CA=$(oc get proxy/cluster -o jsonpath='{.spec.trustedCA.name}' 2>/dev/null || echo "")
+
+if [[ "$CURRENT_TRUSTED_CA" == "{{ .Values.proxyCA.configMapName }}" ]]; then
+  log "Proxy trustedCA already set to {{ .Values.proxyCA.configMapName }}, skipping"
+elif [[ -n "$CURRENT_TRUSTED_CA" && "$CURRENT_TRUSTED_CA" != "{{ .Values.proxyCA.configMapName }}" ]]; then
+  log "WARNING: Proxy trustedCA is already set to '$CURRENT_TRUSTED_CA' (not overwriting)"
+  log "WARNING: To use ZTVP proxy CA, manually run: oc patch proxy/cluster --type=merge -p '{\"spec\":{\"trustedCA\":{\"name\":\"{{ .Values.proxyCA.configMapName }}\"}}}}'"
+else
+  if [[ $PROXY_BUNDLE_SIZE -gt 100 ]]; then
+    log "Setting proxy/cluster trustedCA to {{ .Values.proxyCA.configMapName }}"
+    oc patch proxy/cluster --type=merge -p '{"spec":{"trustedCA":{"name":"{{ .Values.proxyCA.configMapName }}"}}}'
+    log "OK: Proxy trustedCA configured"
+  else
+    log "WARNING: Skipping proxy patch (no proxy CA bundle available)"
+  fi
+fi
+{{- end }}
+
+# ===================================================================
 # PHASE 9: Automatic Rollout (if enabled)
 # ===================================================================
 
