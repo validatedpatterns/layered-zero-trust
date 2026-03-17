@@ -1,5 +1,4 @@
 import logging
-import os
 
 import pytest
 import requests
@@ -17,12 +16,6 @@ logger = logging.getLogger(__loggername__)
 
 app_project_name = "zero-trust-workload-identity-manager"
 app_label = "argocd.argoproj.io/instance=zero-trust-workload-identity-manager"
-
-cluster_name = os.getenv(
-    "CLUSTER_NAME",
-    f'{os.getenv("HUB_CLUSTER_PREFIX")}-{os.getenv("INFRA_PROVIDER")}-{os.getenv("MPTS_TEST_RUN_ID")}',
-)
-cluster_apps_fqdn = f'apps.{cluster_name}.{os.getenv("AWS_DOMAIN")}'
 
 
 @pytest.mark.test_ztwim_project
@@ -69,7 +62,7 @@ def test_ztwim_custom_resources(openshift_dyn_client):
 
 
 @pytest.mark.test_ztwim_custom_resources_trustdomain
-def test_ztwim_custom_resources_trustdomain(openshift_dyn_client):
+def test_ztwim_custom_resources_trustdomain(openshift_dyn_client, cluster_apps_fqdn):
     custom_resources = ["SpireAgent", "SpireServer", "SpireOIDCDiscoveryProvider"]
     try:
         for crd_name in custom_resources:
@@ -82,7 +75,7 @@ def test_ztwim_custom_resources_trustdomain(openshift_dyn_client):
 
 
 @pytest.mark.test_ztwim_spire_oidc_discovery_provider
-def test_ztwim_spire_oidc_discovery_provider(openshift_dyn_client):
+def test_ztwim_spire_oidc_discovery_provider(openshift_dyn_client, cluster_apps_fqdn):
     desired_jwt_issuer = (
         f"https://spire-spiffe-oidc-discovery-provider.{cluster_apps_fqdn}"
     )
