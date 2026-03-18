@@ -105,6 +105,15 @@ class SpireOIDCDiscoveryProvider(Resource):
     kind = "SpireOIDCDiscoveryProvider"
 
 
+class ZeroTrustWorkloadIdentityManager(Resource):
+    """
+    ZeroTrustWorkloadIdentityManager object
+    """
+
+    api_version = "operator.openshift.io/v1alpha1"
+    kind = "ZeroTrustWorkloadIdentityManager"
+
+
 class BucketClass(NamespacedResource):
     """
     BucketClass object

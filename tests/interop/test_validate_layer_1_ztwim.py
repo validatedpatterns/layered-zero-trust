@@ -15,7 +15,7 @@ logger = logging.getLogger(__loggername__)
 
 
 app_project_name = "zero-trust-workload-identity-manager"
-app_label = "argocd.argoproj.io/instance=zero-trust-workload-identity-manager"
+app_label = "app.kubernetes.io/part-of=zero-trust-workload-identity-manager"
 
 
 @pytest.mark.test_ztwim_project
@@ -61,9 +61,9 @@ def test_ztwim_custom_resources(openshift_dyn_client):
         assert False
 
 
-@pytest.mark.test_ztwim_custom_resources_trustdomain
-def test_ztwim_custom_resources_trustdomain(openshift_dyn_client, cluster_apps_fqdn):
-    custom_resources = ["SpireAgent", "SpireServer", "SpireOIDCDiscoveryProvider"]
+@pytest.mark.test_ztwim_trustdomain
+def test_ztwim_trustdomain(openshift_dyn_client, cluster_apps_fqdn):
+    custom_resources = ["ZeroTrustWorkloadIdentityManager"]
     try:
         for crd_name in custom_resources:
             crd = getattr(pattern_crd, crd_name)
@@ -84,7 +84,7 @@ def test_ztwim_spire_oidc_discovery_provider(openshift_dyn_client, cluster_apps_
         crd = getattr(pattern_crd, crd_name)
         instances = crd.get(dyn_client=openshift_dyn_client)
         for instance in instances:
-            assert instance.instance.spec.managedRoute == "false"
+            assert instance.instance.spec.managedRoute == "true"
             assert instance.instance.spec.jwtIssuer == desired_jwt_issuer
     except Exception:
         assert False
@@ -93,8 +93,8 @@ def test_ztwim_spire_oidc_discovery_provider(openshift_dyn_client, cluster_apps_
 @pytest.mark.test_ztwim_routes
 def test_ztwim_routes(openshift_dyn_client):
     desired_routes = {
-        "spire-spiffe-oidc-discovery-provider": False,
-        "spire-server": False,
+        "spire-oidc-discovery-provider": False,
+        "spire-server-federation": False,
     }
     app_routes = get_route_by_app_label(
         openshift_dyn_client=openshift_dyn_client,
