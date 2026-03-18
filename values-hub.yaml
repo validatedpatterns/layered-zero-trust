@@ -193,6 +193,7 @@ clusterGroup:
       #   - Automatic rollout restart for consuming applications
       extraValueFiles:
         - /overrides/values-ztvp-certificates.yaml
+        - '/overrides/values-ztvp-certificates-{{ $.Values.global.clusterPlatform }}.yaml'
       overrides:
         # Disable Job TTL to prevent ArgoCD OutOfSync when Kubernetes deletes completed Jobs
         # The initial Job runs once during first sync; CronJob handles ongoing extraction
@@ -216,11 +217,6 @@ clusterGroup:
           value: openshift-config
         - name: customCA.secretRef.key
           value: ca.crt
-        
-        # Enable proxy CA injection for clusters with self-signed ingress certs (e.g., bare metal)
-        # Not needed on ROSA/managed clusters with publicly trusted certs
-        - name: proxyCA.enabled
-          value: "false"
         
         # Automatic rollout configuration (simple overrides work fine)
         - name: rollout.enabled
