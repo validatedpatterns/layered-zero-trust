@@ -220,7 +220,7 @@ clusterGroup:
         # Enable proxy CA injection for clusters with self-signed ingress certs (e.g., bare metal)
         # Not needed on ROSA/managed clusters with publicly trusted certs
         - name: proxyCA.enabled
-          value: "true"
+          value: "false"
         
         # Automatic rollout configuration (simple overrides work fine)
         - name: rollout.enabled
