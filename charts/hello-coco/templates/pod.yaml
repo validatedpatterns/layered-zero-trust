@@ -14,11 +14,8 @@ spec:
   # not individual containers. All containers in this pod are part of the same trust boundary.
   shareProcessNamespace: true
   serviceAccountName: spire-agent
-  # TODO: Make imagePullSecrets configurable like qtodo chart pattern (values.yaml + conditional)
-  # Currently hardcoded 'global-pull-secret' which must be manually created in the namespace
-  # Should either: 1) use ServiceAccount.imagePullSecrets, or 2) be conditional from values
   imagePullSecrets:
-  - name: global-pull-secret
+  - name: pull-secret
 
   containers:
   # SPIRE Agent Sidecar
