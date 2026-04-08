@@ -1,0 +1,25 @@
+# Secure Supply Chain application + vault role
+# Depends on: pipelines, rhtas, rhtpa, storage (all resolved automatically)
+# Requires --registry-option to select the registry backend.
+clusterGroup:
+  applications:
+    supply-chain:
+      name: supply-chain
+      project: hub
+      path: charts/supply-chain
+      annotations:
+        argocd.argoproj.io/sync-wave: "48"
+      ignoreDifferences:
+        - kind: ServiceAccount
+          jqPathExpressions:
+            - ".imagePullSecrets[]|select(.name | contains(\"-dockercfg-\"))"
+
+  _merge_into:
+    vault:
+      jwt:
+        roles:
+          - name: supply-chain
+            audience: supply-chain
+            subject: "spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/{{ $.Values.global.pattern }}-hub/sa/pipeline"
+            policies:
+              - hub-supply-chain-jwt-secret

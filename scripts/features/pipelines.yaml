@@ -1,0 +1,10 @@
+# OpenShift Pipelines (Tekton)
+# Required for the secure supply chain pipeline flow
+clusterGroup:
+  namespaces:
+    - openshift-pipelines
+
+  subscriptions:
+    openshift-pipelines:
+      name: openshift-pipelines-operator-rh
+      namespace: openshift-operators

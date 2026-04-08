@@ -1,0 +1,27 @@
+# Red Hat Quay container registry
+# Depends on: storage (ODF + NooBaa MCG for backend)
+clusterGroup:
+  namespaces:
+    - quay-enterprise:
+        annotations:
+          argocd.argoproj.io/sync-wave: "32"
+        labels:
+          openshift.io/cluster-monitoring: "true"
+
+  subscriptions:
+    quay-operator:
+      name: quay-operator
+      namespace: openshift-operators
+      channel: stable-3.15
+      annotations:
+        argocd.argoproj.io/sync-wave: "28"
+
+  applications:
+    quay-registry:
+      name: quay-registry
+      namespace: quay-enterprise
+      project: hub
+      chart: quay
+      chartVersion: 0.1.*
+      annotations:
+        argocd.argoproj.io/sync-wave: "41"

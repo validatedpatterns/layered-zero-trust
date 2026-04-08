@@ -1,0 +1,57 @@
+# OPTION 1: Built-in Quay Registry
+# Enables global.registry pointing to the pattern's own Quay instance.
+# Includes Quay namespace, subscription, and application (only needed for option 1).
+# Adds quay.enabled and registry.tlsVerify overrides to supply-chain app.
+# Adds imagePullTrust to ztvp-certificates for node-level kubelet trust.
+global:
+  registry:
+    enabled: true
+    domain: "quay-registry-quay-quay-enterprise.apps.{{ .Values.global.clusterDomain }}"
+    org: ztvp
+    user: quay-user
+    vaultPath: "secret/data/hub/infra/quay/quay-users"
+    passwordVaultKey: "quay-user-password"
+
+clusterGroup:
+  namespaces:
+    - quay-enterprise:
+        annotations:
+          argocd.argoproj.io/sync-wave: "32"
+        labels:
+          openshift.io/cluster-monitoring: "true"
+
+  subscriptions:
+    quay-operator:
+      name: quay-operator
+      namespace: openshift-operators
+      channel: stable-3.15
+      annotations:
+        argocd.argoproj.io/sync-wave: "28"
+
+  applications:
+    quay-registry:
+      name: quay-registry
+      namespace: quay-enterprise
+      project: hub
+      chart: quay
+      chartVersion: 0.1.*
+      annotations:
+        argocd.argoproj.io/sync-wave: "41"
+
+  _merge_into:
+    supply-chain:
+      overrides:
+        - name: quay.enabled
+          value: "true"
+        - name: registry.tlsVerify
+          value: "false"
+        - name: rhtas.enabled
+          value: "true"
+        - name: rhtpa.enabled
+          value: "true"
+    ztvp-certificates:
+      overrides:
+        - name: imagePullTrust.enabled
+          value: "true"
+        - name: imagePullTrust.registries[0]
+          value: "quay-registry-quay-quay-enterprise.apps.{{ $.Values.global.clusterDomain }}"

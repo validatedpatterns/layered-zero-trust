@@ -1,0 +1,27 @@
+# ODF + NooBaa MCG: shared object storage backend
+# Required for RHTPA and Quay (provides S3-compatible storage via NooBaa MCG)
+clusterGroup:
+  namespaces:
+    - openshift-storage:
+        operatorGroup: true
+        targetNamespace: openshift-storage
+        annotations:
+          openshift.io/cluster-monitoring: "true"
+          argocd.argoproj.io/sync-wave: "26"
+
+  subscriptions:
+    odf:
+      name: odf-operator
+      namespace: openshift-storage
+      channel: stable-4.20
+      annotations:
+        argocd.argoproj.io/sync-wave: "27"
+
+  applications:
+    noobaa-mcg:
+      name: noobaa-mcg
+      namespace: openshift-storage
+      project: hub
+      path: charts/noobaa-mcg
+      annotations:
+        argocd.argoproj.io/sync-wave: "36"

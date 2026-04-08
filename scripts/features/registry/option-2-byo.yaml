@@ -1,0 +1,22 @@
+# OPTION 2: BYO/External Registry (quay.io, ghcr.io, etc.)
+# Enables global.registry pointing to an external registry.
+# No imagePullTrust needed (external registries use public CAs).
+# After generating, update domain/org/user below and set the password
+# in ~/values-secret.yaml (see docs/supply-chain.md for details).
+global:
+  registry:
+    enabled: true
+    domain: quay.io
+    org: your-org
+    user: your-username
+    vaultPath: "secret/data/hub/infra/registry/registry-user"
+    passwordVaultKey: "registry-password"
+
+clusterGroup:
+  _merge_into:
+    supply-chain:
+      overrides:
+        - name: rhtas.enabled
+          value: "true"
+        - name: rhtpa.enabled
+          value: "true"
