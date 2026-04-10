@@ -38,7 +38,7 @@ clusterGroup:
       annotations:
         argocd.argoproj.io/sync-wave: "41"
 
-  _merge_into:
+  merge_into_applications:
     supply-chain:
       overrides:
         - name: quay.enabled

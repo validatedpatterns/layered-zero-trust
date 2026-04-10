@@ -14,7 +14,7 @@ clusterGroup:
           jqPathExpressions:
             - ".imagePullSecrets[]|select(.name | contains(\"-dockercfg-\"))"
 
-  _merge_into:
+  merge_into_applications:
     vault:
       jwt:
         roles:

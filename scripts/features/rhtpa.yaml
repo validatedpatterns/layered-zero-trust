@@ -36,7 +36,7 @@ clusterGroup:
           jsonPointers:
             - /status
 
-  _merge_into:
+  merge_into_applications:
     vault:
       jwt:
         roles:

@@ -39,6 +39,7 @@ import sys
 from collections import OrderedDict
 
 from ruamel.yaml import YAML
+from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 FEATURES_DIR = os.path.join(SCRIPT_DIR, "features")
@@ -50,6 +51,24 @@ def load_yaml_file(path):
     yaml.preserve_quotes = True
     with open(path) as fh:
         return yaml.load(fh)
+
+
+def _strip_comments(node):
+    """Recursively remove all ruamel.yaml comments from a YAML subtree."""
+    if isinstance(node, CommentedMap):
+        node.ca.comment = None
+        node.ca.items.clear()
+        if hasattr(node.ca, "end"):
+            node.ca.end = None
+        for v in node.values():
+            _strip_comments(v)
+    elif isinstance(node, CommentedSeq):
+        node.ca.comment = None
+        node.ca.items.clear()
+        if hasattr(node.ca, "end"):
+            node.ca.end = None
+        for item in node:
+            _strip_comments(item)
 
 
 def load_feature_registry():
@@ -126,7 +145,7 @@ def _deep_merge_mappings(base, overlay):
 
 
 def _apply_merge_into(base_apps, merge_into_spec):
-    """Handle _merge_into: merge fragment data into existing application configs.
+    """Handle merge_into_applications: merge fragment data into existing app configs.
 
     merge_into_spec is a mapping like:
         vault:
@@ -141,7 +160,7 @@ def _apply_merge_into(base_apps, merge_into_spec):
     for app_name, additions in merge_into_spec.items():
         if app_name not in base_apps:
             print(
-                f"WARNING: _merge_into target '{app_name}'"
+                f"WARNING: merge_into_applications target '{app_name}'"
                 " not found in base applications",
                 file=sys.stderr,
             )
@@ -210,9 +229,9 @@ def _merge_cluster_group(base, frag_cg):
             if app_name not in base_apps:
                 base_apps[app_name] = copy.deepcopy(app_val)
 
-    if "_merge_into" in frag_cg:
+    if "merge_into_applications" in frag_cg:
         base_apps = base_cg.get("applications", {})
-        _apply_merge_into(base_apps, frag_cg["_merge_into"])
+        _apply_merge_into(base_apps, frag_cg["merge_into_applications"])
 
 
 def validate_output(data):
@@ -269,6 +288,11 @@ def generate_variant(
         merge_fragment(base, registry_frag)
 
     validate_output(base)
+    cg = base.get("clusterGroup")
+    if cg:
+        for key in ("namespaces", "subscriptions", "applications"):
+            if key in cg:
+                _strip_comments(cg[key])
 
     with open(output_path, "w") as fh:
         yaml.dump(base, fh)
