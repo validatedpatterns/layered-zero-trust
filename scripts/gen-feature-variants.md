@@ -68,7 +68,15 @@ The output directory is created automatically if it does not exist.
 | ------ | --------------------------- | ------------------------------------------ |
 | 1      | Built-in Quay registry      | Deploys Quay inside the cluster            |
 | 2      | BYO / external registry     | Uses an external registry (e.g. quay.io)   |
-| 3      | Embedded OCP image registry | Uses the built-in OpenShift image registry |
+| 3      | Embedded OpenShift image registry | Uses the built-in OpenShift image registry |
+
+> **Note:** The registry option fragments use generic `org/image-name`
+> placeholders in the `repository` field. When a feature defines `org`
+> and `image_name` (the `supply-chain` feature sets them to `ztvp` and
+> `qtodo`), the generator replaces both placeholders automatically, so
+> the output already contains `ztvp/qtodo`. If you use a custom feature
+> without these fields, replace the placeholders manually before applying
+> the generated file.
 
 ## How It Works
 

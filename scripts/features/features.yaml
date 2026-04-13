@@ -26,6 +26,8 @@ features:
     description: "Full secure supply chain pipeline"
     depends_on: [pipelines, rhtas, rhtpa, storage]
     registry_option_required: true
+    org: ztvp
+    image_name: qtodo
 
 # Registry options (only used with supply-chain feature)
 # Each maps to a file under registry/ subdirectory.
@@ -38,4 +40,4 @@ registry_options:
     file: "registry/option-2-byo.yaml"
   3:
     label: "embedded-ocp-registry"
-    file: "registry/option-3-embedded-ocp.yaml"
+    file: "registry/option-3-embedded-openshift.yaml"

@@ -21,7 +21,7 @@ Usage:
   # Full supply chain with BYO external registry (option 2)
   python3 scripts/gen-feature-variants.py --features supply-chain --registry-option 2
 
-  # Full supply chain with embedded OCP image registry (option 3)
+  # Full supply chain with embedded OpenShift image registry (option 3)
   python3 scripts/gen-feature-variants.py --features supply-chain --registry-option 3
 
   # Generate all 3 supply-chain registry variants at once
@@ -257,8 +257,24 @@ def validate_output(data):
         role_names.add(name)
 
 
+def _substitute_repository_placeholders(base, org=None, image_name=None):
+    """Replace 'org' and 'image-name' placeholders in global.registry.repository."""
+    repo = str(base.get("global", {}).get("registry", {}).get("repository", ""))
+    if org:
+        repo = repo.replace("org/", f"{org}/", 1)
+    if image_name:
+        repo = repo.replace("image-name", image_name)
+    base["global"]["registry"]["repository"] = repo
+
+
 def generate_variant(
-    base_path, features_dir, resolved_features, registry_fragment_path, output_path
+    base_path,
+    features_dir,
+    resolved_features,
+    registry_fragment_path,
+    output_path,
+    org=None,
+    image_name=None,
 ):
     """Load base, merge all feature fragments + registry option, write output."""
     yaml = YAML()
@@ -286,6 +302,9 @@ def generate_variant(
             sys.exit(1)
         registry_frag = load_yaml_file(registry_fragment_path)
         merge_fragment(base, registry_frag)
+
+    if org or image_name:
+        _substitute_repository_placeholders(base, org=org, image_name=image_name)
 
     validate_output(base)
     cg = base.get("clusterGroup")
@@ -325,7 +344,7 @@ def main():
             "Registry option for supply-chain: "
             "1=built-in Quay, "
             "2=BYO/external registry, "
-            "3=embedded OCP image registry, "
+            "3=embedded OpenShift image registry, "
             "'all'=generate all 3 variants"
         ),
     )
@@ -375,6 +394,19 @@ def main():
     requested = [f.strip() for f in args.features.split(",")]
     resolved = resolve_dependencies(requested, feature_defs)
 
+    org = None
+    image_name = None
+    repo_feature = None
+    for f in resolved:
+        val = feature_defs.get(f, {}).get("org")
+        if val:
+            org = val
+            repo_feature = f
+        val = feature_defs.get(f, {}).get("image_name")
+        if val:
+            image_name = val
+            repo_feature = f
+
     needs_registry = any(
         feature_defs.get(f, {}).get("registry_option_required") for f in resolved
     )
@@ -405,7 +437,9 @@ def main():
             reg_path = os.path.join(FEATURES_DIR, opt_info["file"])
             out_name = build_output_name(requested, opt_num)
             out_path = os.path.join(outdir, out_name)
-            generate_variant(base, FEATURES_DIR, resolved, reg_path, out_path)
+            generate_variant(
+                base, FEATURES_DIR, resolved, reg_path, out_path, org, image_name
+            )
     else:
         reg_path = None
         if args.registry_option:
@@ -424,7 +458,24 @@ def main():
             int(args.registry_option) if args.registry_option else None,
         )
         out_path = os.path.join(outdir, out_name)
-        generate_variant(base, FEATURES_DIR, resolved, reg_path, out_path)
+        generate_variant(
+            base, FEATURES_DIR, resolved, reg_path, out_path, org, image_name
+        )
+
+    if args.registry_option and org and image_name:
+        print(
+            f"\nNote: The '{repo_feature}' feature defines org '{org}' and"
+            f" image_name '{image_name}', so the\n"
+            f"      generated repository has been set to"
+            f" '{org}/{image_name}' automatically."
+        )
+    elif args.registry_option:
+        print(
+            "\nNote: The generated 'repository' value uses generic"
+            " 'org/image-name' placeholders.\n"
+            "      Replace them with the actual org and image name"
+            " before applying the file."
+        )
 
     print("Done.")
 

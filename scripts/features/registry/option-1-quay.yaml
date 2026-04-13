@@ -7,7 +7,8 @@ global:
   registry:
     enabled: true
     domain: "quay-registry-quay-quay-enterprise.apps.{{ .Values.global.clusterDomain }}"
-    org: ztvp
+    # Placeholders auto-replaced by the generator (supply-chain defines org=ztvp, image_name=qtodo)
+    repository: org/image-name
     user: quay-user
     vaultPath: "secret/data/hub/infra/quay/quay-users"
     passwordVaultKey: "quay-user-password"
