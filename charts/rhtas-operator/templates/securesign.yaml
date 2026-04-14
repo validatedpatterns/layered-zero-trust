@@ -12,6 +12,9 @@ metadata:
     {{- if .Values.rhtas.monitoring.enabled }}
     rhtas.redhat.com/metrics: "true"
     {{- end }}
+    {{- if ne .Values.rhtas.logType "prod" }}
+    rhtas.redhat.com/log-type: {{ .Values.rhtas.logType }}
+    {{- end }}
 spec:
   # Fulcio - Certificate Authority
   fulcio:
