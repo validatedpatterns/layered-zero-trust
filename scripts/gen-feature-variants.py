@@ -43,7 +43,7 @@ from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 FEATURES_DIR = os.path.join(SCRIPT_DIR, "features")
-REGISTRY_LABELS = {1: "quay", 2: "byo", 3: "embedded-ocp"}
+REGISTRY_LABELS = {1: "quay", 2: "byo", 3: "embedded-openshift"}
 
 
 def load_yaml_file(path):

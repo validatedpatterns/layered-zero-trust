@@ -39,5 +39,5 @@ registry_options:
     label: "byo-external-registry"
     file: "registry/option-2-byo.yaml"
   3:
-    label: "embedded-ocp-registry"
+    label: "embedded-openshift-registry"
     file: "registry/option-3-embedded-openshift.yaml"
