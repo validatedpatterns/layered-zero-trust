@@ -14,6 +14,10 @@ super-linter-output
 # GitHub Actions leftovers
 github_conf
 
+# Python bytecode cache
+__pycache__/
+*.pyc
+
 # Editor and IDE specific files
 .cursorrules
 .cursor/
