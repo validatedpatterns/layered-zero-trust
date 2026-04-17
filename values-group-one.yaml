@@ -7,18 +7,25 @@ clusterGroup:
   name: group-one
   isHubCluster: false
   namespaces:
-    - golang-external-secrets
+    external-secrets-operator:
+      operatorGroup: true
+      targetNamespaces: []
+    external-secrets:
   # The only subscription on spokes is gitops which gets managed by ACM
-  # subscriptions:
-  projects:
+  subscriptions:
+    eso:
+      name: openshift-external-secrets-operator
+      namespace: external-secrets-operator
+      channel: stable-v1
+  argoProjects:
     - eso
   applications:
-    golang-external-secrets:
-      name: golang-external-secrets
-      namespace: golang-external-secrets
-      project: eso
-      chart: golang-external-secrets
-      chartVersion: 0.1.*
+    openshift-external-secrets:
+      name: openshift-external-secrets
+      namespace: external-secrets
+      argoProject: eso
+      chart: openshift-external-secrets
+      chartVersion: 0.0.*
   imperative:
     # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm
     # The default schedule is every 10 minutes: imperative.schedule
