@@ -23,3 +23,5 @@ clusterGroup:
             subject: "spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/{{ $.Values.global.pattern }}-hub/sa/pipeline"
             policies:
               - hub-supply-chain-jwt-secret
+    supply-chain: {}
+    qtodo: {}
