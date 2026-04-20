@@ -182,12 +182,11 @@ To enable this use case, the following parameters should be defined within the [
           value: true
         - name: rhtpa.enabled
           value: true
+        # If you are using the Quay embedded registry, add these attributes:
+        - name: quay.enabled
+          value: "true"
         - name: registry.tlsVerify
           value: "false"
-        - name: registry.user
-          value: quay-admin
-        - name: registry.passwordVaultKey
-          value: quay-admin-password
     ```
 
 * `applications.vault.jwt.roles.policies`: In the _Vault_ policies section, uncomment the following:
@@ -200,28 +199,13 @@ To enable this use case, the following parameters should be defined within the [
               - hub-infra-rhtpa-jwt-secret
     ```
 
-* `applications.qtodo.overrides`: In the _qtodo_ overrides section, specify the following to source content from the Quay registry instance.
-
-    ```shell
-        - name: app.images.main.name
-          value: quay-registry-quay-quay-enterprise.apps.{{ $.Values.global.clusterDomain }}/ztvp/qtodo
-        - name: app.images.main.version
-          value: latest
-        - name: app.images.main.registry.auth
-          value: true
-        - name: app.images.main.registry.user
-          value: quay-admin
-        - name: app.images.main.registry.passwordVaultKey
-          value: quay-admin-password
-    ```
-
 ## Bring Your Own (BYO) Container Registry
 
 By default, ZTVP deploys a built-in Red Hat Quay registry. However, you can use your own container registry (e.g., quay.io, Docker Hub, GitHub Container Registry, or a private registry) instead.
 
 ### Configuration Steps
 
-1. **Disable built-in Quay registry** (optional - if not using Quay): Comment out the Quay-related applications in `values-hub.yaml`: `quay-enterprise` namespace, `quay-operator` subscription, and `quay-registry` application.
+1. **Disable built-in Quay registry** (optional - if not using Quay): Comment out the Quay-related applications in `values-hub.yaml`: `quay-enterprise` namespace, `quay-operator` subscription, and `quay-registry` application. Remove the `applications.supply-chain.overrides.quay.enabled` and `applications.supply-chain.overrides.registry.tlsVerify` settings.
 
 2. **Configure registry credentials in Vault** (**BYO registry only**): Per VP rule, add your registry credentials to `~/values-secrets.yaml` (or `~/values-secret.yaml` / `~/values-secret-layered-zero-trust.yaml` per VP lookup order):
 
