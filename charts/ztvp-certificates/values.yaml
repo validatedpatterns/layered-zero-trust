@@ -119,7 +119,7 @@ configMapName: ztvp-trusted-ca
 # are auto-injected into all workloads via the cluster network operator.
 # Required for workloads that verify TLS of routes (e.g., ACS Central reaching Keycloak).
 proxyCA:
-  enabled: false
+  enabled: true
   configMapName: ztvp-proxy-ca
 
 # Automatic rollout configuration
