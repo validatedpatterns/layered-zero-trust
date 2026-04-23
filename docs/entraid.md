@@ -3,8 +3,6 @@
 This document describes the steps required to integrate the **Zero Trust Validated Pattern** (ZTVP) with **Azure Entra ID**, trusting this service as the Identity Provider for the following components:
 
 * Qtodo demo application
-* Red Hat Trusted Artifact Signer (RHTAS)
-* Red Hat Trusted Profile Analyzer (RHTPA)
 
 ## Configuration
 
@@ -71,11 +69,3 @@ In the `values-hub.yaml file`, we add the following configuration for the qtodo 
         - name: app.oidc.clientSecret.vaultPath
           value: secret/data/apps/qtodo/qtodo-oidc-entraid
 ```
-
-### RHTAS
-
-### RHTPA
-
-#### API
-
-#### UI
