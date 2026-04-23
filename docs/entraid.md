@@ -4,6 +4,9 @@ This document describes the steps required to integrate the **Zero Trust Validat
 
 * Qtodo demo application
 
+> [!WARNING]
+> The integration of Azure Entra ID into the pattern is still **in progress** and does not cover all components. This document describes those that are supported. For components not supported by Entra ID, **Red Hat Build of Keycloak (RHBK)** will continue to be used as the default OIDC.
+
 ## Configuration
 
 To configure the components we will need access to Azure Portal with permissions to create App Registrations and a Microsoft Entra ID tenant.
