@@ -93,7 +93,7 @@ This configuration uses the [Device code flow](https://learn.microsoft.com/en-us
             --enable-id-token-issuance \
             --query appId \
             -o tsv \
-            | tr -d [:space:])
+            | tr -d '\t\n\r')
     ```
 
 3. Create a new **Client Secret** for our _App Registration_. Save this value securely.
@@ -118,7 +118,7 @@ This configuration uses the [Device code flow](https://learn.microsoft.com/en-us
 5. Get the _App Registration_ object ID.
 
     ```shell
-    export RHTAS_APP_OBJECT_ID=$(az ad app list --display-name "rhtas" --query "[0].id" -o tsv | tr -d [:space:])
+    export RHTAS_APP_OBJECT_ID=$(az ad app list --display-name "rhtas" --query "[0].id" -o tsv | tr -d '\t\n\r')
     ```
 
 6. Enable **Mapped Claims** in the _App Registration_ **manifest**.
@@ -135,7 +135,7 @@ This configuration uses the [Device code flow](https://learn.microsoft.com/en-us
     ```shell
     export SERVICE_PRINCIPAL_ID=$(
         az ad sp create --id="$RHTAS_APP_REGISTRATION" -o tsv --query 'id' \
-        | tr -d [:space:])
+        | tr -d '\t\n\r')
     ```
 
 8. Get the _Claim Mapping Policy_ ID:
@@ -143,7 +143,7 @@ This configuration uses the [Device code flow](https://learn.microsoft.com/en-us
     ```shell
     export CLAIM_MAPPING_POLICY_ID=$(
         az rest --uri https://graph.microsoft.com/v1.0/policies/claimsMappingPolicies \
-                --query "value[?displayName=='EmailVerified'] | [0].id") \
+                --query "value[?displayName=='EmailVerified'] | [0].id" \
                 -o tsv)
     ```
 
@@ -196,3 +196,42 @@ The **device code flow** involves user interaction, so the following tasks in th
 * `qtodo-sign-artifact`
 * `qtodo-sign-image`
 * `qtodo-sbom-attestation`
+
+When the pipeline reaches any of these tasks, we will need to follow these steps to authorize the signature with our _Azure Entra ID_ credentials:
+
+##### Using the OpenShift Web UI
+
+1. Select **Pipelines -> Pipelines** from the left hand navigation bar.
+2. Locate the **qtodo-supply-chain** pipeline. It's within the **layered-zero-trust-hub** project.
+3. Select the last `PipelineRun` or start a new one.
+4. On the logs tab, select the signing task: `qtodo-sign-artifact`, `qtodo-sign-image` or `qtodo-sbom-attestation`
+5. In the log box, on the last lines, you can get the verification code.
+6. Go to [https://login.microsoft.com/device](https://login.microsoft.com/device) and enter the verification code
+7. Pick your _Microsoft Azure_ account.
+8. Authorize the signature by pressing the **Continue** button.
+
+##### Using the OpenShift CLI
+
+1. List the `TaskRuns` in the namespace **layered-zero-trust-hub**.
+
+    ```shell
+    oc get taskrun -n layered-zero-trust-hub
+    ```
+
+2. Continue monitoring the status of the tasks until one of the signing tasks (`qtodo-sign-artifact`, `qtodo-sign-image` or `qtodo-sbom-attestation`) starts.
+3. For each signing task, obtain the verification code and verify it using a Web browser:
+
+    ```shell
+    export SIGN_ARTIFACT_POD=$(oc get taskrun -n layered-zero-trust-hub -l tekton.dev/pipelineTask=qtodo-sign-artifact -o jsonpath='{ .items[0].status.podName }')
+    oc logs -n layered-zero-trust-hub ${SIGN_ARTIFACT_POD} | grep 'verification code'
+
+    export SIGN_IMAGE_POD=$(oc get taskrun -n layered-zero-trust-hub -l tekton.dev/pipelineTask=qtodo-sign-image -o jsonpath='{ .items[0].status.podName }')
+    oc logs -n layered-zero-trust-hub ${SIGN_IMAGE_POD} | grep 'verification code'
+
+    export SIGN_SBOM_POD=$(oc get taskrun -n layered-zero-trust-hub -l tekton.dev/pipelineTask=qtodo-sbom-attestation -o jsonpath='{ .items[0].status.podName }')
+    oc logs -n layered-zero-trust-hub ${SIGN_SBOM_POD} | grep 'verification code'
+    ```
+
+4. Go to [https://login.microsoft.com/device](https://login.microsoft.com/device) and enter the verification code
+5. Pick your _Microsoft Azure_ account.
+6. Authorize the signature by pressing the **Continue** button.
