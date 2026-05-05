@@ -18,6 +18,16 @@ clusterGroup:
           value: "https://login.microsoftonline.com/<YOUR_TENANT_ID>/v2.0"
         - name: rhtas.fulcio.oidcIssuers.email.clientID
           value: "<YOUR_CLIENT_ID>"
+    trusted-profile-analyzer:
+        overrides:
+          - name: rhtpa.zeroTrust.oidc.authServerUrl
+            value: "https://login.microsoftonline.com/<YOUR_TENANT_ID>/v2.0"
+          - name: rhtpa.zeroTrust.oidc.clients.frontend.clientId
+            value: "<RHTPA_FRONTEND_CLIENT_ID>"
+          - name: rhtpa.zeroTrust.oidc.clients.cli.clientId
+            value: "<RHTPA_API_CLIENT_ID>"
+          - name: rhtpa.zeroTrust.oidc.clients.cli.apiId
+            value: "<RHTPA_API_API_ID>"
     supply-chain:
       overrides:
         - name: rhtas.spire.enabled
@@ -34,5 +44,10 @@ clusterGroup:
           value: "https://login.microsoftonline.com/<YOUR_TENANT_ID>/v2.0"
         - name: rhtas.oidc.identity
           value: "<YOUR_ENTRAID_EMAIL>"
-        - name: rhtpa.enabled
-          value: "false"
+        - name: rhtpa.oidc.url
+          value: "https://login.microsoftonline.com/<YOUR_TENANT_ID>"  # Do not include /v2.0
+        - name: rhtpa.oidc.clientId
+          value: "<RHTPA_API_CLIENT_ID>"
+        - name: rhtpa.oidc.apiId
+          value: "<RHTPA_API_API_ID>"
+
