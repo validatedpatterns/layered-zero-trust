@@ -1,10 +1,9 @@
 # ZTVP Certificates
 
-The `ztvp-certificates` chart manages CA certificate extraction, validation,
+The [`ztvp-certificates`](../charts/ztvp-certificates/) chart manages CA certificate extraction, validation,
 bundling, and distribution across the Zero Trust Validated Pattern. It runs as
-an ArgoCD-managed application in the `openshift-config` namespace at sync-wave
-**21**, ensuring certificates are available before any workload that needs TLS
-verification.
+an application managed by Argo CD in the `openshift-config` namespace, ensuring
+certificates are available before any workload that needs TLS verification.
 
 ## Architecture
 
@@ -35,7 +34,7 @@ verification.
 |---|---|
 | **ServiceAccount / RBAC** | Grants the extraction Job read access to secrets, configmaps, ingresscontrollers, and proxy across namespaces |
 | **ConfigMap (script)** | Holds the templated `extract-certificates.sh` script |
-| **Job (initial)** | Runs once at first sync (sync-wave 23, `Prune=false`) to populate the CA bundle |
+| **Job (initial)** | Runs once at first sync to populate the CA bundle |
 | **CronJob** | Runs on schedule (default daily at 02:00) for automatic rotation |
 | **ACM Policy + Placement** | Distributes the `ztvp-trusted-ca` ConfigMap into target namespaces via ACM governance |
 | **ManagedClusterSetBinding** | Binds the `default` ManagedClusterSet in `openshift-config` so the Placement can target `local-cluster` |
@@ -56,8 +55,8 @@ configuration.
 | 6 -- Validation | `validation.enabled` | Checks minimum size and `openssl x509` parse for every `.crt` |
 | 7 -- Combine | always | Concatenates all `.crt` files into `tls-ca-bundle.pem`; fails if bundle < 100 bytes |
 | 8 -- ConfigMap | always | `oc apply` the `ztvp-trusted-ca` ConfigMap with annotations recording extraction metadata |
-| 8.5 -- Proxy CA | `proxyCA.enabled` | Creates a separate ConfigMap with ingress + service CAs only |
-| 8.6 -- Proxy Patch | `proxyCA.enabled` | Patches `proxy/cluster` to set `trustedCA` (only if not already set to another value) |
+| 8.1 -- Proxy CA | `proxyCA.enabled` | Creates a separate ConfigMap with ingress + service CAs only |
+| 8.2 -- Proxy Patch | `proxyCA.enabled` | Patches `proxy/cluster` to set `trustedCA` (only if not already set to another value) |
 | 9 -- Image Pull Trust | `imagePullTrust.enabled` | Creates a ConfigMap keyed by registry hostname and patches `image.config.openshift.io/cluster` |
 | 10 -- Rollout | `rollout.enabled` | Restarts Deployments/StatefulSets that consume the certificate bundle |
 
@@ -79,12 +78,12 @@ signed by a public CA.
 
 1. The Job auto-detects the ingress CA from each `IngressController`'s router
    secret in `openshift-ingress`.
-2. The service CA is read from `openshift-service-ca.crt`.
+2. The service CA is read from `openshift-service-ca.crt` from within the Job Pod.
 3. If a cluster-wide proxy bundle exists, it is included.
-4. All certificates are combined into `ztvp-trusted-ca` and distributed via
+4. All certificates are combined into `ztvp-trusted-ca` ConfigMap and distributed via
    ACM Policy to target namespaces.
 5. A proxy CA ConfigMap (`ztvp-proxy-ca`) is created with ingress + service
-   CAs and `proxy/cluster` is patched so the Cluster Network Operator injects
+   CAs and the `proxy/cluster` is patched so the Cluster Network Operator injects
    these CAs into all workloads automatically.
 
 No platform override file is needed. The chart's default `values.yaml` handles
@@ -114,11 +113,11 @@ proxyCA:
 > `proxyCA.enabled: true`. They are retained for clarity and backward
 > compatibility with older chart versions.
 
-**Behavior is identical to Scenario 1** -- Phases 8.5 and 8.6 run by default:
+**Behavior is identical to Scenario 1** -- Phases 8.1 and 8.2 run by default:
 
-1. Phase 8.5 builds a proxy-specific bundle containing only the ingress and
+1. Phase 8.1 builds a proxy-specific bundle containing only the ingress and
    service CAs (the Cluster Network Operator merges these with system CAs).
-2. Phase 8.6 patches `proxy/cluster` to set `spec.trustedCA.name` to
+2. Phase 8.2 patches `proxy/cluster` to set `spec.trustedCA.name` to
    `ztvp-proxy-ca`.
 3. The CNO propagates the merged bundle to every node, making the ingress CA
    trusted system-wide for all pods without explicit volume mounts.
@@ -244,7 +243,7 @@ openshift-config/ztvp-trusted-ca  ---ACM Policy--->  qtodo/ztvp-trusted-ca
                                                       ...
 ```
 
-The policy uses `fromConfigMap` hub templates so that the ConfigMap data is
+The policy uses [`fromConfigMap`](https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.12/html-single/governance/index#fromConfigMap-function) hub templates so that the ConfigMap data is
 always sourced from the hub cluster's copy. Target namespaces are configured
 via `distribution.targetNamespaces`.
 
@@ -276,17 +275,18 @@ metadata:
 
 ## Sync Wave Ordering
 
-The chart's resources are ordered within the ArgoCD sync:
+The chart's resources are ordered within the Argo CD sync:
 
-| Wave | Resources |
+| Order | Resources |
 |---|---|
-| 22 | ServiceAccount, RBAC (Role, RoleBinding, ClusterRole, ClusterRoleBinding) |
-| 23 | Initial Job, CronJob, ConfigMap (script) |
-| 25 | ManagedClusterSetBinding |
-| 26 | ACM Policy, PlacementBinding, Placement |
+| 1st | ServiceAccount, RBAC (Role, RoleBinding, ClusterRole, ClusterRoleBinding) |
+| 2nd | Initial Job, CronJob, ConfigMap (script) |
+| 3rd | ManagedClusterSetBinding |
+| 4th | ACM Policy, PlacementBinding, Placement |
 
-The application itself sits at sync-wave **21** in `values-hub.yaml`, ensuring
-it deploys before operators and workloads that depend on the CA bundle.
+The application itself is deployed early in the overall sync order (via
+`values-hub.yaml`), ensuring it runs before operators and workloads that depend
+on the CA bundle.
 
 ## Configuration Reference
 
