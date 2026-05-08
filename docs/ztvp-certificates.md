@@ -90,22 +90,28 @@ signed by a public CA.
 No platform override file is needed. The chart's default `values.yaml` handles
 this scenario out of the box.
 
-### Scenario 2: Bare Metal with Self-Signed Ingress
+### Scenario 2: Bare Metal / vSphere with Self-Signed Ingress
 
-Bare metal clusters typically use self-signed certificates for the default
-ingress. Since `proxyCA` is enabled by default (see Scenario 1), the ingress
-CA is automatically injected cluster-wide. Workloads that verify TLS on routes
-(e.g., ACS Central connecting to Keycloak) work without extra configuration.
+Bare metal and vSphere clusters typically use self-signed certificates for the
+default ingress. Since `proxyCA` is enabled by default (see Scenario 1), the
+ingress CA is automatically injected cluster-wide. Workloads that verify TLS
+on routes (e.g., ACS Central connecting to Keycloak) work without extra
+configuration.
 
-**Platform override** (`overrides/values-ztvp-certificates-BareMetal.yaml`):
+**Platform overrides:**
+
+* `overrides/values-ztvp-certificates-BareMetal.yaml`
+* `overrides/values-ztvp-certificates-VSphere.yaml`
+
+Both contain:
 
 ```yaml
 proxyCA:
   enabled: true
 ```
 
-> **Note:** This override is now redundant because the chart default is
-> `proxyCA.enabled: true`. It is retained for clarity and backward
+> **Note:** These overrides are now redundant because the chart default is
+> `proxyCA.enabled: true`. They are retained for clarity and backward
 > compatibility with older chart versions.
 
 **Behavior is identical to Scenario 1** -- Phases 8.5 and 8.6 run by default:
@@ -117,22 +123,7 @@ proxyCA:
 3. The CNO propagates the merged bundle to every node, making the ingress CA
    trusted system-wide for all pods without explicit volume mounts.
 
-### Scenario 3: vSphere with Self-Signed Ingress
-
-Identical behavior to Bare Metal. vSphere clusters also typically use
-self-signed ingress certificates.
-
-**Platform override** (`overrides/values-ztvp-certificates-VSphere.yaml`):
-
-```yaml
-proxyCA:
-  enabled: true
-```
-
-> **Note:** This override is also redundant; the chart default already enables
-> `proxyCA`.
-
-### Scenario 4: Enterprise Custom CA
+### Scenario 3: Enterprise Custom CA
 
 When the organization uses a private PKI (e.g., a corporate root CA that
 signed the cluster's ingress certificate), the administrator creates a
@@ -165,7 +156,7 @@ oc create secret generic custom-ca-bundle \
 3. The combined bundle contains both the custom CA and the auto-detected
    certificates.
 
-### Scenario 5: Multiple Additional CAs
+### Scenario 4: Multiple Additional CAs
 
 When several external CAs are needed (e.g., corporate root CA, a partner CA,
 and an intermediate CA), use `additionalCertificates` via the
@@ -195,7 +186,7 @@ customCA:
 2. All additional certificates are combined with auto-detected and custom CAs
    in Phase 7.
 
-### Scenario 6: Image Pull Trust for Built-In Registry
+### Scenario 5: Image Pull Trust for Built-In Registry
 
 When an image registry (e.g., Quay or the embedded OpenShift registry) is
 exposed behind the cluster ingress with a self-signed or internal CA, kubelet
@@ -220,7 +211,7 @@ image pulls fail with `x509: certificate signed by unknown authority`. The
    `additionalTrustedCA.name` to that ConfigMap.
 4. The Machine Config Operator rolls the trust configuration out to all nodes.
 
-### Scenario 7: Custom Source Locations
+### Scenario 6: Custom Source Locations
 
 In non-standard environments where the ingress CA or service CA are stored in
 different locations, `customSource` overrides the default auto-detection
