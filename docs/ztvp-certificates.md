@@ -57,7 +57,7 @@ configuration.
 | 8 -- ConfigMap | always | `oc apply` the `ztvp-trusted-ca` ConfigMap with annotations recording extraction metadata |
 | 8.1 -- Proxy CA | `proxyCA.enabled` | Creates a separate ConfigMap with ingress + service CAs only |
 | 8.2 -- Proxy Patch | `proxyCA.enabled` | Patches `proxy/cluster` to set `trustedCA` (only if not already set to another value) |
-| 9 -- Image Pull Trust | `imagePullTrust.enabled` | Creates a ConfigMap keyed by registry hostname and patches `image.config.openshift.io/cluster` |
+| 9 -- Image Pull Trust | `imagePullTrust.enabled` | Creates a ConfigMap keyed by registry hostname and patches `image.config.openshift.io/cluster` to set the `additionalTrustedCA` attribute. |
 | 10 -- Rollout | `rollout.enabled` | Restarts Deployments/StatefulSets that consume the certificate bundle |
 
 ## Scenario Handling
