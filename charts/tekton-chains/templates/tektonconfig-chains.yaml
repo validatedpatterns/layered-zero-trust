@@ -1,0 +1,64 @@
+{{- if .Values.chains.enabled }}
+---
+apiVersion: operator.tekton.dev/v1alpha1
+kind: TektonConfig
+metadata:
+  name: config
+  annotations:
+    argocd.argoproj.io/sync-wave: "47"
+    argocd.argoproj.io/sync-options: Delete=false,ServerSideApply=true,SkipDryRunOnMissingResource=true
+spec:
+  chain:
+    artifacts.taskrun.format: {{ .Values.chains.artifacts.taskrun.format }}
+    artifacts.taskrun.storage: {{ .Values.chains.artifacts.taskrun.storage }}
+    artifacts.pipelinerun.format: {{ .Values.chains.artifacts.pipelinerun.format }}
+    artifacts.pipelinerun.storage: {{ .Values.chains.artifacts.pipelinerun.storage }}
+    {{- if .Values.chains.artifacts.pipelinerun.enableDeepInspection }}
+    artifacts.pipelinerun.enable-deep-inspection: "true"
+    {{- end }}
+    artifacts.oci.storage: {{ .Values.chains.artifacts.oci.storage }}
+    disabled: false
+    transparency.enabled: {{ .Values.chains.transparency.enabled | quote }}
+    transparency.url: https://rekor-server-trusted-artifact-signer.{{ .Values.global.hubClusterDomain }}
+    signers.x509.fulcio.enabled: {{ .Values.chains.signers.x509.fulcio.enabled }}
+    signers.x509.fulcio.address: https://fulcio-server-trusted-artifact-signer.{{ .Values.global.hubClusterDomain }}
+    signers.x509.fulcio.issuer: https://spire-spiffe-oidc-discovery-provider.{{ .Values.global.hubClusterDomain }}
+    signers.x509.fulcio.provider: {{ .Values.chains.signers.x509.fulcio.provider }}
+    {{- if .Values.chains.signers.x509.tuf.enabled }}
+    signers.x509.tuf.mirror.url: https://tuf-trusted-artifact-signer.{{ .Values.global.hubClusterDomain }}
+    {{- end }}
+    options:
+      disabled: false
+      deployments:
+        tekton-chains-controller:
+          spec:
+            template:
+              spec:
+                containers:
+                  - name: tekton-chains-controller
+                    env:
+                      - name: SPIFFE_ENDPOINT_SOCKET
+                        value: {{ .Values.chains.spiffe.socketMount }}/{{ .Values.chains.spiffe.socketFile }}
+                      {{- if .Values.chains.signers.x509.tuf.enabled }}
+                      - name: TUF_ROOT
+                        value: {{ .Values.chains.tuf.mountPath }}
+                      {{- end }}
+                    resources: {}
+                    volumeMounts:
+                      - mountPath: {{ .Values.chains.spiffe.socketMount }}
+                        name: spiffe-workload-api
+                      {{- if .Values.chains.signers.x509.tuf.enabled }}
+                      - mountPath: {{ .Values.chains.tuf.mountPath }}
+                        name: {{ .Values.chains.tuf.name }}
+                      {{- end }}
+                volumes:
+                  - csi:
+                      driver: csi.spiffe.io
+                      readOnly: true
+                    name: spiffe-workload-api
+                  {{- if .Values.chains.signers.x509.tuf.enabled }}
+                  - emptyDir: {}
+                    name: {{ .Values.chains.tuf.name }}
+                  {{- end }}
+  targetNamespace: openshift-pipelines
+{{- end }}

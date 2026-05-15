@@ -70,6 +70,8 @@ Every sync-wave in the repository, in order. **App** = hub-level Argo CD Applica
 | 46 | └ acs-central | chart | console-link |
 | 46 | └ acs-secured-cluster | chart | secured-cluster-cr |
 | 46 | └ rhtas-operator | chart | securesign |
+| 47 | tekton-chains | **App** | Tekton Chains config (RHTAS keyless signing) |
+| 47 | └ tekton-chains | chart | tektonconfig-chains (TektonConfig CR) |
 | 48 | supply-chain | **App** | |
 | 48+0 | └ supply-chain | chart | registry-image-namespace (Namespace, RBAC), pipeline-sa, tasks (incl. restart-qtodo), secrets (quay-pass, rhtpa-pass), quay-user, rhtas/rhtpa-config, pipeline-qtodo-restarter (Role+RoleBinding in qtodo ns) |
 | 48+1 | └ supply-chain | chart (hook) | enable-registry-default-route (Sync hook Job) |
@@ -112,6 +114,7 @@ Every sync-wave in the repository, in order. **App** = hub-level Argo CD Applica
 | trusted-profile-analyzer | 10 | 41 | Chart resources (OBC, DB, etc.) |
 | acs-secured-cluster | 15 | 46 | — |
 | trusted-artifact-signer | 15 | 46 | Deploy after dependencies |
+| tekton-chains | — | 47 | After RHTAS, before supply-chain (newly added) |
 | supply-chain | — | 48 | After RHTAS/ACS, before chart templates (newly added) |
 | acs-policies | 20 | 51 | After ACS Central + Secured Cluster |
 
@@ -208,6 +211,12 @@ Charts marked **(external)** have been externalized to standalone repositories m
 | Resource | Old | Current |
 | --- | ---: | ---: |
 | securesign.yaml | 15 | 46 |
+
+### tekton-chains (`charts/tekton-chains/templates/`) — App wave: 47
+
+| Resource | Old | Current |
+| --- | ---: | ---: |
+| tektonconfig-chains.yaml | — | 47 |
 
 ### rhtpa-operator (`charts/rhtpa-operator/templates/`) — App wave: 41
 

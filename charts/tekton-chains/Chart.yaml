@@ -1,0 +1,17 @@
+apiVersion: v2
+name: tekton-chains
+description: Tekton Chains configuration for OpenShift Pipelines supply chain security with RHTAS keyless signing
+type: application
+version: 0.1.0
+appVersion: "1.15.0"
+keywords:
+  - tekton-chains
+  - supply-chain-security
+  - sigstore
+  - in-toto
+  - slsa
+  - zero-trust
+  - openshift-pipelines
+maintainers:
+  - name: Zero Trust Validated Patterns Team
+    email: ztvp-arch-group@redhat.com

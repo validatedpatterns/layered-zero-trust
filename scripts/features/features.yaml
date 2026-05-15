@@ -22,9 +22,13 @@ features:
     description: "OpenShift Pipelines"
     depends_on: []
 
+  tekton-chains:
+    description: "Tekton Chains with RHTAS keyless signing via SPIFFE"
+    depends_on: [pipelines, rhtas]
+
   supply-chain:
     description: "Full secure supply chain pipeline"
-    depends_on: [pipelines, rhtas, rhtpa, storage]
+    depends_on: [tekton-chains, rhtpa, storage]
     registry_option_required: true
     org: ztvp
     image_name: qtodo

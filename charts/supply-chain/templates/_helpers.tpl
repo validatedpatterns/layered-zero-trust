@@ -93,7 +93,6 @@ Sigstore environment variables used in Pipeline Tasks
   value: $(params.ca-file)
 - name: COSIGN_YES
   value: "true"
-{{- if eq .Values.rhtas.oidc.enabled true }}
 - name: OIDC_IDENTITY
   value: $(params.oidc-identity)
 - name: OIDC_ISSUER
@@ -106,6 +105,7 @@ Sigstore environment variables used in Pipeline Tasks
   value: $(params.oidc-issuer)
 - name: SIGSTORE_OIDC_ISSUER
   value: $(params.oidc-issuer)
+{{- if eq .Values.rhtas.oidc.enabled true }}
 - name: OIDC_CLIENT_ID
   value: $(params.rhtas-oidc-client-id)
 - name: COSIGN_OIDC_CLIENT_ID
@@ -135,11 +135,11 @@ Sigstore params used in Pipeline Tasks
   value: $(params.tuf-url)
 - name: cli-server-url
   value: $(params.cli-server-url)
-{{- if eq .Values.rhtas.oidc.enabled true }}
 - name: oidc-identity
   value: $(params.oidc-identity)
 - name: oidc-issuer
   value: $(params.oidc-issuer)
+{{- if eq .Values.rhtas.oidc.enabled true }}
 - name: rhtas-oidc-client-id
   value: $(params.rhtas-oidc-client-id)
 {{- end }}
@@ -164,13 +164,13 @@ Sigstore params descriptions used in Pipeline Tasks
 - description: Cosign CLI server URL
   name: cli-server-url
   type: string
-{{- if eq .Values.rhtas.oidc.enabled true }}
 - description: OIDC identity in signatures
   name: oidc-identity
   type: string
 - description: OIDC issuer in signatures
   name: oidc-issuer
   type: string
+{{- if eq .Values.rhtas.oidc.enabled true }}
 - description: RHTAS OIDC client ID
   name: rhtas-oidc-client-id
   type: string

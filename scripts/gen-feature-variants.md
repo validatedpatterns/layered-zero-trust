@@ -48,6 +48,9 @@ python3 scripts/gen-feature-variants.py --features rhtpa
 # Enable multiple features
 python3 scripts/gen-feature-variants.py --features rhtpa,rhtas
 
+# Enable Tekton Chains (auto-resolves: pipelines -> rhtas -> tekton-chains)
+python3 scripts/gen-feature-variants.py --features tekton-chains
+
 # Full supply chain: pick a registry option (1, 2, or 3)
 python3 scripts/gen-feature-variants.py --features supply-chain --registry-option 1
 

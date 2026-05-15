@@ -25,3 +25,8 @@ clusterGroup:
       chartVersion: 0.1.*
       annotations:
         argocd.argoproj.io/sync-wave: "41"
+      overrides:
+      - name: job.image
+        value: "registry.redhat.io/openshift4/ose-cli:latest"
+      - name: job.resources.limits.memory
+        value: "512Mi"

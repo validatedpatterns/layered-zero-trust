@@ -1,0 +1,11 @@
+# Tekton Chains for supply chain security with RHTAS keyless signing
+# Depends on: pipelines (OpenShift Pipelines operator), rhtas (RHTAS for Fulcio/Rekor/TUF)
+# Applies TektonConfig with ServerSideApply to configure SPIFFE and TUF volumes
+clusterGroup:
+  applications:
+    tekton-chains:
+      name: tekton-chains
+      project: hub
+      path: charts/tekton-chains
+      annotations:
+        argocd.argoproj.io/sync-wave: "47"
