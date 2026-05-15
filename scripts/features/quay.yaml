@@ -27,6 +27,6 @@ clusterGroup:
         argocd.argoproj.io/sync-wave: "41"
       overrides:
       - name: job.image
-        value: "registry.redhat.io/openshift4/ose-cli:latest"
+        value: "registry.redhat.io/openshift4/ose-cli-rhel9:latest"
       - name: job.resources.limits.memory
         value: "512Mi"
