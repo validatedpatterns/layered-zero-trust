@@ -424,7 +424,7 @@ The credentials to access the Quay web interface can be obtained as follows:
       -o jsonpath='{.items[0].spec.host}')"
   ```
 
-* Quay username: The same one you specified in `values-hub.yaml` or **quay-admin**.
+* Quay username: The same one you specified in `values-hub.yaml` or **quay-user**.
 * Quay password:
 
   ```shell
