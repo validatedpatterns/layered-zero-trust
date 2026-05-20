@@ -1,6 +1,6 @@
 {{- if eq .Values.rhtpa.enabled true }}
 ---
-apiVersion: tekton.dev/v1beta1
+apiVersion: tekton.dev/v1
 kind: Task
 metadata:
   name: qtodo-upload-sbom

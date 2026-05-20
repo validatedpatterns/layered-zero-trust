@@ -92,7 +92,7 @@ spec:
           fi
 
           cat <<'MANIFEST' | oc create -f -
-          apiVersion: tekton.dev/v1beta1
+          apiVersion: tekton.dev/v1
           kind: PipelineRun
           metadata:
             generateName: qtodo-supply-chain-

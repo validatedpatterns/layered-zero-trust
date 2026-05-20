@@ -304,6 +304,22 @@ def _substitute_repository_placeholders(base, org=None, image_name=None):
     base["global"]["registry"]["repository"] = repo
 
 
+GIT_REPO_PLACEHOLDER = "REPLACE_WITH_GIT_REPO_URL"
+
+
+def _substitute_git_repo_url(base, git_repo_url):
+    """Replace the git repo placeholder in supply-chain overrides."""
+    apps = base.get("clusterGroup", {}).get("applications", {})
+    sc = apps.get("supply-chain", {})
+    for override in sc.get("overrides", []):
+        if (
+            override.get("name") == "qtodo.repository"
+            and str(override.get("value")) == GIT_REPO_PLACEHOLDER
+        ):
+            override["value"] = git_repo_url
+            return
+
+
 def generate_variant(
     base_path,
     features_dir,
@@ -312,6 +328,7 @@ def generate_variant(
     output_path,
     org=None,
     image_name=None,
+    git_repo_url=None,
 ):
     """Load base, merge all feature fragments + registry option, write output."""
     yaml = YAML()
@@ -343,6 +360,9 @@ def generate_variant(
     if org or image_name:
         _substitute_repository_placeholders(base, org=org, image_name=image_name)
 
+    if git_repo_url:
+        _substitute_git_repo_url(base, git_repo_url)
+
     validate_output(base)
     cg = base.get("clusterGroup")
     if cg:
@@ -360,7 +380,8 @@ def build_output_name(features, registry_option=None):
     """Construct the output filename from features and optional registry option."""
     if "supply-chain" in features:
         label = REGISTRY_LABELS.get(registry_option, f"option-{registry_option}")
-        return f"values-hub-supply-chain-{label}.yaml"
+        suffix = "-protected-repos" if "protected-repos" in features else ""
+        return f"values-hub-supply-chain-{label}{suffix}.yaml"
     return f"values-hub-{'-'.join(features)}.yaml"
 
 
@@ -394,6 +415,12 @@ def main():
         "--outdir",
         default=None,
         help="Output directory (default: /tmp)",
+    )
+    parser.add_argument(
+        "--git-repo",
+        default=None,
+        help="Private Git repository URL for protected-repos feature "
+        "(e.g. https://github.com/your-org/qtodo.git)",
     )
     parser.add_argument(
         "--list-features",
@@ -455,11 +482,24 @@ def main():
         )
         sys.exit(1)
 
+    needs_git_repo = any(
+        feature_defs.get(f, {}).get("git_repo_required") for f in resolved
+    )
+    if needs_git_repo and not args.git_repo:
+        print(
+            "ERROR: --git-repo is required when protected-repos feature is enabled "
+            "(e.g. --git-repo https://github.com/your-org/qtodo.git)",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     print(f"Base:     {base}")
     print(f"Output:   {outdir}")
     print(f"Features: {' -> '.join(resolved)}")
     if args.registry_option:
         print(f"Registry: option {args.registry_option}")
+    if args.git_repo:
+        print(f"Git repo: {args.git_repo}")
 
     if args.registry_option == "all":
         for opt_num in [1, 2, 3]:
@@ -475,7 +515,14 @@ def main():
             out_name = build_output_name(requested, opt_num)
             out_path = os.path.join(outdir, out_name)
             generate_variant(
-                base, FEATURES_DIR, resolved, reg_path, out_path, org, image_name
+                base,
+                FEATURES_DIR,
+                resolved,
+                reg_path,
+                out_path,
+                org,
+                image_name,
+                git_repo_url=args.git_repo,
             )
     else:
         reg_path = None
@@ -496,7 +543,14 @@ def main():
         )
         out_path = os.path.join(outdir, out_name)
         generate_variant(
-            base, FEATURES_DIR, resolved, reg_path, out_path, org, image_name
+            base,
+            FEATURES_DIR,
+            resolved,
+            reg_path,
+            out_path,
+            org,
+            image_name,
+            git_repo_url=args.git_repo,
         )
 
     if args.registry_option and org and image_name:

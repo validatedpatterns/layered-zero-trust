@@ -46,6 +46,12 @@ For the Secure Supply Chain use case, the command would be:
 python3 scripts/gen-feature-variants.py --base values-hub.yaml --features supply-chain --registry-option <id>
 ```
 
+If the source repository is **private** (protected), add the `protected-repos` feature:
+
+```shell
+python3 scripts/gen-feature-variants.py --base values-hub.yaml --features supply-chain,protected-repos --registry-option <id>
+```
+
 Where `<id>` is one of the options available in _Bring Your Own (BYO) Container Registry_:
 
 1. Embedded Quay Registry
@@ -251,6 +257,7 @@ Once the supply-chain application has synced in ArgoCD, start the pipeline using
    At the bottom we have the **workspaces**. These must be configured manually.
    * For **qtodo-source**, select `PersistentVolumeClaim` and the PVC name is `qtodo-workspace-source`.
    * For **registry-auth-config**, select `Secret` and the name of the secret is `qtodo-registry-auth`.
+   * For **git-auth** (optional, only when using protected repositories), select `Secret` and the name of the secret is `qtodo-git-credentials`.
 
 5. Press **Start** to finish and run the pipeline.
 
@@ -278,9 +285,13 @@ spec:
     - name: registry-auth-config
       secret:
         secretName: qtodo-registry-auth
+    # Uncomment for protected (private) repositories:
+    # - name: git-auth
+    #   secret:
+    #     secretName: qtodo-git-credentials
 ```
 
-As was described previously, verify the values associated with the PVC storage and registry configuration.
+As was described previously, verify the values associated with the PVC storage and registry configuration. If you are using a protected repository, uncomment the `git-auth` workspace.
 
 Using the previously created definition, start a new execution of the pipeline using `oc` CLI:
 
@@ -307,10 +318,79 @@ oc get taskruns -n layered-zero-trust-hub -l tekton.dev/pipelineRun=<pipelinerun
 oc logs -n layered-zero-trust-hub -l tekton.dev/pipelineRun=<pipelinerun-name>,tekton.dev/pipelineTask=<task-name>
 ```
 
+### Protected Repositories
+
+By default the pipeline clones the qtodo source from a **public** GitHub repository. If your source code lives in a private (protected) repository, enable the Git credentials feature so the `git-clone` task can authenticate.
+
+#### 1. Store Git credentials in Vault
+
+Uncomment the `git-credentials` secret in your local `~/values-secret.yaml` (copied from `values-secret.yaml.template`) and fill in your Git username and Personal Access Token (PAT):
+
+```yaml
+- name: git-credentials
+  vaultPrefixes:
+  - hub/supply-chain
+  fields:
+  - name: username
+    value: "your-git-username"
+    onMissingValue: error
+  - name: password
+    value: "your-personal-access-token"
+    onMissingValue: error
+```
+
+Then load the secret into Vault: `make load-secrets`.
+
+#### 2. Enable Git credentials in the supply-chain overrides
+
+Add the following overrides to the `supply-chain` application in `values-hub.yaml`:
+
+```yaml
+- name: git.credentials.enabled
+  value: "true"
+- name: git.credentials.host
+  value: "https://github.com"
+- name: git.credentials.vaultPath
+  value: "secret/data/hub/supply-chain/git-credentials"
+```
+
+Alternatively, if you use the `gen-feature-variants.py` script, add `protected-repos` to the features list and provide your private repository URL with `--git-repo`. The Git credential overrides and the `qtodo.repository` override are included automatically:
+
+```shell
+python3 scripts/gen-feature-variants.py \
+  --features supply-chain,protected-repos \
+  --registry-option <id> \
+  --git-repo https://github.com/your-org/qtodo.git
+```
+
+#### 3. Point the pipeline at your private repository
+
+When using the generator with `--git-repo`, the `qtodo.repository` override is set automatically in the generated `values-hub.yaml`. If you are configuring manually, add this override to the `supply-chain` application:
+
+```yaml
+- name: qtodo.repository
+  value: "https://github.com/your-org/qtodo.git"
+```
+
+#### How it works
+
+When `git.credentials.enabled` is `true`:
+
+* An `ExternalSecret` (`qtodo-git-credentials`) pulls the username and PAT from Vault and creates an `Opaque` secret containing `.git-credentials` and `.gitconfig` files, annotated with `tekton.dev/git-0` pointing to the configured host.
+* The pipeline ServiceAccount mounts this secret, and the `git-clone` task receives it via the optional `git-auth` / `basic-auth` workspace. When starting a PipelineRun, select `Secret` / `qtodo-git-credentials` for the **git-auth** workspace.
+* The Vault policy `hub-supply-chain-jwt-secret` grants read access to `secret/data/hub/supply-chain/*` for the pipeline's SPIFFE identity.
+
+### Init task (pre-flight image check)
+
+The pipeline includes an `init` task that runs before `git-clone`. It uses `skopeo inspect` to check whether the target image already exists in the registry. If the image exists (and `rebuild` is not set to `"true"`), the pipeline skips the build. This avoids unnecessary rebuilds and is modeled after the [RHTAP sample pipelines](https://github.com/konflux-ci/build-definitions).
+
+The pipeline also emits Tekton Chains provenance results (`CHAINS-GIT_URL`, `CHAINS-GIT_COMMIT`, `IMAGE_URL`, `IMAGE_DIGEST`) so that Tekton Chains can automatically generate and sign provenance attestations.
+
 ### Pipeline tasks
 
 The pipeline we have prepared has the following steps:
 
+* **init**. Checks whether the target image already exists in the registry. Gates the build with a `when` condition.
 * **qtodo-clone-repository**. Clones the `qtodo` repository.
 * **qtodo-build-artifact**. Builds an _uber-jar_ of `qtodo` application.
 * **qtodo-sign-artifact**. Signs the JAR file generated during the build process.

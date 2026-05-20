@@ -1,0 +1,18 @@
+# Protected repository support for the supply-chain pipeline.
+# Enables git-clone to authenticate against private Git repositories
+# using credentials stored in Vault (ExternalSecret -> basic-auth secret).
+#
+# Requires the git-credentials secret in values-secret.yaml.template
+# to be uncommented and populated with your Git username and PAT.
+clusterGroup:
+  merge_into_applications:
+    supply-chain:
+      overrides:
+        - name: git.credentials.enabled
+          value: "true"
+        - name: git.credentials.host
+          value: "https://github.com"
+        - name: git.credentials.vaultPath
+          value: "secret/data/hub/supply-chain/git-credentials"
+        - name: qtodo.repository
+          value: "REPLACE_WITH_GIT_REPO_URL"

@@ -361,6 +361,9 @@ clusterGroup:
             path "secret/data/hub/infra/rhtpa/rhtpa-oidc-cli" {
               capabilities = ["read"]
             }
+            path "secret/data/hub/supply-chain/*" {
+              capabilities = ["read"]
+            }
       jwt:
         enabled: true
         oidcDiscoveryUrl: https://spire-spiffe-oidc-discovery-provider.zero-trust-workload-identity-manager.svc.cluster.local
@@ -577,6 +580,14 @@ clusterGroup:
     #    - kind: ServiceAccount
     #      jqPathExpressions:
     #        - .imagePullSecrets[]|select(.name | contains("-dockercfg-"))
+    #    - group: tekton.dev
+    #      kind: Task
+    #      jsonPointers:
+    #        - /spec/steps
+    #    - group: tekton.dev
+    #      kind: Pipeline
+    #      jsonPointers:
+    #        - /spec/tasks
     #  overrides:
     #    # Registry credentials are inherited from global.registry.
     #    # Only set app-specific overrides below.
@@ -601,6 +612,15 @@ clusterGroup:
     #    # Uncomment to auto-trigger a pipeline run on every ArgoCD sync
     #    # - name: pipelinerun.enabled
     #    #   value: "true"
+    #    # Protected repository credentials (Vault + ExternalSecret)
+    #    # - name: git.credentials.enabled
+    #    #   value: "true"
+    #    # - name: git.credentials.host
+    #    #   value: "https://github.com"
+    #    # - name: git.credentials.vaultPath
+    #    #   value: "secret/data/hub/supply-chain/git-credentials"
+    #    # - name: qtodo.repository
+    #    #   value: "https://github.com/your-org/qtodo.git"
     #
     # ACS Central Services
     acs-central:
