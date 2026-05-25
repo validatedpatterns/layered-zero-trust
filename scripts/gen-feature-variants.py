@@ -125,6 +125,25 @@ def _merge_namespace_lists(base_list, fragment_list):
             existing.add(key)
 
 
+def _is_named_list(lst):
+    """Return True if lst is a list of mappings that all contain a 'name' key."""
+    return len(lst) > 0 and all(
+        isinstance(item, dict) and "name" in item for item in lst
+    )
+
+
+def _merge_named_lists(base_list, overlay_list):
+    """Merge overlay items into base by 'name', replacing on conflict."""
+    index = {item["name"]: i for i, item in enumerate(base_list)}
+    for item in overlay_list:
+        name = item["name"]
+        if name in index:
+            base_list[index[name]] = copy.deepcopy(item)
+        else:
+            index[name] = len(base_list)
+            base_list.append(copy.deepcopy(item))
+
+
 def _deep_merge_mappings(base, overlay):
     """Recursively merge overlay into base (overlay wins for scalars)."""
     for key in overlay:
@@ -139,7 +158,10 @@ def _deep_merge_mappings(base, overlay):
             and isinstance(base[key], list)
             and isinstance(overlay[key], list)
         ):
-            base[key].extend(overlay[key])
+            if _is_named_list(base[key]) or _is_named_list(overlay[key]):
+                _merge_named_lists(base[key], overlay[key])
+            else:
+                base[key].extend(overlay[key])
         else:
             base[key] = overlay[key]
 
@@ -155,7 +177,8 @@ def _apply_merge_into(base_apps, merge_into_spec):
           overrides: [...]
 
     For each target app, recursively merge into the existing app config.
-    Lists (roles, overrides) are appended rather than replaced.
+    Named lists (items with a 'name' key) use upsert semantics; plain lists
+    are appended.
     """
     for app_name, additions in merge_into_spec.items():
         if app_name not in base_apps:
@@ -247,6 +270,20 @@ def validate_output(data):
         seen.add(key)
 
     apps = cg.get("applications", {})
+    for app_name, app_val in apps.items():
+        overrides = app_val.get("overrides", []) if isinstance(app_val, dict) else []
+        override_names = set()
+        for ovr in overrides:
+            name = ovr.get("name") if isinstance(ovr, dict) else None
+            if name and name in override_names:
+                print(
+                    f"WARNING: duplicate override '{name}' in "
+                    f"application '{app_name}'",
+                    file=sys.stderr,
+                )
+            if name:
+                override_names.add(name)
+
     vault = apps.get("vault", {})
     jwt_roles = vault.get("jwt", {}).get("roles", [])
     role_names = set()
