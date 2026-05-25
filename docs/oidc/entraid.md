@@ -375,17 +375,18 @@ And last but not least, we add application roles for admin consent:
         * Description: `Allows the application to delete documents`
         * Enable the role in the checkbox
         * Click **Apply**
-4. In the left menu, click **API permissions**
-5. Click **Add a permission**
-6. Go to **My APIs** and select the API application registration you created earlier
-7. Select **Application permissions**
-8. Check the boxes for:
+4. Click **Owners** in the left menu and check if your Azure user is appears in the list. If not, add it by clicking **Add owners**
+5. In the left menu, click **API permissions**
+6. Click **Add a permission**
+7. Go to **My APIs** and select the API application registration you created earlier
+8. Select **Application permissions**
+9. Check the boxes for:
     * `App.Read.Document`
     * `App.Create.Document`
     * `App.Update.Document`
     * `App.Delete.Document`
-9. Click **Add permissions**
-10. Click **Grant admin consent** for the application roles we just added. This is **mandatory**
+10. Click **Add permissions**
+11. Click **Grant admin consent** for the application roles we just added. This is **mandatory**
 
 ##### RHTPA Frontend configuration
 
@@ -400,7 +401,7 @@ And last but not least, we add application roles for admin consent:
      * **Multi-tenant**: Users from any organization
    * **Redirect URI**:
      * Platform: `Single-page application (SPA)`
-     * URI: Add the URL with your custom domain here (for example `https://trustify.apps.ztvp.example.com/`)
+     * URI: Add the URL with your custom domain here (for example `https://servertrustify.apps.ztvp.example.com/`)
 6. Click **Register**
 
 After the creation, you will see the _Overview_ page:
@@ -415,11 +416,11 @@ The next step is configure the authentication.
 1. Click **Authentication** in the left menu
     * **Redirect URI configuration Tab**
       **  * **Single-page application** should be selected.
-    * **Settings Tab
+    * **Settings Tab**
         * **Implicit grant and hybrid flows:**
             * **DO NOT** check "Access tokens" or "ID tokens" - not needed for SPA with PKCE
         * **Allow public client flows**: Disabled
-2. Click **Save**
+2. Click **Save** if you hace made any changes to these parameters
 
 To grant the frontend permission to call your API:
 
@@ -476,3 +477,24 @@ In the `values-hub.yaml` file, we add the following configuration for the **trus
 ```
 
 In the `values-secret.yaml` file, make sure that the secret `rhtpa-oidc-cli` uses the file with the secret associated with the _App Registration_ `rhtpa-api` instead of generating it dynamically.
+
+```yaml
+  # - name: rhtpa-oidc-cli
+  #   vaultPrefixes:
+  #   - hub/infra/rhtpa
+  #   fields:
+  #   - name: client-secret
+  #     onMissingValue: generate
+  #     vaultPolicy: alphaNumericPolicy
+
+  # Microsoft Entra ID (Azure AD) OIDC for RHTPA
+  # This secret supplies the client secret for the Entra app registration
+  # that backs zeroTrust.oidc.clients.cli The value is read from a local file at 'path'
+  # Create the client secret in Azure Portal and store it in that file
+  - name: rhtpa-oidc-cli
+    vaultPrefixes:
+    - hub/infra/rhtpa
+    fields:
+    - name: client-secret
+      path: ~/.azure/ztvp-entraid-secret
+```
