@@ -420,7 +420,7 @@ The next step is configure the authentication.
         * **Implicit grant and hybrid flows:**
             * **DO NOT** check "Access tokens" or "ID tokens" - not needed for SPA with PKCE
         * **Allow public client flows**: Disabled
-2. Click **Save** if you hace made any changes to these parameters
+2. Click **Save** if you have made any changes to these parameters
 
 To grant the frontend permission to call your API:
 
