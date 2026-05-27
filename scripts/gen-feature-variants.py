@@ -35,8 +35,10 @@ Usage:
 import argparse
 import copy
 import os
+import re
 import sys
 from collections import OrderedDict
+from urllib.parse import urlparse
 
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
@@ -125,25 +127,6 @@ def _merge_namespace_lists(base_list, fragment_list):
             existing.add(key)
 
 
-def _is_named_list(lst):
-    """Return True if lst is a list of mappings that all contain a 'name' key."""
-    return len(lst) > 0 and all(
-        isinstance(item, dict) and "name" in item for item in lst
-    )
-
-
-def _merge_named_lists(base_list, overlay_list):
-    """Merge overlay items into base by 'name', replacing on conflict."""
-    index = {item["name"]: i for i, item in enumerate(base_list)}
-    for item in overlay_list:
-        name = item["name"]
-        if name in index:
-            base_list[index[name]] = copy.deepcopy(item)
-        else:
-            index[name] = len(base_list)
-            base_list.append(copy.deepcopy(item))
-
-
 def _deep_merge_mappings(base, overlay):
     """Recursively merge overlay into base (overlay wins for scalars)."""
     for key in overlay:
@@ -158,10 +141,7 @@ def _deep_merge_mappings(base, overlay):
             and isinstance(base[key], list)
             and isinstance(overlay[key], list)
         ):
-            if _is_named_list(base[key]) or _is_named_list(overlay[key]):
-                _merge_named_lists(base[key], overlay[key])
-            else:
-                base[key].extend(overlay[key])
+            base[key].extend(overlay[key])
         else:
             base[key] = overlay[key]
 
@@ -177,8 +157,7 @@ def _apply_merge_into(base_apps, merge_into_spec):
           overrides: [...]
 
     For each target app, recursively merge into the existing app config.
-    Named lists (items with a 'name' key) use upsert semantics; plain lists
-    are appended.
+    Lists (roles, overrides) are appended rather than replaced.
     """
     for app_name, additions in merge_into_spec.items():
         if app_name not in base_apps:
@@ -270,20 +249,6 @@ def validate_output(data):
         seen.add(key)
 
     apps = cg.get("applications", {})
-    for app_name, app_val in apps.items():
-        overrides = app_val.get("overrides", []) if isinstance(app_val, dict) else []
-        override_names = set()
-        for ovr in overrides:
-            name = ovr.get("name") if isinstance(ovr, dict) else None
-            if name and name in override_names:
-                print(
-                    f"WARNING: duplicate override '{name}' in "
-                    f"application '{app_name}'",
-                    file=sys.stderr,
-                )
-            if name:
-                override_names.add(name)
-
     vault = apps.get("vault", {})
     jwt_roles = vault.get("jwt", {}).get("roles", [])
     role_names = set()
@@ -305,19 +270,40 @@ def _substitute_repository_placeholders(base, org=None, image_name=None):
 
 
 GIT_REPO_PLACEHOLDER = "REPLACE_WITH_GIT_REPO_URL"
+GIT_HOST_PLACEHOLDER = "REPLACE_WITH_GIT_HOST"
+GIT_AUTH_TYPE_PLACEHOLDER = "REPLACE_WITH_GIT_AUTH_TYPE"
+
+SSH_URL_RE = re.compile(r"^[\w.-]+@([\w.-]+):")
 
 
-def _substitute_git_repo_url(base, git_repo_url):
-    """Replace the git repo placeholder in supply-chain overrides."""
+def _parse_git_repo_url(git_repo_url):
+    """Derive (host, auth_type) from a Git repository URL.
+
+    HTTPS URLs  -> host = "https://github.com",  auth_type = "https"
+    SSH URLs    -> host = "github.com",           auth_type = "ssh"
+    """
+    m = SSH_URL_RE.match(git_repo_url)
+    if m:
+        return m.group(1), "ssh"
+    parsed = urlparse(git_repo_url)
+    scheme = parsed.scheme or "https"
+    hostname = parsed.hostname or ""
+    return f"{scheme}://{hostname}", "https"
+
+
+def _substitute_git_overrides(base, git_repo_url, git_host, git_auth_type):
+    """Replace git-related placeholders in supply-chain overrides."""
     apps = base.get("clusterGroup", {}).get("applications", {})
     sc = apps.get("supply-chain", {})
+    placeholder_map = {
+        "qtodo.repository": (GIT_REPO_PLACEHOLDER, git_repo_url),
+        "git.credentials.host": (GIT_HOST_PLACEHOLDER, git_host),
+        "git.credentials.authType": (GIT_AUTH_TYPE_PLACEHOLDER, git_auth_type),
+    }
     for override in sc.get("overrides", []):
-        if (
-            override.get("name") == "qtodo.repository"
-            and str(override.get("value")) == GIT_REPO_PLACEHOLDER
-        ):
-            override["value"] = git_repo_url
-            return
+        entry = placeholder_map.get(override.get("name"))
+        if entry and str(override.get("value")) == entry[0]:
+            override["value"] = entry[1]
 
 
 def generate_variant(
@@ -361,7 +347,8 @@ def generate_variant(
         _substitute_repository_placeholders(base, org=org, image_name=image_name)
 
     if git_repo_url:
-        _substitute_git_repo_url(base, git_repo_url)
+        git_host, git_auth_type = _parse_git_repo_url(git_repo_url)
+        _substitute_git_overrides(base, git_repo_url, git_host, git_auth_type)
 
     validate_output(base)
     cg = base.get("clusterGroup")

@@ -44,10 +44,13 @@ rhtpa:
 git:
   credentials:
     enabled: false
+    authType: "https"
     host: "https://github.com"
     vaultPath: "secret/data/hub/supply-chain/git-credentials"
     usernameKey: "username"
     passwordKey: "password"
+    sshPrivateKeyKey: "ssh-privatekey"
+    knownHostsKey: "known_hosts"
 
 # qtodo repository configuration
 qtodo:

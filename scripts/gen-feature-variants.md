@@ -91,21 +91,40 @@ The output directory is created automatically if it does not exist.
 
 When the `protected-repos` feature is enabled, the `--git-repo` argument is
 **required**. It specifies the private Git repository URL that the Tekton
-pipeline will clone. The generator substitutes the placeholder in the
-`protected-repos` fragment with the supplied URL:
+pipeline will clone. The generator auto-detects the authentication mode
+(HTTPS or SSH) from the URL scheme and sets `git.credentials.authType` and
+`git.credentials.host` accordingly:
 
 ```bash
+# HTTPS (basic-auth with username + PAT)
 python3 scripts/gen-feature-variants.py \
     --features supply-chain,protected-repos \
     --registry-option 1 \
     --git-repo https://github.com/your-org/qtodo.git
+
+# SSH (key-based auth)
+python3 scripts/gen-feature-variants.py \
+    --features supply-chain,protected-repos \
+    --registry-option 1 \
+    --git-repo git@github.com:your-org/qtodo.git
 ```
 
-The generated `values-hub.yaml` will include:
+For an **HTTPS** URL the generated `values-hub.yaml` will include:
 
 ```yaml
-- name: qtodo.repository
-  value: "https://github.com/your-org/qtodo.git"
+- name: git.credentials.authType
+  value: "https"
+- name: git.credentials.host
+  value: "https://github.com"
+```
+
+For an **SSH** URL:
+
+```yaml
+- name: git.credentials.authType
+  value: "ssh"
+- name: git.credentials.host
+  value: "github.com"
 ```
 
 See [Protected Repositories](../docs/supply-chain.md#protected-repositories)

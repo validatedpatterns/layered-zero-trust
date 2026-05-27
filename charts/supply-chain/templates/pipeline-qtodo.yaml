@@ -163,8 +163,13 @@ spec:
       workspaces:
         - name: output
           workspace: qtodo-source
+{{- if eq (default "https" .Values.git.credentials.authType) "ssh" }}
+        - name: ssh-directory
+          workspace: git-auth
+{{- else }}
         - name: basic-auth
           workspace: git-auth
+{{- end }}
 
     - name: qtodo-build-artifact
       runAfter:

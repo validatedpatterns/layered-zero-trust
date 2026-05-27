@@ -23,6 +23,28 @@ vault:
           - namespaceSelector:
               matchLabels:
                 kubernetes.io/metadata.name: qtodo
+        # registry-token-refresher seed job — fetches Vault token for Quay registry
+        - ports:
+          - protocol: TCP
+            port: 8200
+          from:
+          - podSelector:
+              matchLabels:
+                job-name: registry-token-refresher-seed
+            namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: layered-zero-trust-hub
+        # registry-token-refresher CronJob — periodic token refresh to Vault
+        - ports:
+          - protocol: TCP
+            port: 8200
+          from:
+          - podSelector:
+              matchLabels:
+                app.kubernetes.io/name: registry-token-refresher
+            namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: layered-zero-trust-hub
         # Vault cluster replication port — HA readiness
         - ports:
           - protocol: TCP
