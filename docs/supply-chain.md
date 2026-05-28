@@ -75,13 +75,20 @@ By default, ZTVP deploys a built-in Red Hat Quay registry. However, you can use 
 
    Uncomment the `registry-user` secret and replace the placeholder with your registry token or password:
 
+   Store your registry token in a local file:
+
+   ```shell
+   mkdir -p ~/.config/validated-patterns
+   echo -n "your-registry-token" > ~/.config/validated-patterns/registry-token
+   ```
+
    ```yaml
    - name: registry-user
      vaultPrefixes:
        - hub/infra/registry
      fields:
        - name: registry-password
-         value: "REPLACE_WITH_REGISTRY_TOKEN"
+         path: ~/.config/validated-patterns/registry-token
          onMissingValue: error
    ```
 
@@ -366,16 +373,24 @@ Uncomment the `git-credentials` secret in your local `~/values-secret.yaml` (cop
 
 **Option A -- HTTPS basic auth** (username + Personal Access Token):
 
+Store your credentials in local files to avoid plaintext in YAML:
+
+```shell
+mkdir -p ~/.config/validated-patterns
+echo -n "your-git-username" > ~/.config/validated-patterns/git-username
+echo -n "your-personal-access-token" > ~/.config/validated-patterns/git-token
+```
+
 ```yaml
 - name: git-credentials
   vaultPrefixes:
   - hub/supply-chain
   fields:
   - name: username
-    value: "your-git-username"
+    path: ~/.config/validated-patterns/git-username
     onMissingValue: error
   - name: password
-    value: "your-personal-access-token"
+    path: ~/.config/validated-patterns/git-token
     onMissingValue: error
 ```
 
@@ -387,10 +402,18 @@ Uncomment the `git-credentials` secret in your local `~/values-secret.yaml` (cop
   - hub/supply-chain
   fields:
   - name: ssh-privatekey
-    path: ~/.ssh/id_ed25519   # or id_rsa, id_ecdsa, etc.
+    path: ~/.ssh/id_ed25519_ztvp   # or id_rsa, id_ecdsa, etc.
   - name: known_hosts
     path: ~/.ssh/known_hosts_github
 ```
+
+Generate a passwordless SSH key pair (if you don't already have one):
+
+```shell
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_ztvp -N ""
+```
+
+The key **must not** be password-protected -- Tekton cannot prompt for a passphrase at runtime.
 
 Generate the `known_hosts` file for your Git host:
 
@@ -398,7 +421,7 @@ Generate the `known_hosts` file for your Git host:
 ssh-keyscan github.com > ~/.ssh/known_hosts_github
 ```
 
-Then load the secret into Vault: `make load-secrets`.
+Then load the secret into Vault: `./pattern.sh make load-secrets`.
 
 #### 2. Enable Git credentials in the supply-chain overrides
 
@@ -437,7 +460,7 @@ When using the generator with `--git-repo`, the `qtodo.repository` override is s
 
 ```yaml
 - name: qtodo.repository
-  value: "https://github.com/your-org/qtodo.git"   # or SSH URL
+  value: "https://github.com/your-org/qtodo.git"   # or SSH URL (git@github.com:your-org/qtodo.git)
 ```
 
 #### How it works
