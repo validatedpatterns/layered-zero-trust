@@ -57,6 +57,8 @@ bootstrap_secrets:
     value: git
   - name: url
     value: git@github.com:YOUR-ORG/layered-zero-trust.git
+  - name: insecureIgnoreHostKey
+    value: "true"
   - name: sshPrivateKey
     path: ~/.ssh/ztvp-deploy-key
 ```
@@ -122,6 +124,21 @@ bootstrap_secrets:
 ./pattern.sh make TOKEN_SECRET=private-repo TOKEN_NAMESPACE=openshift-operators install
 ```
 
+## Skipping Origin Validation
+
+The Makefile performs a pre-flight `git ls-remote` check against the HTTPS
+form of the repository URL.  For private repos this check will fail (or
+prompt for credentials) because the local machine does not have HTTPS
+credentials configured.  Skip the check by setting:
+
+```shell
+./pattern.sh make DISABLE_VALIDATE_ORIGIN=true \
+  TOKEN_SECRET=private-repo TOKEN_NAMESPACE=openshift-operators install
+```
+
+This is safe -- the cluster uses the `private-repo` secret (SSH key or PAT)
+for actual access; the validation is only a local convenience check.
+
 ## How It Works
 
 1. The `bootstrap_secrets` section in `values-secret.yaml` instructs the
@@ -159,9 +176,21 @@ Expected output: `Synced` (or `OutOfSync` if you have uncommitted changes).
 
 ## Troubleshooting
 
+* **ACM shows Degraded during initial install** -- This is expected.  The
+  ACM policy `vp-private-hub-policy` copies the repository credentials to
+  the `open-cluster-management` namespace, but depends on the VP operator
+  first propagating the secret to `openshift-gitops`.  On a fresh install
+  this takes an extra reconciliation cycle (1-2 minutes) while namespaces
+  are being created.  The ACM application will self-heal once the VP
+  operator completes the copy.
+
 * **ArgoCD shows "repository not accessible"** -- Verify the SSH key or PAT
   has read access.  For SSH, confirm the key has no passphrase (`ssh-keygen
   -y -f ~/.ssh/ztvp-deploy-key` should not prompt).
+
+* **SSH: "knownhosts: key is unknown"** -- The `insecureIgnoreHostKey: "true"`
+  field is missing from the bootstrap secret.  The ArgoCD repo-server runs
+  in a container without your Git host's fingerprint in known_hosts.
 
 * **Secret not found during install** -- Ensure you ran `load-secrets` (part
   of `post-install`) *after* the bootstrap secret was created.  The
