@@ -5,8 +5,9 @@ from a private Git repository.
 
 The Validated Patterns framework supports deploying from both SSH-secured and
 HTTPS-secured (PAT) private repositories.  The mechanism works by creating an
-ArgoCD repository secret **before** the pattern is deployed, so that both the
-Cluster ArgoCD and Hub ArgoCD instances can pull the pattern manifests.
+ArgoCD repository secret **before** the pattern is deployed, so that the VP
+operator can propagate credentials to all ArgoCD instances managed by the
+pattern.
 
 > [!NOTE]
 > The upstream documentation is at
@@ -71,21 +72,6 @@ bootstrap_secrets:
     value: "true"
   - name: sshPrivateKey
     path: ~/.ssh/ztvp-deploy-key
-# ACM workaround (see Troubleshooting)
-- name: vp-private-repo-credentials
-  targetNamespaces:
-  - openshift-gitops
-  labels:
-    argocd.argoproj.io/secret-type: repository
-  fields:
-  - name: type
-    value: git
-  - name: url
-    value: git@github.com:YOUR-ORG/layered-zero-trust.git
-  - name: insecureIgnoreHostKey
-    value: "true"
-  - name: sshPrivateKey
-    path: ~/.ssh/ztvp-deploy-key
 ```
 
 ### 4. Deploy
@@ -139,21 +125,6 @@ bootstrap_secrets:
     value: YOUR-USERNAME
   - name: password
     path: ~/.config/validated-patterns/git-pat
-# ACM workaround (see Troubleshooting)
-- name: vp-private-repo-credentials
-  targetNamespaces:
-  - openshift-gitops
-  labels:
-    argocd.argoproj.io/secret-type: repository
-  fields:
-  - name: type
-    value: git
-  - name: url
-    value: https://github.com/YOUR-ORG/layered-zero-trust.git
-  - name: username
-    value: YOUR-USERNAME
-  - name: password
-    path: ~/.config/validated-patterns/git-pat
 ```
 
 > [!NOTE]
@@ -192,8 +163,14 @@ for actual access; the validation is only a local convenience check.
 
 3. The `TOKEN_SECRET` and `TOKEN_NAMESPACE` Make variables set the
    `tokenSecret` and `tokenSecretNamespace` fields on the Pattern Custom
-   Resource, which propagates the credentials to all ArgoCD instances
-   managed by the pattern.
+   Resource.  The VP operator copies the secret as
+   `vp-private-repo-credentials` into `vp-gitops` (its managed ArgoCD
+   namespace).
+
+4. The ACM chart (0.2.x+) `vp-private-hub-policy` copies credentials from
+   `global.vpArgoNamespace`, which the VP operator automatically sets to
+   `vp-gitops`.  This allows the policy to find the secret the VP operator
+   placed there without any manual override.
 
 ## Verifying
 
@@ -206,10 +183,19 @@ oc get secret private-repo -n openshift-operators \
 
 Expected output: `repository`
 
+Confirm the VP operator propagated the credential to `vp-gitops`:
+
+```shell
+oc get secret vp-private-repo-credentials -n vp-gitops \
+  -o jsonpath='{.metadata.labels.argocd\.argoproj\.io/secret-type}'
+```
+
+Expected output: `repository`
+
 Check the Cluster ArgoCD can see the repository:
 
 ```shell
-oc get application layered-zero-trust-hub -n openshift-gitops \
+oc get application layered-zero-trust-hub -n vp-gitops \
   -o jsonpath='{.status.sync.status}'
 ```
 
@@ -218,11 +204,11 @@ Expected output: `Synced` (or `OutOfSync` if you have uncommitted changes).
 ## Troubleshooting
 
 * **ACM shows Degraded (vp-private-hub-policy NonCompliant)** -- The ACM
-  chart policy copies repo credentials from `openshift-gitops`, but the VP
-  operator only places them in `vp-gitops`.  Fix this by adding a second
-  `bootstrap_secrets` entry named `vp-private-repo-credentials` targeting
-  `openshift-gitops` (see the "ACM workaround" section in
-  `values-secret.yaml.template`).  Then re-run `load-secrets`.
+  chart 0.1.x has `openshift-gitops` hardcoded in the private-repo policy
+  template, but the VP operator (0.0.70+) places credentials in
+  `vp-gitops`.  Ensure `values-hub.yaml` uses ACM chart 0.2.x or later
+  (`chartVersion: 0.2.*`), which reads `global.vpArgoNamespace` -- a value
+  the VP operator sets automatically.
 
 * **ArgoCD shows "repository not accessible"** -- Verify the SSH key or PAT
   has read access.  For SSH, confirm the key has no passphrase (`ssh-keygen
@@ -238,7 +224,7 @@ Expected output: `Synced` (or `OutOfSync` if you have uncommitted changes).
   publicly trusted CAs and do not require this step.
 
   The corporate CA must be in the cluster trust store **before** install
-  because the VP operator needs it to clone the repo.  Add the internal CA
+  because the VP operator needs it to clone the repository.  Add the internal CA
   as a pre-install step:
 
 ```shell
