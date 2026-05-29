@@ -19,6 +19,16 @@ Cluster ArgoCD and Hub ArgoCD instances can pull the pattern manifests.
 * A fork or private copy of this repository
 * A deploy key (SSH) or Personal Access Token (HTTPS) with **read** access
 
+> [!IMPORTANT]
+> The git remote URL in your local clone **must match** the auth type in
+> your `bootstrap_secrets`.  The Makefile passes the remote URL to the
+> Pattern CR verbatim when `TOKEN_SECRET` is set:
+>
+> * SSH auth: remote must be `git@host:org/repo.git`
+> * HTTPS/PAT auth: remote must be `https://host/org/repo.git`
+>
+> Set with: `git remote set-url origin <matching-url>`
+
 ## Option A: SSH Key Authentication
 
 ### 1. Generate a deploy key
@@ -38,10 +48,10 @@ Deploy keys, etc.).
 Copy the template and uncomment the SSH `bootstrap_secrets` block:
 
 ```shell
-cp values-secret.yaml.template ~/values-secret-layered-zero-trust.yaml
+cp values-secret.yaml.template ~/values-secret.yaml
 ```
 
-Edit `~/values-secret-layered-zero-trust.yaml` and uncomment **Option A**
+Edit `~/values-secret.yaml` and uncomment **Option A**
 under the "BOOTSTRAP SECRETS" section.  Update the `url` field with your
 repository's SSH URL:
 
@@ -50,6 +60,21 @@ bootstrap_secrets:
 - name: private-repo
   targetNamespaces:
   - openshift-operators
+  labels:
+    argocd.argoproj.io/secret-type: repository
+  fields:
+  - name: type
+    value: git
+  - name: url
+    value: git@github.com:YOUR-ORG/layered-zero-trust.git
+  - name: insecureIgnoreHostKey
+    value: "true"
+  - name: sshPrivateKey
+    path: ~/.ssh/ztvp-deploy-key
+# ACM workaround (see Troubleshooting)
+- name: vp-private-repo-credentials
+  targetNamespaces:
+  - openshift-gitops
   labels:
     argocd.argoproj.io/secret-type: repository
   fields:
@@ -75,7 +100,8 @@ bootstrap_secrets:
 
 * **GitHub:** Settings -> Developer settings -> Personal access tokens ->
   Fine-grained tokens.  Grant **Contents: Read** on the target repository.
-* **GitLab:** Settings -> Access Tokens.  Grant `read_repository` scope.
+* **GitLab:** Settings -> Access Tokens.  Grant **Reporter** role with
+  `read_repository` scope (Guest role is insufficient to clone code).
 
 Store the token in a local file:
 
@@ -90,10 +116,10 @@ chmod 600 ~/.config/validated-patterns/git-pat
 Copy the template and uncomment the HTTPS `bootstrap_secrets` block:
 
 ```shell
-cp values-secret.yaml.template ~/values-secret-layered-zero-trust.yaml
+cp values-secret.yaml.template ~/values-secret.yaml
 ```
 
-Edit `~/values-secret-layered-zero-trust.yaml` and uncomment **Option B**
+Edit `~/values-secret.yaml` and uncomment **Option B**
 under the "BOOTSTRAP SECRETS" section.  Update the `url`, `username`, and
 `password` path:
 
@@ -102,6 +128,21 @@ bootstrap_secrets:
 - name: private-repo
   targetNamespaces:
   - openshift-operators
+  labels:
+    argocd.argoproj.io/secret-type: repository
+  fields:
+  - name: type
+    value: git
+  - name: url
+    value: https://github.com/YOUR-ORG/layered-zero-trust.git
+  - name: username
+    value: YOUR-USERNAME
+  - name: password
+    path: ~/.config/validated-patterns/git-pat
+# ACM workaround (see Troubleshooting)
+- name: vp-private-repo-credentials
+  targetNamespaces:
+  - openshift-gitops
   labels:
     argocd.argoproj.io/secret-type: repository
   fields:
@@ -176,13 +217,12 @@ Expected output: `Synced` (or `OutOfSync` if you have uncommitted changes).
 
 ## Troubleshooting
 
-* **ACM shows Degraded during initial install** -- This is expected.  The
-  ACM policy `vp-private-hub-policy` copies the repository credentials to
-  the `open-cluster-management` namespace, but depends on the VP operator
-  first propagating the secret to `openshift-gitops`.  On a fresh install
-  this takes an extra reconciliation cycle (1-2 minutes) while namespaces
-  are being created.  The ACM application will self-heal once the VP
-  operator completes the copy.
+* **ACM shows Degraded (vp-private-hub-policy NonCompliant)** -- The ACM
+  chart policy copies repo credentials from `openshift-gitops`, but the VP
+  operator only places them in `vp-gitops`.  Fix this by adding a second
+  `bootstrap_secrets` entry named `vp-private-repo-credentials` targeting
+  `openshift-gitops` (see the "ACM workaround" section in
+  `values-secret.yaml.template`).  Then re-run `load-secrets`.
 
 * **ArgoCD shows "repository not accessible"** -- Verify the SSH key or PAT
   has read access.  For SSH, confirm the key has no passphrase (`ssh-keygen
@@ -192,9 +232,36 @@ Expected output: `Synced` (or `OutOfSync` if you have uncommitted changes).
   field is missing from the bootstrap secret.  The ArgoCD repo-server runs
   in a container without your Git host's fingerprint in known_hosts.
 
-* **Secret not found during install** -- Ensure you ran `load-secrets` (part
-  of `post-install`) *after* the bootstrap secret was created.  The
-  `TOKEN_SECRET` and `TOKEN_NAMESPACE` values must match exactly.
+* **HTTPS: "x509: certificate signed by unknown authority"** -- This
+  affects internal/self-hosted GitLab instances whose TLS certificates are
+  signed by a corporate CA.  GitHub and public GitLab (`gitlab.com`) use
+  publicly trusted CAs and do not require this step.
+
+  The corporate CA must be in the cluster trust store **before** install
+  because the VP operator needs it to clone the repo.  Add the internal CA
+  as a pre-install step:
+
+```shell
+oc create configmap custom-ca -n openshift-config \
+  --from-file=ca-bundle.crt=/path/to/corporate-ca-bundle.pem
+oc patch proxy/cluster --type=merge \
+  -p '{"spec":{"trustedCA":{"name":"custom-ca"}}}'
+```
+
+  Wait a few minutes for operator pods to restart with the updated bundle.
+
+  > [!NOTE]
+  > After the pattern deploys, the `ztvp-certificates` chart automatically
+  > merges your `custom-ca` content into its managed `ztvp-proxy-ca`
+  > ConfigMap and switches `proxy/cluster.spec.trustedCA` to
+  > `ztvp-proxy-ca`.  This adds the cluster ingress and service CAs so
+  > that workloads like ACS Central can reach Keycloak without additional
+  > manual steps.  You do **not** need to manually add the ingress CA to
+  > your `custom-ca`.
+
+* **Secret not found during install** -- Ensure you ran
+  `./pattern.sh make load-secrets` *after* the bootstrap secret was created.
+  The `TOKEN_SECRET` and `TOKEN_NAMESPACE` values must match exactly.
 
 * **GitLab HTTPS fails** -- Remember that GitLab PAT auth requires
   `username: oauth2`, not your GitLab user handle.

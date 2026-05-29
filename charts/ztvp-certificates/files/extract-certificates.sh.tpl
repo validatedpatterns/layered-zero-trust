@@ -342,11 +342,18 @@ fi
 {{- if .Values.proxyCA.enabled }}
 log "Creating proxy CA ConfigMap for cluster trustedCA injection"
 
-# Build a bundle with ONLY the custom CAs (ingress + service).
-# The Cluster Network Operator automatically merges these with system CAs.
+# Build the proxy CA bundle with ALL extracted custom CAs so that workloads
+# trusting the injected bundle can reach both cluster-internal services
+# (via ingress/service CA) and external hosts behind corporate CAs
+# (via additionalCertificates / customCA).
+# The Cluster Network Operator merges these with the system (Mozilla) CAs.
 > "${TEMP_DIR}/proxy-ca-bundle.pem"
-for cert_file in "${TEMP_DIR}"/ingress-ca-*.crt "${TEMP_DIR}/service-ca.crt"; do
+for cert_file in "${TEMP_DIR}"/ingress-ca-*.crt "${TEMP_DIR}/service-ca.crt" "${TEMP_DIR}/custom-ca.crt" "${TEMP_DIR}"/*.crt; do
   [[ -f "$cert_file" ]] || continue
+  # Deduplicate: skip if already appended (the *.crt glob may re-match earlier files)
+  if grep -qF "$(head -2 "$cert_file")" "${TEMP_DIR}/proxy-ca-bundle.pem" 2>/dev/null; then
+    continue
+  fi
   cat "$cert_file" >> "${TEMP_DIR}/proxy-ca-bundle.pem"
   echo "" >> "${TEMP_DIR}/proxy-ca-bundle.pem"
 done
@@ -384,8 +391,38 @@ CURRENT_TRUSTED_CA=$(oc get proxy/cluster -o jsonpath='{.spec.trustedCA.name}' 2
 if [[ "$CURRENT_TRUSTED_CA" == "{{ .Values.proxyCA.configMapName }}" ]]; then
   log "Proxy trustedCA already set to {{ .Values.proxyCA.configMapName }}, skipping"
 elif [[ -n "$CURRENT_TRUSTED_CA" && "$CURRENT_TRUSTED_CA" != "{{ .Values.proxyCA.configMapName }}" ]]; then
-  log "WARNING: Proxy trustedCA is already set to '$CURRENT_TRUSTED_CA' (not overwriting)"
-  log "WARNING: To use ZTVP proxy CA, manually run: oc patch proxy/cluster --type=merge -p '{\"spec\":{\"trustedCA\":{\"name\":\"{{ .Values.proxyCA.configMapName }}\"}}}}'"
+  # Merge any CAs from the existing proxy ConfigMap into our bundle so
+  # nothing is lost when we take over trustedCA management.
+  log "Existing proxy trustedCA ConfigMap: $CURRENT_TRUSTED_CA"
+  EXISTING_CA_DATA=$(oc get configmap "$CURRENT_TRUSTED_CA" -n {{ .Values.global.namespace }} \
+    -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null || echo "")
+  if [[ -n "$EXISTING_CA_DATA" ]]; then
+    echo "$EXISTING_CA_DATA" > "${TEMP_DIR}/existing-proxy-ca.crt"
+    # Append any certs not already in our bundle
+    while IFS= read -r line; do
+      echo "$line"
+    done < "${TEMP_DIR}/existing-proxy-ca.crt" >> "${TEMP_DIR}/proxy-ca-bundle.pem"
+    PROXY_BUNDLE_SIZE=$(wc -c < "${TEMP_DIR}/proxy-ca-bundle.pem" 2>/dev/null || echo 0)
+    log "Merged existing proxy CAs into {{ .Values.proxyCA.configMapName }}"
+    # Re-create the ConfigMap with merged content
+    cat <<MERGEEOF | oc apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.proxyCA.configMapName }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- range $key, $value := .Values.configMapLabels }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+data:
+  ca-bundle.crt: |
+$(cat "${TEMP_DIR}/proxy-ca-bundle.pem" | sed 's/^/      /')
+MERGEEOF
+  fi
+  log "Updating proxy/cluster trustedCA from '$CURRENT_TRUSTED_CA' to {{ .Values.proxyCA.configMapName }}"
+  oc patch proxy/cluster --type=merge -p '{"spec":{"trustedCA":{"name":"{{ .Values.proxyCA.configMapName }}"}}}'
+  log "OK: Proxy trustedCA configured (previous: $CURRENT_TRUSTED_CA)"
 else
   if [[ $PROXY_BUNDLE_SIZE -gt 100 ]]; then
     log "Setting proxy/cluster trustedCA to {{ .Values.proxyCA.configMapName }}"
