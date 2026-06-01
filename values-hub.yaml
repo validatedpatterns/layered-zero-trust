@@ -197,6 +197,7 @@ clusterGroup:
   sharedValueFiles:
     - '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
     - '/overrides/values-{{ $.Values.global.clusterVersion }}-{{ $.Values.clusterGroup.name }}.yaml'
+    - '/overrides/values-vault-jwt.yaml'
   # sharedValueFiles is a flexible mechanism that will add the listed valuefiles to every app defined in the
   # applications section. We intend this to supplement and possibly even replace previous "magic" mechanisms, though
   # we do not at present have a target date for removal.
@@ -332,66 +333,6 @@ clusterGroup:
         - /overrides/values-vault-network-policy.yaml
       annotations:
         argocd.argoproj.io/sync-wave: "25"
-      # Custom Vault policies for least-privilege access
-      # Each application gets access only to its specific secrets path
-      #
-      # TWO types of policies needed:
-      # 1. <prefix>-k8s-secret - for Kubernetes auth (ClusterSecretStore/ExternalSecrets)
-      # 2. <prefix>-jwt-secret - for JWT/SPIFFE auth (application workloads)
-      #
-      # NOTE: K8s auth policies are auto-created by Ansible from vaultPrefixes
-      # JWT auth policies below are manually defined for apps that need direct Vault access
-      policies:
-        # ============================================================
-        # JWT/SPIFFE Auth Policies (for application workloads)
-        # These are used by apps authenticating via SPIFFE JWT tokens
-        # Only define policies for apps that need direct Vault access
-        # K8s auth policies (<prefix>-k8s-secret) are auto-created by Ansible
-        # ============================================================
-        - name: apps-qtodo-jwt-secret
-          policy: |
-            path "secret/data/apps/qtodo/*" {
-              capabilities = ["read"]
-            }
-        - name: hub-infra-rhtpa-jwt-secret
-          policy: |
-            path "secret/data/hub/infra/rhtpa/*" {
-              capabilities = ["read"]
-            }
-        - name: hub-supply-chain-jwt-secret
-          policy: |
-            path "secret/data/hub/infra/quay/*" {
-              capabilities = ["read"]
-            }
-            path "secret/data/hub/infra/registry/*" {
-              capabilities = ["read", "create", "update"]
-            }
-            path "secret/data/hub/infra/rhtpa/rhtpa-oidc-cli" {
-              capabilities = ["read"]
-            }
-      jwt:
-        enabled: true
-        oidcDiscoveryUrl: https://spire-spiffe-oidc-discovery-provider.zero-trust-workload-identity-manager.svc.cluster.local
-        oidcDiscoveryCa: /run/secrets/kubernetes.io/serviceaccount/service-ca.crt
-        defaultRole: qtodo
-        roles:
-          - name: qtodo
-            audience: https://keycloak.apps.{{ $.Values.global.clusterDomain }}/realms/ztvp
-            subject: spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/qtodo/sa/qtodo
-            policies:
-              - apps-qtodo-jwt-secret
-          # RHTPA vault role
-          # - name: rhtpa
-          #   audience: rhtpa
-          #   subject: spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/trusted-profile-analyzer/sa/rhtpa
-          #   policies:
-          #     - hub-infra-rhtpa-jwt-secret
-          # Supply chain vault role (for Tekton pipelines; enable with supply-chain app / Option 3 or BYO registry)
-          # - name: supply-chain
-          #   audience: supply-chain
-          #   subject: spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/{{ $.Values.global.pattern }}-hub/sa/pipeline
-          #   policies:
-          #     - hub-supply-chain-jwt-secret
     # Shared Object Storage Backend
     # Required for RHTPA and QUAY (provides S3-compatible storage via NooBaa MCG)
     # NooBaa MCG provides S3-compatible object storage for multiple applications
