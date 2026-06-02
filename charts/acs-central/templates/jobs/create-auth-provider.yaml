@@ -8,6 +8,8 @@ metadata:
     {{- include "acs-central.labels" . | nindent 4 }}
   annotations:
     argocd.argoproj.io/sync-wave: "44"
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   template:
     metadata:

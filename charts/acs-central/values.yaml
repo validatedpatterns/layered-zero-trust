@@ -20,7 +20,7 @@ central:
   adminPassword:
     # Use external secret from Vault
     useExternalSecret: true
-    secretName: central-htpasswd
+    secretName: central-admin-htpasswd
     secretKey: password
 
   # Image configuration
