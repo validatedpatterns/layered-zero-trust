@@ -571,6 +571,9 @@ clusterGroup:
           value: "ztvp"
         - name: integration.keycloak.clientId
           value: "acs-central"
+        # Must match acs-secured-cluster clusterName (init bundle API name)
+        - name: clusterName
+          value: hub
     # ACS to scan images stored in Quay (Uncomment to enable)
     #    - name: integration.quay.enabled
     #      value: "true"
