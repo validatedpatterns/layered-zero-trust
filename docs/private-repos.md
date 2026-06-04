@@ -132,24 +132,18 @@ bootstrap_secrets:
 
 ### 3. Deploy
 
-```shell
-./pattern.sh make TOKEN_SECRET=private-repo TOKEN_NAMESPACE=openshift-operators install
-```
-
-## Skipping Origin Validation
-
-The Makefile performs a pre-flight `git ls-remote` check against the HTTPS
-form of the repository URL.  For private repos this check will fail (or
-prompt for credentials) because the local machine does not have HTTPS
-credentials configured.  Skip the check by setting:
+For private repos the Makefile performs a pre-flight `git ls-remote` check
+that will fail because the local machine does not have HTTPS credentials for
+the private remote.  Pass `DISABLE_VALIDATE_ORIGIN=true` to skip it:
 
 ```shell
 ./pattern.sh make DISABLE_VALIDATE_ORIGIN=true \
   TOKEN_SECRET=private-repo TOKEN_NAMESPACE=openshift-operators install
 ```
 
-This is safe -- the cluster uses the `private-repo` secret (SSH key or PAT)
-for actual access; the validation is only a local convenience check.
+> [!NOTE]
+> This is safe -- the cluster uses the `private-repo` secret (SSH key or PAT)
+> for actual access; the validation is only a local convenience check.
 
 ## How It Works
 
