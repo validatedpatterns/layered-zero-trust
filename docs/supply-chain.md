@@ -46,6 +46,12 @@ For the Secure Supply Chain use case, the command would be:
 python3 scripts/gen-feature-variants.py --base values-hub.yaml --features supply-chain --registry-option <id>
 ```
 
+If the source repository is **private** (protected), add the `protected-repos` feature:
+
+```shell
+python3 scripts/gen-feature-variants.py --base values-hub.yaml --features supply-chain,protected-repos --registry-option <id>
+```
+
 Where `<id>` is one of the options available in _Bring Your Own (BYO) Container Registry_:
 
 1. Embedded Quay Registry
@@ -69,13 +75,20 @@ By default, ZTVP deploys a built-in Red Hat Quay registry. However, you can use 
 
    Uncomment the `registry-user` secret and replace the placeholder with your registry token or password:
 
+   Store your registry token in a local file:
+
+   ```shell
+   mkdir -p ~/.config/validated-patterns
+   echo -n "your-registry-token" > ~/.config/validated-patterns/registry-token
+   ```
+
    ```yaml
    - name: registry-user
      vaultPrefixes:
        - hub/infra/registry
      fields:
        - name: registry-password
-         value: "REPLACE_WITH_REGISTRY_TOKEN"
+         path: ~/.config/validated-patterns/registry-token
          onMissingValue: error
    ```
 
@@ -251,12 +264,44 @@ Once the supply-chain application has synced in ArgoCD, start the pipeline using
    At the bottom we have the **workspaces**. These must be configured manually.
    * For **qtodo-source**, select `PersistentVolumeClaim` and the PVC name is `qtodo-workspace-source`.
    * For **registry-auth-config**, select `Secret` and the name of the secret is `qtodo-registry-auth`.
+   * For **git-auth**, the binding depends on the authentication mode (see [How it works](#how-it-works) for details):
+     * **HTTPS mode**: select `Secret` and the name of the secret is `qtodo-git-credentials`. The `git-clone` ClusterTask's `basic-auth` workspace requires the secret to be provided explicitly; ServiceAccount-level credential injection alone is not sufficient for HTTPS.
+     * **SSH mode**: leave **git-auth** unbound (empty). SSH credentials are injected automatically via the `pipeline` ServiceAccount. Binding the workspace directly causes the `git-clone` ClusterTask's `prepare.sh` to run a recursive `chmod` on the copied secret volume, which fails on the read-only Kubernetes projected volume symlinks.
 
 5. Press **Start** to finish and run the pipeline.
 
 #### Using CLI
 
 We can also start a pipeline execution using a CLI and the Kubernetes API. We start creating a new `PipelineRun` resource referencing the `qtodo-supply-chain` pipeline. Let's create a new file called `qtodo-pipeline.yaml` and copy this content.
+
+**HTTPS mode** (bind `git-auth` to the `qtodo-git-credentials` secret):
+
+```yaml
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: qtodo-manual-run-
+  namespace: layered-zero-trust-hub
+spec:
+  pipelineRef:
+    name: qtodo-supply-chain
+  taskRunTemplate:
+    serviceAccountName: pipeline
+  timeouts:
+    pipeline: 1h0m0s
+  workspaces:
+    - name: qtodo-source
+      persistentVolumeClaim:
+        claimName: qtodo-workspace-source
+    - name: registry-auth-config
+      secret:
+        secretName: qtodo-registry-auth
+    - name: git-auth
+      secret:
+        secretName: qtodo-git-credentials
+```
+
+**SSH mode** (leave `git-auth` unbound):
 
 ```yaml
 apiVersion: tekton.dev/v1
@@ -281,6 +326,8 @@ spec:
 ```
 
 As was described previously, verify the values associated with the PVC storage and registry configuration.
+
+> **Note**: The `git-auth` workspace binding differs between authentication modes. In **HTTPS mode**, the `qtodo-git-credentials` secret must be bound explicitly -- ServiceAccount-level credential injection alone is not sufficient for the `git-clone` ClusterTask's `basic-auth` workspace. In **SSH mode**, the workspace must be left **unbound**; SSH credentials are injected automatically through the `pipeline` ServiceAccount. Binding the `git-auth` workspace in SSH mode causes the `git-clone` ClusterTask's `prepare.sh` to run a recursive `chmod` on the copied secret volume, which fails on the read-only Kubernetes projected volume symlinks.
 
 Using the previously created definition, start a new execution of the pipeline using `oc` CLI:
 
@@ -307,10 +354,139 @@ oc get taskruns -n layered-zero-trust-hub -l tekton.dev/pipelineRun=<pipelinerun
 oc logs -n layered-zero-trust-hub -l tekton.dev/pipelineRun=<pipelinerun-name>,tekton.dev/pipelineTask=<task-name>
 ```
 
+### Protected Repositories
+
+By default the pipeline clones the qtodo source from a **public** GitHub repository. If your source code lives in a private (protected) repository, enable the Git credentials feature so the `git-clone` task can authenticate.
+
+Two authentication modes are supported:
+
+| Mode | URL format | Vault fields | Secret type |
+| ----- | ------------------------------------ | ----------------------------------- | ---------------------- |
+| HTTPS | `https://github.com/org/repo.git` | `username` + `password` (PAT) | Opaque (basic-auth) |
+| SSH | `git@github.com:org/repo.git` | `ssh-privatekey` + `known_hosts` | kubernetes.io/ssh-auth |
+
+When using the `gen-feature-variants.py` script with `--git-repo`, the auth mode is auto-detected from the URL scheme.
+
+#### 1. Store Git credentials in Vault
+
+Uncomment the `git-credentials` secret in your local `~/values-secret.yaml` (copied from `values-secret.yaml.template`). Choose **one** of the two options:
+
+**Option A -- HTTPS basic auth** (username + Personal Access Token):
+
+Store your credentials in local files to avoid plaintext in YAML:
+
+```shell
+mkdir -p ~/.config/validated-patterns
+echo -n "your-git-username" > ~/.config/validated-patterns/git-username
+echo -n "your-personal-access-token" > ~/.config/validated-patterns/git-token
+```
+
+```yaml
+- name: git-credentials
+  vaultPrefixes:
+  - hub/supply-chain
+  fields:
+  - name: username
+    path: ~/.config/validated-patterns/git-username
+    onMissingValue: error
+  - name: password
+    path: ~/.config/validated-patterns/git-token
+    onMissingValue: error
+```
+
+**Option B -- SSH key auth**:
+
+```yaml
+- name: git-credentials
+  vaultPrefixes:
+  - hub/supply-chain
+  fields:
+  - name: ssh-privatekey
+    path: ~/.ssh/id_ed25519_ztvp   # or id_rsa, id_ecdsa, etc.
+  - name: known_hosts
+    path: ~/.ssh/known_hosts_github
+```
+
+Generate a passwordless SSH key pair (if you don't already have one):
+
+```shell
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_ztvp -N ""
+```
+
+The key **must not** be password-protected -- Tekton cannot prompt for a passphrase at runtime.
+
+Generate the `known_hosts` file for your Git host:
+
+```shell
+ssh-keyscan github.com > ~/.ssh/known_hosts_github
+```
+
+Then load the secret into Vault: `./pattern.sh make load-secrets`.
+
+#### 2. Enable Git credentials in the supply-chain overrides
+
+**Preferred: use the generator.** Add `protected-repos` to the features list and provide your private repository URL with `--git-repo`. The generator auto-detects the auth mode and sets all overrides (host, authType, repository) automatically:
+
+```shell
+# HTTPS
+python3 scripts/gen-feature-variants.py \
+  --features supply-chain,protected-repos \
+  --registry-option <id> \
+  --git-repo https://github.com/your-org/qtodo.git
+
+# SSH
+python3 scripts/gen-feature-variants.py \
+  --features supply-chain,protected-repos \
+  --registry-option <id> \
+  --git-repo git@github.com:your-org/qtodo.git
+```
+
+**Manual configuration.** Add the following overrides to the `supply-chain` application in `values-hub.yaml`:
+
+```yaml
+- name: git.credentials.enabled
+  value: "true"
+- name: git.credentials.authType
+  value: "https"                    # or "ssh"
+- name: git.credentials.host
+  value: "https://github.com"      # SSH: "github.com" (no scheme)
+- name: git.credentials.vaultPath
+  value: "secret/data/hub/supply-chain/git-credentials"
+```
+
+#### 3. Point the pipeline at your private repository
+
+When using the generator with `--git-repo`, the `qtodo.repository` override is set automatically in the generated `values-hub.yaml`. If you are configuring manually, add this override to the `supply-chain` application:
+
+```yaml
+- name: qtodo.repository
+  value: "https://github.com/your-org/qtodo.git"   # or SSH URL (git@github.com:your-org/qtodo.git)
+```
+
+#### How it works
+
+When `git.credentials.enabled` is `true`:
+
+* An `ExternalSecret` (`qtodo-git-credentials`) pulls the credentials from Vault and creates a secret annotated with `tekton.dev/git-0` pointing to the configured host.
+  * **HTTPS mode**: creates an `Opaque` secret with `.git-credentials` and `.gitconfig` files.
+  * **SSH mode**: creates a `kubernetes.io/ssh-auth` secret with `ssh-privatekey` and `known_hosts` entries.
+* The `pipeline` ServiceAccount lists the secret (see `pipeline-sa.yaml`). Tekton's credential initialization automatically injects the credentials into task containers -- `.gitconfig` and `.git-credentials` for HTTPS, or `~/.ssh/config`, `~/.ssh/id_*`, and `~/.ssh/known_hosts` for SSH.
+* The `git-auth` workspace is declared in the pipeline as `optional: true`. How it should be bound depends on the authentication mode:
+  * **HTTPS mode**: the `git-auth` workspace **must** be bound to the `qtodo-git-credentials` secret. ServiceAccount-level credential injection alone is not sufficient -- without an explicit workspace binding, the `git-clone` ClusterTask cannot access the protected repository.
+  * **SSH mode**: the `git-auth` workspace must be left **unbound**. SSH credentials are injected automatically via the ServiceAccount. Binding the workspace triggers the `git-clone` ClusterTask's `prepare.sh`, which runs a recursive `chmod` on the copied secret volume; this fails on the read-only Kubernetes projected volume symlinks and aborts the step.
+* The Vault policy `hub-supply-chain-jwt-secret` grants read access to `secret/data/hub/supply-chain/*` for the pipeline's SPIFFE identity.
+
+### Init task (pre-flight image check)
+
+The pipeline includes an `init` task that runs before `git-clone`. It uses `skopeo inspect` to check whether the target image already exists in the registry. If the image exists (and `rebuild` is not set to `"true"`), the pipeline skips the build. This avoids unnecessary rebuilds and is modeled after the [RHTAP sample pipelines](https://github.com/konflux-ci/build-definitions).
+
+The pipeline also emits Tekton Chains provenance results (`CHAINS-GIT_URL`, `CHAINS-GIT_COMMIT`, `IMAGE_URL`, `IMAGE_DIGEST`) so that Tekton Chains can automatically generate and sign provenance attestations.
+
 ### Pipeline tasks
 
 The pipeline we have prepared has the following steps:
 
+* **init**. Checks whether the target image already exists in the registry. Gates the build with a `when` condition.
 * **qtodo-clone-repository**. Clones the `qtodo` repository.
 * **qtodo-build-artifact**. Builds an _uber-jar_ of `qtodo` application.
 * **qtodo-sign-artifact**. Signs the JAR file generated during the build process.

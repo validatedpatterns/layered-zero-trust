@@ -57,6 +57,12 @@ python3 scripts/gen-feature-variants.py --features supply-chain --registry-optio
 # Generate all three supply-chain registry variants at once
 python3 scripts/gen-feature-variants.py --features supply-chain --registry-option all
 
+# Supply chain with protected (private) Git repository support
+python3 scripts/gen-feature-variants.py \
+    --features supply-chain,protected-repos \
+    --registry-option 2 \
+    --git-repo https://github.com/your-org/qtodo.git
+
 # Custom base file and output directory
 python3 scripts/gen-feature-variants.py \
     --features rhtpa --base values-hub.yaml --outdir /tmp
@@ -80,6 +86,49 @@ The output directory is created automatically if it does not exist.
 > the output already contains `ztvp/qtodo`. If you use a custom feature
 > without these fields, replace the placeholders manually before applying
 > the generated file.
+
+## Protected Repositories (`--git-repo`)
+
+When the `protected-repos` feature is enabled, the `--git-repo` argument is
+**required**. It specifies the private Git repository URL that the Tekton
+pipeline will clone. The generator auto-detects the authentication mode
+(HTTPS or SSH) from the URL scheme and sets `git.credentials.authType` and
+`git.credentials.host` accordingly:
+
+```bash
+# HTTPS (basic-auth with username + PAT)
+python3 scripts/gen-feature-variants.py \
+    --features supply-chain,protected-repos \
+    --registry-option 1 \
+    --git-repo https://github.com/your-org/qtodo.git
+
+# SSH (key-based auth)
+python3 scripts/gen-feature-variants.py \
+    --features supply-chain,protected-repos \
+    --registry-option 1 \
+    --git-repo git@github.com:your-org/qtodo.git
+```
+
+For an **HTTPS** URL the generated `values-hub.yaml` will include:
+
+```yaml
+- name: git.credentials.authType
+  value: "https"
+- name: git.credentials.host
+  value: "https://github.com"
+```
+
+For an **SSH** URL:
+
+```yaml
+- name: git.credentials.authType
+  value: "ssh"
+- name: git.credentials.host
+  value: "github.com"
+```
+
+See [Protected Repositories](../docs/supply-chain.md#protected-repositories)
+for the full setup (Vault credentials, ExternalSecret, workspace selection).
 
 ## How It Works
 

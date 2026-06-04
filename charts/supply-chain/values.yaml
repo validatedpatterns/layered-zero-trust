@@ -40,6 +40,18 @@ rhtpa:
     clientSecretVaultPath: "secret/data/hub/infra/rhtpa/rhtpa-oidc-cli"
     clientSecretVaultKey: "client-secret"
 
+# git credentials for protected repositories
+git:
+  credentials:
+    enabled: false
+    authType: "https"
+    host: "https://github.com"
+    vaultPath: "secret/data/hub/supply-chain/git-credentials"
+    usernameKey: "username"
+    passwordKey: "password"
+    sshPrivateKeyKey: "ssh-privatekey"
+    knownHostsKey: "known_hosts"
+
 # qtodo repository configuration
 qtodo:
   repository: "https://github.com/validatedpatterns-demos/qtodo.git"
@@ -145,3 +157,4 @@ tasks:
     mandrel: "registry.redhat.io/quarkus/mandrel-for-jdk-21-rhel8:23.1-36"
     syft: "registry.redhat.io/rh-syft-tech-preview/syft-rhel9:1.29.0"
     rhtpa: "registry.access.redhat.com/ubi9/ubi:9.7-1764794285"
+    skopeo: "registry.access.redhat.com/ubi9/skopeo:9.5-1745865345@sha256:d91eb0dac7308ddfb12193368a42009509925edba80da9ffd3b82d03427dc3ed"

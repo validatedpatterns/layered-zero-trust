@@ -1,5 +1,5 @@
 ---
-apiVersion: tekton.dev/v1beta1
+apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
   name: qtodo-supply-chain
@@ -8,12 +8,20 @@ spec:
   params:
     - name: git-url
       type: string
-      description: The URL of the public Github qtodo repository
+      description: The URL of the qtodo repository (public or protected)
       default: {{ .Values.qtodo.repository | quote }}
     - name: git-revision
       type: string
-      description: The revision of the public Github qtodo repository
+      description: The revision of the qtodo repository
       default: {{ .Values.qtodo.revision }}
+    - name: rebuild
+      type: string
+      description: Force rebuild the image even if it already exists
+      default: "false"
+    - name: skip-checks
+      type: string
+      description: Skip pre-build checks against existing image
+      default: "false"
     - name: qtodo-build-cmd
       type: string
       description: The command to build the qtodo artifact
@@ -100,9 +108,44 @@ spec:
   workspaces:
     - name: qtodo-source
     - name: registry-auth-config
+    - name: git-auth
+      optional: true
+
+  results:
+    - name: CHAINS-GIT_URL
+      description: The git URL used for the build (Tekton Chains provenance)
+      value: $(tasks.qtodo-clone-repository.results.URL)
+    - name: CHAINS-GIT_COMMIT
+      description: The git commit SHA used for the build (Tekton Chains provenance)
+      value: $(tasks.qtodo-clone-repository.results.COMMIT)
+    - name: IMAGE_URL
+      description: The image URL built by the pipeline (Tekton Chains provenance)
+      value: $(tasks.qtodo-build-image.results.IMAGE_URL)
+    - name: IMAGE_DIGEST
+      description: The image digest built by the pipeline (Tekton Chains provenance)
+      value: $(tasks.qtodo-build-image.results.IMAGE_DIGEST)
 
   tasks:
+    - name: init
+      taskRef:
+        name: init
+        kind: Task
+      params:
+        - name: image-url
+          value: $(params.image-target)
+        - name: rebuild
+          value: $(params.rebuild)
+        - name: skip-checks
+          value: $(params.skip-checks)
+
     - name: qtodo-clone-repository
+      runAfter:
+        - init
+      when:
+        - input: $(tasks.init.results.build)
+          operator: in
+          values:
+            - "true"
       taskRef:
         resolver: cluster
         params:
@@ -120,6 +163,13 @@ spec:
       workspaces:
         - name: output
           workspace: qtodo-source
+{{- if eq (default "https" .Values.git.credentials.authType) "ssh" }}
+        - name: ssh-directory
+          workspace: git-auth
+{{- else }}
+        - name: basic-auth
+          workspace: git-auth
+{{- end }}
 
     - name: qtodo-build-artifact
       runAfter:
