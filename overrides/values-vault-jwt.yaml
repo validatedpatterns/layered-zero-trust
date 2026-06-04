@@ -27,6 +27,9 @@ vault_jwt_policies:
       path "secret/data/hub/infra/rhtpa/rhtpa-oidc-cli" {
         capabilities = ["read"]
       }
+      path "secret/data/hub/supply-chain/*" {
+        capabilities = ["read"]
+      }
 vault_jwt_roles:
   - name: qtodo
     audience: https://keycloak.apps.{{ $.Values.global.clusterDomain }}/realms/ztvp
