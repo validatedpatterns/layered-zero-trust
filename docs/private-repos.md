@@ -74,11 +74,44 @@ bootstrap_secrets:
     path: ~/.ssh/ztvp-deploy-key
 ```
 
+> [!NOTE]
+> **About `insecureIgnoreHostKey`:** ArgoCD ships with pre-populated SSH
+> fingerprints for github.com, gitlab.com, bitbucket.org, and
+> ssh.dev.azure.com in its `argocd-ssh-known-hosts-cm` ConfigMap.  If your
+> repository is hosted on one of these providers you may omit
+> `insecureIgnoreHostKey` and ArgoCD will verify the host key automatically.
+>
+> For self-hosted Git servers (e.g. internal GitLab), the VP framework's
+> `bootstrap_secrets` mechanism does not currently support injecting entries
+> into `argocd-ssh-known-hosts-cm`.  Since the `vp-gitops` namespace does
+> not exist until the VP operator creates it during install, you cannot
+> pre-populate known hosts beforehand.  Use `insecureIgnoreHostKey: "true"`
+> for the initial deployment.
+>
+> As a post-install hardening step, you can add proper host verification
+> and remove the insecure flag:
+>
+> ```shell
+> ssh-keyscan gitlab.internal.example.com >> /tmp/known_hosts
+> oc patch cm argocd-ssh-known-hosts-cm -n vp-gitops \
+>   --type merge -p "{\"data\":{\"ssh_known_hosts\":\"$(cat /tmp/known_hosts)\"}}"
+> ```
+
 ### 4. Deploy
 
+The Makefile performs a pre-flight `git ls-remote` check against the HTTPS
+form of the URL.  For private repos this check will fail because the local
+machine does not have credentials for the private remote.  Pass
+`DISABLE_VALIDATE_ORIGIN=true` to skip it:
+
 ```shell
-./pattern.sh make TOKEN_SECRET=private-repo TOKEN_NAMESPACE=openshift-operators install
+./pattern.sh make DISABLE_VALIDATE_ORIGIN=true \
+  TOKEN_SECRET=private-repo TOKEN_NAMESPACE=openshift-operators install
 ```
+
+> [!NOTE]
+> This is safe -- the cluster uses the `private-repo` secret (SSH key or PAT)
+> for actual access; the validation is only a local convenience check.
 
 ## Option B: HTTPS with Personal Access Token (PAT)
 
