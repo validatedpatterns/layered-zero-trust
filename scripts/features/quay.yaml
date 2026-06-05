@@ -2,11 +2,11 @@
 # Depends on: storage (ODF + NooBaa MCG for backend)
 clusterGroup:
   namespaces:
-    - quay-enterprise:
-        annotations:
-          argocd.argoproj.io/sync-wave: "32"
-        labels:
-          openshift.io/cluster-monitoring: "true"
+    quay-enterprise:
+      annotations:
+        argocd.argoproj.io/sync-wave: "32"
+      labels:
+        openshift.io/cluster-monitoring: "true"
 
   subscriptions:
     quay-operator:

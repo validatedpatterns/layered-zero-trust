@@ -2,11 +2,11 @@
 # Depends on: Vault, SPIRE, Keycloak (all in base config)
 clusterGroup:
   namespaces:
-    - trusted-artifact-signer:
-        annotations:
-          argocd.argoproj.io/sync-wave: "32"
-        labels:
-          openshift.io/cluster-monitoring: "true"
+    trusted-artifact-signer:
+      annotations:
+        argocd.argoproj.io/sync-wave: "32"
+      labels:
+        openshift.io/cluster-monitoring: "true"
 
   subscriptions:
     rhtas-operator:

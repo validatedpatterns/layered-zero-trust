@@ -2,7 +2,7 @@
 # Required for the secure supply chain pipeline flow
 clusterGroup:
   namespaces:
-    - openshift-pipelines
+    openshift-pipelines:
 
   subscriptions:
     openshift-pipelines:

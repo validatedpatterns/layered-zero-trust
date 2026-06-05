@@ -2,16 +2,16 @@
 # Depends on: storage (NooBaa MCG), Vault, SPIRE, Keycloak
 clusterGroup:
   namespaces:
-    - rhtpa-operator:
-        operatorGroup: true
-        targetNamespace: rhtpa-operator
-        annotations:
-          argocd.argoproj.io/sync-wave: "26"
-    - trusted-profile-analyzer:
-        annotations:
-          argocd.argoproj.io/sync-wave: "32"
-        labels:
-          openshift.io/cluster-monitoring: "true"
+    rhtpa-operator:
+      operatorGroup: true
+      targetNamespace: rhtpa-operator
+      annotations:
+        argocd.argoproj.io/sync-wave: "26"
+    trusted-profile-analyzer:
+      annotations:
+        argocd.argoproj.io/sync-wave: "32"
+      labels:
+        openshift.io/cluster-monitoring: "true"
 
   subscriptions:
     rhtpa-operator:
