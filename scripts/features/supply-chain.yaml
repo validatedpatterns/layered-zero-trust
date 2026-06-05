@@ -26,6 +26,12 @@ clusterGroup:
             - /spec/tasks
 
   merge_into_applications:
+    ztvp-certificates:
+      overrides:
+        - name: "distribution.targetNamespaces[0]"
+          value: "qtodo"
+        - name: "distribution.targetNamespaces[1]"
+          value: "{{ $.Values.global.pattern }}-hub"
     vault:
       jwt:
         roles:

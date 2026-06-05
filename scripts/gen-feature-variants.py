@@ -344,38 +344,82 @@ def _substitute_repository_placeholders(base, org=None, image_name=None):
 GIT_REPO_PLACEHOLDER = "REPLACE_WITH_GIT_REPO_URL"
 GIT_HOST_PLACEHOLDER = "REPLACE_WITH_GIT_HOST"
 GIT_AUTH_TYPE_PLACEHOLDER = "REPLACE_WITH_GIT_AUTH_TYPE"
+SSL_CA_ENABLED_PLACEHOLDER = "REPLACE_WITH_SSL_CA_ENABLED"
+GIT_HOSTNAME_PLACEHOLDER = "REPLACE_WITH_GIT_HOSTNAME"
+
+PUBLIC_GIT_HOSTS = {"github.com", "gitlab.com", "bitbucket.org"}
 
 SSH_URL_RE = re.compile(r"^[\w.-]+@([\w.-]+):")
 
 
 def _parse_git_repo_url(git_repo_url):
-    """Derive (host, auth_type) from a Git repository URL.
+    """Derive (host, auth_type, hostname) from a Git repository URL.
 
-    HTTPS URLs  -> host = "https://github.com",  auth_type = "https"
-    SSH URLs    -> host = "github.com",           auth_type = "ssh"
+    HTTPS URLs  -> host = "https://github.com",  auth_type = "https", hostname = "github.com"
+    SSH URLs    -> host = "github.com",           auth_type = "ssh",   hostname = "github.com"
     """
     m = SSH_URL_RE.match(git_repo_url)
     if m:
-        return m.group(1), "ssh"
+        hostname = m.group(1)
+        return hostname, "ssh", hostname
     parsed = urlparse(git_repo_url)
     scheme = parsed.scheme or "https"
     hostname = parsed.hostname or ""
-    return f"{scheme}://{hostname}", "https"
+    return f"{scheme}://{hostname}", "https", hostname
 
 
-def _substitute_git_overrides(base, git_repo_url, git_host, git_auth_type):
-    """Replace git-related placeholders in supply-chain overrides."""
+def _substitute_git_overrides(
+    base, git_repo_url, git_host, git_auth_type, git_hostname
+):
+    """Replace git-related placeholders in supply-chain and ztvp-certificates overrides."""
     apps = base.get("clusterGroup", {}).get("applications", {})
+    is_internal = git_hostname not in PUBLIC_GIT_HOSTS
+
     sc = apps.get("supply-chain", {})
-    placeholder_map = {
+    sc_placeholder_map = {
         "qtodo.repository": (GIT_REPO_PLACEHOLDER, git_repo_url),
         "git.credentials.host": (GIT_HOST_PLACEHOLDER, git_host),
         "git.credentials.authType": (GIT_AUTH_TYPE_PLACEHOLDER, git_auth_type),
+        "git.sslCABundle.enabled": (
+            SSL_CA_ENABLED_PLACEHOLDER,
+            "true" if is_internal else "false",
+        ),
     }
-    for override in sc.get("overrides", []):
-        entry = placeholder_map.get(override.get("name"))
+    sc_overrides = sc.get("overrides", [])
+    for override in sc_overrides:
+        entry = sc_placeholder_map.get(override.get("name"))
         if entry and str(override.get("value")) == entry[0]:
             override["value"] = entry[1]
+
+    # Remove git.sslCABundle.enabled override when false (public hosts)
+    if not is_internal:
+        sc_overrides[:] = [
+            o
+            for o in sc_overrides
+            if not (
+                o.get("name") == "git.sslCABundle.enabled" and o.get("value") == "false"
+            )
+        ]
+
+    certs = apps.get("ztvp-certificates", {})
+    certs_overrides = certs.get("overrides", [])
+    if is_internal:
+        for override in certs_overrides:
+            if (
+                override.get("name") == "customCA.remoteHosts[0]"
+                and str(override.get("value")) == GIT_HOSTNAME_PLACEHOLDER
+            ):
+                override["value"] = git_hostname
+    else:
+        # Remove the remoteHosts placeholder for public hosts
+        certs_overrides[:] = [
+            o
+            for o in certs_overrides
+            if not (
+                o.get("name") == "customCA.remoteHosts[0]"
+                and str(o.get("value")) == GIT_HOSTNAME_PLACEHOLDER
+            )
+        ]
 
 
 def _update_vault_jwt_override_file(override_file_path, new_roles):
@@ -475,8 +519,10 @@ def generate_variant(
         _substitute_repository_placeholders(base, org=org, image_name=image_name)
 
     if git_repo_url:
-        git_host, git_auth_type = _parse_git_repo_url(git_repo_url)
-        _substitute_git_overrides(base, git_repo_url, git_host, git_auth_type)
+        git_host, git_auth_type, git_hostname = _parse_git_repo_url(git_repo_url)
+        _substitute_git_overrides(
+            base, git_repo_url, git_host, git_auth_type, git_hostname
+        )
 
     validate_output(base)
     cg = base.get("clusterGroup")

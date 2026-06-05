@@ -51,6 +51,13 @@ git:
     passwordKey: "password"
     sshPrivateKeyKey: "ssh-privatekey"
     knownHostsKey: "known_hosts"
+  # Corporate/custom CA bundle for HTTPS git clones from internal hosts.
+  # When enabled, the git-clone task mounts the CA ConfigMap as the
+  # ssl-ca-directory workspace so TLS verification succeeds against
+  # internal Git servers (e.g. GitLab behind a corporate CA).
+  sslCABundle:
+    enabled: false
+    configMapName: "ztvp-trusted-ca"
 
 # qtodo repository configuration
 qtodo:

@@ -22,6 +22,7 @@ log "ZTVP CA Certificate Extraction"
 log "==========================================="
 log "Auto-detect: {{ .Values.autoDetect }}"
 log "Custom CA: {{ .Values.customCA.secretRef.enabled }}"
+log "Remote hosts: {{ len .Values.customCA.remoteHosts }}"
 log "Namespace: {{ .Values.global.namespace }}"
 log "ConfigMap: {{ .Values.configMapName }}"
 
@@ -44,6 +45,30 @@ else
   error "Custom secret not found: {{ .Values.customCA.secretRef.namespace }}/{{ .Values.customCA.secretRef.name }}"
   exit 1
 fi
+{{- end }}
+
+# ===================================================================
+# PHASE 1.5: Extract CA chains from remote hosts (if configured)
+# No authentication required -- CAs are part of the public TLS handshake.
+# ===================================================================
+
+{{- if .Values.customCA.remoteHosts }}
+REMOTE_HOST_COUNT=0
+{{- range $host := .Values.customCA.remoteHosts }}
+log "Extracting CA chain from remote host: {{ $host }}:443"
+REMOTE_CERTS=$(openssl s_client -connect {{ $host }}:443 -showcerts </dev/null 2>/dev/null \
+  | awk '/BEGIN CERTIFICATE/,/END CERTIFICATE/')
+if [[ -n "$REMOTE_CERTS" ]]; then
+  SAFE_NAME=$(echo "{{ $host }}" | tr '.:' '-')
+  echo "$REMOTE_CERTS" > "${TEMP_DIR}/remote-${SAFE_NAME}.crt"
+  REMOTE_HOST_COUNT=$((REMOTE_HOST_COUNT + 1))
+  CUSTOM_CA_FOUND=true
+  log "OK: Extracted CA chain from {{ $host }}"
+else
+  error "Failed to extract CA chain from {{ $host }}:443 (is the host reachable?)"
+fi
+{{- end }}
+log "Extracted CA chains from $REMOTE_HOST_COUNT remote host(s)"
 {{- end }}
 
 # ===================================================================
@@ -298,6 +323,7 @@ metadata:
     ztvp.io/auto-detect: "{{ .Values.autoDetect }}"
     ztvp.io/custom-ca-enabled: "{{ .Values.customCA.secretRef.enabled }}"
     ztvp.io/custom-ca-found: "${CUSTOM_CA_FOUND}"
+    ztvp.io/remote-hosts: "{{ len .Values.customCA.remoteHosts }}"
     ztvp.io/ingress-ca-found: "${INGRESS_CA_FOUND}"
     ztvp.io/service-ca-found: "${SERVICE_CA_FOUND}"
     ztvp.io/cluster-ca-found: "${CLUSTER_CA_FOUND}"

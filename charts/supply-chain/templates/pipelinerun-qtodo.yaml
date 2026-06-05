@@ -107,6 +107,11 @@ spec:
               - name: registry-auth-config
                 secret:
                   secretName: {{ .Values.registry.authSecretName }}
+{{- if .Values.git.sslCABundle.enabled }}
+              - name: ssl-ca-directory
+                configMap:
+                  name: {{ .Values.git.sslCABundle.configMapName }}
+{{- end }}
           MANIFEST
           echo "PipelineRun created successfully."
 {{- end }}

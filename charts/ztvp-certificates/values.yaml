@@ -38,6 +38,18 @@ customCA:
   #   oc create secret generic <name> --from-file=ca.crt=/path/to/cert.crt -n openshift-config
   # Configure via overrides/values-ztvp-certificates.yaml (using extraValueFiles)
   additionalCertificates: []
+
+  # Remote host CA extraction: fetch TLS CA chains directly from remote hosts.
+  # No authentication needed -- CA certificates are part of the public TLS handshake.
+  # The extraction Job runs openssl s_client against each host on port 443 and
+  # saves the full certificate chain. Useful for internal Git servers, registries,
+  # or any service behind a corporate CA.
+  # The CronJob keeps the extracted CAs fresh automatically.
+  remoteHosts: []
+  # Example:
+  # remoteHosts:
+  #   - gitlab.cee.redhat.com
+  #   - registry.internal.example.com
   # Example:
   # additionalCertificates:
   #   - name: corporate-root-ca

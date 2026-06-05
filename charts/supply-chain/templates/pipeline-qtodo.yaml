@@ -110,6 +110,10 @@ spec:
     - name: registry-auth-config
     - name: git-auth
       optional: true
+{{- if .Values.git.sslCABundle.enabled }}
+    - name: ssl-ca-directory
+      optional: true
+{{- end }}
 
   results:
     - name: CHAINS-GIT_URL
@@ -160,6 +164,10 @@ spec:
           value: $(params.git-url)
         - name: REVISION
           value: $(params.git-revision)
+{{- if .Values.git.sslCABundle.enabled }}
+        - name: CRT_FILENAME
+          value: tls-ca-bundle.pem
+{{- end }}
       workspaces:
         - name: output
           workspace: qtodo-source
@@ -169,6 +177,10 @@ spec:
 {{- else }}
         - name: basic-auth
           workspace: git-auth
+{{- end }}
+{{- if .Values.git.sslCABundle.enabled }}
+        - name: ssl-ca-directory
+          workspace: ssl-ca-directory
 {{- end }}
 
     - name: qtodo-build-artifact

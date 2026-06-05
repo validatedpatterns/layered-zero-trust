@@ -561,12 +561,17 @@ clusterGroup:
     #    # Protected repository credentials (Vault + ExternalSecret)
     #    # - name: git.credentials.enabled
     #    #   value: "true"
+    #    # - name: git.credentials.authType
+    #    #   value: "https"   # or "ssh"
     #    # - name: git.credentials.host
     #    #   value: "https://github.com"
     #    # - name: git.credentials.vaultPath
     #    #   value: "secret/data/hub/supply-chain/git-credentials"
     #    # - name: qtodo.repository
     #    #   value: "https://github.com/your-org/qtodo.git"
+    #    # Corporate CA trust for internal Git hosts (HTTPS only)
+    #    # - name: git.sslCABundle.enabled
+    #    #   value: "true"
     #
     # ACS Central Services
     acs-central:
