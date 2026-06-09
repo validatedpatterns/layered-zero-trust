@@ -107,7 +107,7 @@ spec:
               - name: registry-auth-config
                 secret:
                   secretName: {{ .Values.registry.authSecretName }}
-{{- if .Values.git.sslCABundle.enabled }}
+{{- if and .Values.git.sslCABundle.enabled (ne (default "https" .Values.git.credentials.authType) "ssh") }}
               - name: ssl-ca-directory
                 configMap:
                   name: {{ .Values.git.sslCABundle.configMapName }}

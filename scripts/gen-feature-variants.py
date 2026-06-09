@@ -361,8 +361,12 @@ def _parse_git_repo_url(git_repo_url):
     m = SSH_URL_RE.match(git_repo_url)
     if m:
         hostname = m.group(1)
+        if not hostname:
+            raise ValueError(f"Invalid SSH URL: {git_repo_url}")
         return hostname, "ssh", hostname
     parsed = urlparse(git_repo_url)
+    if not parsed.hostname:
+        raise ValueError(f"Invalid git URL (no hostname): {git_repo_url}")
     scheme = parsed.scheme or "https"
     hostname = parsed.hostname or ""
     return f"{scheme}://{hostname}", "https", hostname

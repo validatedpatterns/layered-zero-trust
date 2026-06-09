@@ -110,7 +110,7 @@ spec:
     - name: registry-auth-config
     - name: git-auth
       optional: true
-{{- if .Values.git.sslCABundle.enabled }}
+{{- if and .Values.git.sslCABundle.enabled (ne (default "https" .Values.git.credentials.authType) "ssh") }}
     - name: ssl-ca-directory
       optional: true
 {{- end }}
@@ -164,7 +164,7 @@ spec:
           value: $(params.git-url)
         - name: REVISION
           value: $(params.git-revision)
-{{- if .Values.git.sslCABundle.enabled }}
+{{- if and .Values.git.sslCABundle.enabled (ne (default "https" .Values.git.credentials.authType) "ssh") }}
         - name: CRT_FILENAME
           value: tls-ca-bundle.pem
 {{- end }}
@@ -178,7 +178,7 @@ spec:
         - name: basic-auth
           workspace: git-auth
 {{- end }}
-{{- if .Values.git.sslCABundle.enabled }}
+{{- if and .Values.git.sslCABundle.enabled (ne (default "https" .Values.git.credentials.authType) "ssh") }}
         - name: ssl-ca-directory
           workspace: ssl-ca-directory
 {{- end }}
