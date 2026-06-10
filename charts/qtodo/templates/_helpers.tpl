@@ -21,21 +21,36 @@ quay.io/ztvp/qtodo) so no VP --set override is needed.
 Generate the URL of the OIDC service
 */}}
 {{- define "qtodo.oidc.url" }}
-{{- if not .Values.app.oidc.authServerUrl }}
-{{- printf "https://keycloak.%s/realms/%s" .Values.global.localClusterDomain .Values.app.oidc.realm }}
-{{- else }}
+{{- if .Values.app.oidc.authServerUrl }}
 {{- print .Values.app.oidc.authServerUrl }}
+{{- else if eq .Values.app.oidc.provider "entraid" }}
+{{- if not .Values.app.oidc.entraid.tenantId }}
+{{- fail "app.oidc.entraid.tenantId is required when using Entra ID provider" }}
+{{- end }}
+{{- printf "https://login.microsoftonline.com/%s/v2.0" .Values.app.oidc.entraid.tenantId }}
+{{- else }}
+{{- printf "https://keycloak.%s/realms/%s" .Values.global.localClusterDomain .Values.app.oidc.realm }}
 {{- end }}
 {{- end }}
 
 {{/*
-Generate the JWT Audience
+Generate the JWT Audience for SPIFFE authentication
 */}}
 {{- define "qtodo.jwt.audience" }}
-{{- if not .Values.app.vault.audience }}
-{{- printf "https://keycloak.%s/realms/%s" .Values.global.localClusterDomain .Values.app.oidc.realm }}
-{{- else }}
+{{- if .Values.app.vault.audience }}
 {{- print .Values.app.vault.audience }}
+{{- else if eq .Values.app.oidc.provider "entraid" }}
+{{- if .Values.app.oidc.entraid.audience }}
+{{- if hasPrefix "api://" .Values.app.oidc.entraid.audience }}
+{{- print .Values.app.oidc.entraid.audience }}
+{{- else }}
+{{- printf "api://%s" .Values.app.oidc.entraid.audience }}
+{{- end }}
+{{- else }}
+{{- fail "app.oidc.entraid.audience is required when using Entra ID provider" }}
+{{- end }}
+{{- else }}
+{{- printf "https://keycloak.%s/realms/%s" .Values.global.localClusterDomain .Values.app.oidc.realm }}
 {{- end }}
 {{- end }}
 

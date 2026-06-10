@@ -15,5 +15,8 @@ data:
 {{- if and .Values.app.oidc.clientAssertion.enabled (not .Values.app.oidc.clientSecret.enabled) }}
   QUARKUS_OIDC_CREDENTIALS_JWT_SOURCE: "bearer"
   QUARKUS_OIDC_CREDENTIALS_JWT_TOKEN_PATH: "{{ .Values.app.oidc.clientAssertion.jwtTokenPath }}"
+{{- if eq .Values.app.oidc.provider "entraid" }}
+  QUARKUS_OIDC_CREDENTIALS_JWT_AUDIENCE: "{{ include "qtodo.jwt.audience" . }}"
+{{- end }}
 {{- end }}
 {{- end }}

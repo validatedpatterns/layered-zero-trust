@@ -43,7 +43,7 @@ rhtpa:
         cli:
           clientId: "rhtpa-cli"  # Confidential client for RHTPA CLI/API
           secretName: "rhtpa-oidc-cli-secret"  # Kubernetes secret containing client secret
-          apiId: ""  # API client ID, used in Azure Entra ID integration
+          apiId: ""  # Azure Entra ID Application (client) ID - UUID only
           # RHTPA OIDC CLI secret path (infra)
           secretVaultPath: "secret/data/hub/infra/rhtpa/rhtpa-oidc-cli"
 

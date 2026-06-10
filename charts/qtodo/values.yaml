@@ -49,6 +49,8 @@ app:
 
   oidc:
     enabled: false  # Will be enabled when SPIFFE is enabled
+    # OIDC Provider: keycloak or entraid
+    provider: "keycloak"
     authServerUrl: ""
     realm: "ztvp"
     clientId: "qtodo-app"
@@ -63,6 +65,10 @@ app:
       enabled: false
       name: "oidc-client-secret"
       vaultPath: "secret/data/apps/qtodo/qtodo-oidc-client"
+    # Entra ID specific configuration
+    entraid:
+      tenantId: ""
+      audience: "api://AzureADTokenExchange"
 
   # Route configuration
   route:
@@ -83,7 +89,7 @@ app:
     url: ""
     role: "qtodo"
     # JWT Audience (auto-generated if not set)
-    # audience: "api://client-id"
+    # audience: "<URI for the audience>"
     # QTodo secrets path (app-level isolation)
     secretPath: "secret/data/apps/qtodo/qtodo-db"
 

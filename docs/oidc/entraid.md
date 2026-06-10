@@ -12,7 +12,128 @@ To configure the components we will need access to Azure Portal with permissions
 
 ### Qtodo
 
-#### Qtodo Azure setup
+The qtodo application supports two authentication methods with Azure Entra ID:
+
+1. **Client Assertion (Recommended)**: Uses SPIFFE JWT tokens for workload identity. No client secrets needed
+2. **Client Secret**: Traditional secret-based authentication
+
+We recommend the **Client Assertion** method, which aligns with zero-trust principles by eliminating static credentials.
+
+#### Qtodo Azure setup with Client Assertion
+
+> **⚠️ Important: SSL Certificate Requirement**
+>
+> For client assertion authentication to work with Azure Entra ID, Microsoft's platform must be able to reach the SPIRE OIDC discovery endpoints over HTTPS with a **valid SSL certificate**:
+>
+> * `https://spire-spiffe-oidc-discovery-provider.apps.<your-cluster-domain>/.well-known/openid-configuration`
+> * `https://spire-spiffe-oidc-discovery-provider.apps.<your-cluster-domain>/keys`
+>
+> The hostname in these URLs matches the `issuer` value in the SPIFFE JWT token. If Azure Entra ID cannot reach these endpoints or encounters an SSL certificate error (self-signed, expired, untrusted CA, etc.), the federated credential validation will fail and authentication will not work.
+>
+> **Requirements:**
+>
+> * The SPIRE OIDC Discovery Provider route must be publicly accessible from the internet
+> * The SSL certificate must be issued by a trusted Certificate Authority
+> * The certificate must be valid (not expired, correct hostname, complete certificate chain)
+>
+> Self-signed certificates or certificates from internal/private CAs will cause authentication failures.
+
+You can configure qtodo with Azure Entra ID using either the **Azure Portal** (GUI) or **Azure CLI** (automated).
+
+##### Option A: Automated Setup with Azure CLI
+
+For a quick, automated setup, use the provided script:
+
+```bash
+# Set your environment variables
+export CLUSTER_DOMAIN="ztvp.example.com"
+export QTODO_REDIRECT_URI="https://qtodo-qtodo.apps.ztvp.example.com/"
+
+# Run the setup script
+./scripts/entraid/setup-qtodo-entraid.sh
+```
+
+The script will:
+
+1. Create the app registration
+2. Set up federated credentials with SPIFFE (using generic audience)
+3. Add optional claims
+4. Disable user assignment requirement
+5. Output configuration data
+
+**Manual Azure CLI Commands:**
+
+If you prefer to run commands individually:
+
+```bash
+# Login to Azure
+az login
+
+# Get your tenant ID
+export TENANT_ID=$(az account show --query tenantId -o tsv | tr -d '\t\n\r')
+
+# Set configuration
+export APP_NAME="qtodo"
+export CLUSTER_DOMAIN="ztvp.example.com"
+export APPS_DOMAIN="apps.${CLUSTER_DOMAIN}"
+export QTODO_REDIRECT_URI="https://qtodo-qtodo.${APPS_DOMAIN}/"
+export SPIRE_ISSUER="https://spire-spiffe-oidc-discovery-provider.${APPS_DOMAIN}"
+export SPIFFE_SUBJECT="spiffe://${APPS_DOMAIN}/ns/qtodo/sa/qtodo"
+export AUDIENCE="api://AzureADTokenExchange"
+
+# Create app registration
+export CLIENT_ID=$(az ad app create \
+    --display-name="${APP_NAME}" \
+    --web-redirect-uris="${QTODO_REDIRECT_URI}" \
+    --enable-id-token-issuance \
+    --query appId \
+    -o tsv | tr -d '\t\n\r')
+
+echo "Client ID: ${CLIENT_ID}"
+
+# Get object ID
+export OBJECT_ID=$(az ad app show --id="${CLIENT_ID}" --query id -o tsv | tr -d '\t\n\r')
+
+# Create federated credential
+az ad app federated-credential create \
+    --id="${CLIENT_ID}" \
+    --parameters "{
+        \"name\": \"qtodo-spiffe-federation\",
+        \"issuer\": \"${SPIRE_ISSUER}\",
+        \"subject\": \"${SPIFFE_SUBJECT}\",
+        \"audiences\": [\"${AUDIENCE}\"],
+        \"description\": \"SPIFFE workload identity for qtodo application\"
+    }"
+
+# Add optional claims
+az rest --method PATCH \
+    --uri "https://graph.microsoft.com/v1.0/applications/${OBJECT_ID}" \
+    --headers 'Content-Type=application/json' \
+    --body '{
+        "optionalClaims": {
+            "idToken": [
+                {"name": "email", "source": null, "essential": false, "additionalProperties": []},
+                {"name": "preferred_username", "source": null, "essential": false, "additionalProperties": []}
+            ]
+        }
+    }'
+
+# Create service principal and disable assignment requirement
+export SP_ID=$(az ad sp create --id="${CLIENT_ID}" --query id -o tsv | tr -d '\t\n\r')
+az rest --method PATCH \
+    --uri "https://graph.microsoft.com/v1.0/servicePrincipals/${SP_ID}" \
+    --headers 'Content-Type=application/json' \
+    --body '{"appRoleAssignmentRequired": false}'
+
+echo "Setup complete!"
+echo "Tenant ID: ${TENANT_ID}"
+echo "Client ID: ${CLIENT_ID}"
+echo "Audience: ${AUDIENCE}"
+```
+
+##### Option B: Manual Setup via Azure Portal
+
+##### Step 1: Create the App Registration
 
 1. Go to [Azure Portal](https://portal.azure.com)
 2. Navigate to **Microsoft Entra ID**
@@ -21,32 +142,215 @@ To configure the components we will need access to Azure Portal with permissions
 5. Fill in the details:
    * **Name**: `qtodo`
    * **Supported account types**: Choose based on your needs
-     * **Single tenant**: Only users in your organization
+     * **Single tenant**: Only users in your organization (recommended for enterprise deployments)
      * **Multi-tenant**: Users from any organization
-   * **Redirect URI**: Add the URL of the qtodo application here (for example `https://qtodo-qtodo.apps.ztvp.example.com/`)
+   * **Redirect URI**: Add the URL of the qtodo application (for example `https://qtodo-qtodo.apps.ztvp.example.com/`)
 6. Click **Register**
 
-After the creation, you will see the _Overview_ page:
+After creation, note down these values from the **Overview** page:
 
 * **Application (client) ID**: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
 * **Directory (tenant) ID**: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
 
-**Save these values** - you will need them later.
+**Save these values** - you will need them for the ZTVP configuration.
 
-Let's create a new secret for our app:
+##### Step 2: Configure Federated Credentials
+
+Federated credentials allow Azure Entra ID to trust SPIFFE JWT tokens issued by your SPIRE server.
 
 1. Click **Certificates & secrets** in the left menu
-2. Click **New client secret**
-3. Add a description: `qtodo secret`
-4. Choose expiration: 6 months, 12 months, 24 months, or custom
+2. Click the **Federated credentials** tab
+3. Click **Add credential**
+4. Select **Other issuer** as the federated credential scenario
+5. Fill in the credential details:
+   * **Issuer**: Your SPIRE OIDC Discovery Provider URL
+     * Format: `https://spire-spiffe-oidc-discovery-provider.<your-cluster-domain>`
+     * Example: `https://spire-spiffe-oidc-discovery-provider.apps.ztvp.example.com`
+   * **Subject identifier**: SPIFFE ID of the qtodo workload
+     * Format: `spiffe://<trust-domain>/ns/<namespace>/sa/<service-account>`
+     * Example: `spiffe://apps.ztvp.example.com/ns/qtodo/sa/qtodo`
+   * **Name**: `qtodo-spiffe-federation` (or any descriptive name)
+   * **Description**: `SPIFFE workload identity for qtodo application`
+   * **Audience**: Use the generic audience value
+     * Value: `api://AzureADTokenExchange`
+6. Click **Add**
+
+**Important Notes**:
+
+* The **Issuer** must match exactly what your SPIRE server publishes in its OIDC discovery document
+* The **Subject** must match the SPIFFE ID assigned to the qtodo pod's service account
+* The **Audience** must match the value you'll configure in `app.oidc.entraid.audience` (`api://AzureADTokenExchange`)
+
+To verify your SPIRE OIDC issuer URL, run:
+
+```bash
+oc get cm -n zero-trust-workload-identity-manager spire-server -o jsonpath='{.data.server\.conf}' | jq -r '.server.jwt_issuer'
+```
+
+##### Step 3: Configure Authentication settings
+
+1. Click **Authentication** in the left menu
+2. Under **Platform configurations**, verify your redirect URI is listed
+3. Under **Implicit grant and hybrid flows**:
+   * Check **ID tokens** (used for user authentication)
+4. Click **Save**
+
+##### Step 4: Configure Token settings
+
+1. Click **Token configuration** in the left menu
+2. Click **Add optional claim**
+3. Select **ID** token type
+4. Add the following claims (check the boxes):
+   * `email`
+   * `preferred_username`
 5. Click **Add**
-6. **IMPORTANT**: Copy the **Value** immediately - it will not be shown again
+6. If prompted about Microsoft Graph permissions, check the box to grant them
 
-**Save this value securely** - We will need to add this secret to the Hashicorp Vault in the OpenShift cluster.
+##### Step 5: Disable User Assignment Requirement (Optional)
 
-#### Qtodo ZTVP setup
+By default, Azure Entra ID requires users to be explicitly assigned to an application before they can access it. To allow all users in your tenant to access qtodo without explicit assignment:
 
-In the `values-secret.yaml` file, we add a new entry with the secret we generated in the Azure portal. For example:
+1. Go to **Enterprise applications** in the left menu (not App registrations)
+2. Find and click on your **qtodo** application
+   * If you don't see it, make sure "Application type" filter is set to "All applications"
+3. Click **Properties** in the left menu
+4. Find the setting **Assignment required?**
+5. Toggle it to **No**
+6. Click **Save**
+
+This allows all users in your Azure AD tenant to authenticate to qtodo without requiring explicit role assignments.
+
+**Note:** If you need to restrict access to specific users or groups, keep this setting as **Yes** and use the **Users and groups** section to assign users.
+
+#### Qtodo ZTVP setup with Client Assertion
+
+Now configure your ZTVP deployment to use the Entra ID app registration with client assertion authentication.
+
+In the `values-hub.yaml` file, add the following configuration for the qtodo application:
+
+```yaml
+    qtodo:
+      overrides:
+        # Enable OIDC authentication
+        - name: app.oidc.enabled
+          value: true
+        # Set Entra ID as the OIDC provider
+        - name: app.oidc.provider
+          value: entraid
+        # Entra ID tenant ID (from Azure portal)
+        - name: app.oidc.entraid.tenantId
+          value: <YOUR_TENANT_ID>
+        # Application (client) ID from Azure portal
+        - name: app.oidc.clientId
+          value: <YOUR_CLIENT_ID>
+        # Audience for SPIFFE JWT token validation
+        - name: app.oidc.entraid.audience
+          value: api://AzureADTokenExchange
+        # Enable client assertion (SPIFFE JWT)
+        - name: app.oidc.clientAssertion.enabled
+          value: true
+        # Disable client secret
+        - name: app.oidc.clientSecret.enabled
+          value: false
+```
+
+#### How it works
+
+When using client assertion with Entra ID for a **web application**, there are TWO authentication flows:
+
+##### User Authentication (Web Browser)
+
+1. **User visits qtodo**: User opens `https://qtodo-qtodo.apps.example.com` in their web browser
+2. **Redirect to Entra ID**: qtodo redirects the browser to Entra IDs authorization endpoint
+3. **User authenticates**: User enters credentials (username/password, MFA, etc.) in Entra ID
+4. **Redirect back with code**: Entra ID redirects back to qtodo with an authorization code
+5. **Token exchange**: qtodo exchanges the code for tokens (see Backend Authentication below)
+6. **User logged in**: User can now access qtodo with an active session
+
+##### Backend Authentication (Client Assertion)
+
+When qtodo needs to exchange the authorization code for tokens:
+
+1. **SPIRE issues JWT token**: The SPIRE agent running on the qtodo pod issues a JWT token (SVID) with:
+   * `iss` (issuer): Your SPIRE OIDC Discovery Provider URL
+   * `sub` (subject): The qtodo workload's SPIFFE ID
+   * `aud` (audience): The generic audience value `api://AzureADTokenExchange`
+
+2. **Qtodo uses JWT for authentication**: Instead of a client secret, qtodo presents the SPIFFE JWT token to Entra ID when requesting access tokens:
+
+   ```text
+   POST /token
+   grant_type=authorization_code
+   code={AUTHORIZATION_CODE}
+   client_id={CLIENT_ID}
+   client_assertion={SPIFFE_JWT}
+   client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer
+   ```
+
+3. **Entra ID validates the token**: Azure verifies:
+   * The JWT is signed by the trusted SPIRE server (via OIDC discovery)
+   * The subject matches a registered federated credential
+   * The audience matches the configured value
+
+4. **Access granted**: If validation succeeds, Entra ID issues tokens (ID token, access token, refresh token)
+
+**Key Point**: Client assertion replaces the client secret in the token exchange step. Users still log in via browser redirect - nothing changes from their perspective.
+
+This eliminates the need to store and rotate client secrets, reducing the attack surface and following zero-trust principles.
+
+#### Qtodo Vault JWT Role Configuration
+
+To enable the qtodo application to authenticate to HashiCorp Vault using SPIFFE JWT tokens, you need to configure a Vault JWT auth role in `overrides/values-vault-jwt.yaml`:
+
+```yaml
+vault_jwt_roles:
+- name: qtodo
+  audience: api://AzureADTokenExchange
+  subject: spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/qtodo/sa/qtodo
+  policies:
+  - apps-qtodo-jwt-secret
+```
+
+**Key Parameters**:
+
+* **audience**: Must match the value configured in `app.oidc.entraid.audience` (e.g., `api://AzureADTokenExchange`)
+* **subject**: The SPIFFE ID of the qtodo workload (`spiffe://<trust-domain>/ns/<namespace>/sa/<service-account>`)
+* **policies**: Vault policies granting access to qtodo secrets (e.g., `apps-qtodo-jwt-secret` grants read access to `secret/data/apps/qtodo/*`)
+
+This role allows qtodo to exchange its SPIFFE JWT token for a Vault token with the specified policies, enabling secure access to database credentials and other secrets stored in Vault.
+
+#### Alternative: Using Client Secret (Not Recommended)
+
+If you need to use traditional client secret authentication instead of client assertion, follow these steps:
+
+1. In Azure Portal, go to your app registration
+2. Click **Certificates & secrets** → **Client secrets** tab
+3. Click **New client secret**
+4. Add description and expiration, then click **Add**
+5. **Copy the secret value immediately** - it won't be shown again
+
+Then update your ZTVP configuration:
+
+```yaml
+    qtodo:
+      overrides:
+        - name: app.oidc.enabled
+          value: true
+        - name: app.oidc.provider
+          value: entraid
+        - name: app.oidc.entraid.tenantId
+          value: <YOUR_TENANT_ID>
+        - name: app.oidc.clientId
+          value: <YOUR_CLIENT_ID>
+        - name: app.oidc.clientAssertion.enabled
+          value: false
+        - name: app.oidc.clientSecret.enabled
+          value: true
+        - name: app.oidc.clientSecret.vaultPath
+          value: secret/data/apps/qtodo/qtodo-oidc-entraid
+```
+
+And add to `values-secret.yaml`:
 
 ```yaml
   - name: qtodo-oidc-entraid
@@ -55,21 +359,6 @@ In the `values-secret.yaml` file, we add a new entry with the secret we generate
     fields:
     - name: client-secret
       path: ~/.azure/ztvp-qtodo-entraid-secret
-```
-
-In the `values-hub.yaml file`, we add the following configuration for the qtodo application:
-
-```yaml
-    qtodo:
-      overrides:
-        - name: app.oidc.authServerUrl
-          value: https://login.microsoftonline.com/<YOUR_TENANT_ID>/v2.0
-        - name: app.oidc.clientId
-          value: <YOUR_CLIENT_ID>
-        - name: app.oidc.clientSecret.enabled
-          value: true
-        - name: app.oidc.clientSecret.vaultPath
-          value: secret/data/apps/qtodo/qtodo-oidc-entraid
 ```
 
 ### RHTAS
@@ -132,7 +421,7 @@ This configuration uses the [Device code flow](https://learn.microsoft.com/en-us
 
     ```shell
     export SERVICE_PRINCIPAL_ID=$(
-        az ad sp create --id="$RHTAS_APP_REGISTRATION" -o tsv --query 'id' \
+        az ad sp create --id="$RHTAS_APP_REGISTRATION" --query 'id' -o tsv \
         | tr -d '\t\n\r')
     ```
 
@@ -170,7 +459,7 @@ In the `values-hub.yaml` file, we add the following configuration for the **trus
          - name: rhtas.zeroTrust.email.issuer
            value: https://login.microsoftonline.com/<YOUR_TENANT_ID>/v2.0
          - name: rhtas.fulcio.oidcIssuers.email.clientID
-           value: <YOUR_CLIENT_ID>
+           value: <RHTAS_CLIENT_ID>
     supply-chain:
        overrides:
          - name: rhtas.spire.enabled
@@ -180,7 +469,7 @@ In the `values-hub.yaml` file, we add the following configuration for the **trus
          - name: rhtas.oidc.url
            value: https://login.microsoftonline.com/<YOUR_TENANT_ID>/v2.0
          - name: rhtas.oidc.clientId
-           value: <YOUR_CLIENT_ID>
+           value: <RHTAS_CLIENT_ID>
          - name: rhtas.oidc.clientSecretName
            value: ""
          - name: rhtas.oidc.issuer
@@ -415,7 +704,7 @@ The next step is configure the authentication.
 
 1. Click **Authentication** in the left menu
     * **Redirect URI configuration Tab**
-      **  * **Single-page application** should be selected.
+        * **Single-page application** should be selected.
     * **Settings Tab**
         * **Implicit grant and hybrid flows:**
             * **DO NOT** check "Access tokens" or "ID tokens" - not needed for SPA with PKCE
@@ -463,7 +752,7 @@ In the `values-hub.yaml` file, we add the following configuration for the **trus
           - name: rhtpa.zeroTrust.oidc.clients.cli.clientId
             value: <RHTPA_API_CLIENT_ID>
           - name: rhtpa.zeroTrust.oidc.clients.cli.apiId
-            value: <RHTPA_API_API_ID>
+            value: <RHTPA_API_CLIENT_ID>  # UUID only - Helm template prepends api://
     supply-chain:
         overrides:
           - name: rhtpa.oidc.enabled
@@ -473,7 +762,7 @@ In the `values-hub.yaml` file, we add the following configuration for the **trus
           - name: rhtpa.oidc.clientId
             value: <RHTPA_API_CLIENT_ID>
           - name: rhtpa.oidc.apiId
-            value: <RHTPA_API_API_ID>
+            value: <RHTPA_API_CLIENT_ID>  # UUID only - script prepends api://
 ```
 
 In the `values-secret.yaml` file, make sure that the secret `rhtpa-oidc-cli` uses the file with the secret associated with the _App Registration_ `rhtpa-api` instead of generating it dynamically.
@@ -498,3 +787,81 @@ In the `values-secret.yaml` file, make sure that the secret `rhtpa-oidc-cli` use
     - name: client-secret
       path: ~/.azure/ztvp-entraid-secret
 ```
+
+#### RHTPA Vault JWT Role Configuration
+
+To enable the RHTPA application to authenticate to HashiCorp Vault using SPIFFE JWT tokens, configure a Vault JWT auth role in `overrides/values-vault-jwt.yaml`:
+
+```yaml
+vault_jwt_roles:
+- name: rhtpa
+  audience: rhtpa
+  subject: "spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/trusted-profile-analyzer/sa/rhtpa"
+  policies:
+  - hub-infra-rhtpa-jwt-secret
+```
+
+**Key Parameters**:
+
+* **audience**: Internal identifier for RHTPA's Vault authentication (`rhtpa`)
+* **subject**: The SPIFFE ID of the RHTPA workload
+* **policies**: Vault policies granting access to RHTPA secrets (e.g., `hub-infra-rhtpa-jwt-secret` grants read access to `secret/data/hub/infra/rhtpa/*`)
+
+This role allows RHTPA to exchange its SPIFFE JWT token for a Vault token with the specified policies, enabling secure access to the Entra ID client secret and database credentials stored in Vault.
+
+### Supply Chain
+
+#### Supply Chain Vault JWT Role Configuration
+
+To enable the supply chain pipelines to authenticate to HashiCorp Vault using SPIFFE JWT tokens, configure a Vault JWT auth role in `overrides/values-vault-jwt.yaml`:
+
+```yaml
+vault_jwt_roles:
+- name: supply-chain
+  audience: supply-chain
+  subject: "spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/{{ $.Values.global.pattern }}-hub/sa/pipeline"
+  policies:
+  - hub-supply-chain-jwt-secret
+```
+
+**Key Parameters**:
+
+* **audience**: Internal identifier for supply chain Vault authentication (`supply-chain`)
+* **subject**: The SPIFFE ID of the Tekton pipeline service account (e.g., `spiffe://apps.<domain>/ns/layered-zero-trust-hub/sa/pipeline`)
+* **policies**: Vault policies granting access to supply chain secrets
+
+**Vault Policy for Supply Chain**:
+
+The `hub-supply-chain-jwt-secret` policy grants access to:
+
+* **Quay registry credentials**: `secret/data/hub/infra/quay/*` (read)
+* **BYO registry credentials**: `secret/data/hub/infra/registry/*` (read, create, update)
+* **RHTPA OIDC credentials**: `secret/data/hub/infra/rhtpa/rhtpa-oidc-cli` (read)
+* **Git credentials**: `secret/data/hub/supply-chain/*` (read)
+
+Example policy definition in `overrides/values-vault-jwt.yaml`:
+
+```yaml
+vault_jwt_policies:
+- name: hub-supply-chain-jwt-secret
+  policy: |
+    path "secret/data/hub/infra/quay/*" {
+      capabilities = ["read"]
+    }
+    path "secret/data/hub/infra/registry/*" {
+      capabilities = ["read", "create", "update"]
+    }
+    path "secret/data/hub/infra/rhtpa/rhtpa-oidc-cli" {
+      capabilities = ["read"]
+    }
+    path "secret/data/hub/supply-chain/*" {
+      capabilities = ["read"]
+    }
+```
+
+This configuration enables the Tekton pipeline to:
+
+1. Authenticate to Vault using its SPIFFE JWT token
+2. Retrieve registry credentials for pushing container images
+3. Retrieve RHTPA OIDC credentials for SBOM upload
+4. Retrieve Git credentials for cloning protected repositories
