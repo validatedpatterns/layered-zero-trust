@@ -1,6 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
+MACHINE_TYPE=linux
+if [ "$(uname -s)" = "Darwin" ]; then
+    MACHINE_TYPE=mac
+    export TARGET_ORIGIN=origin
+fi
+
 function is_available {
   command -v "$1" >/dev/null 2>&1 || { echo >&2 "$1 is required but it's not installed. Aborting."; exit 1; }
 }
@@ -86,6 +92,14 @@ if [ -n "${EXTRA_ARGS:-}" ]; then
     EXTRA_ARGS_ARRAY=(${EXTRA_ARGS})
 fi
 
+if [ "${MACHINE_TYPE}" = "mac" ]; then
+    PKI_EXPAND=(${PKI_HOST_MOUNT_ARGS[@]+"${PKI_HOST_MOUNT_ARGS[@]}"})
+    EXTRA_EXPAND=(${EXTRA_ARGS_ARRAY[@]+"${EXTRA_ARGS_ARRAY[@]}"})
+else
+    PKI_EXPAND=("${PKI_HOST_MOUNT_ARGS[@]}")
+    EXTRA_EXPAND=("${EXTRA_ARGS_ARRAY[@]}")
+fi
+
 # Copy Kubeconfig from current environment. The utilities will pick up ~/.kube/config if set so it's not mandatory
 # $HOME is mounted as itself for any files that are referenced with absolute paths
 # $HOME is mounted to /root because the UID in the container is 0 and that's where SSH looks for credentials
@@ -114,12 +128,12 @@ podman run -it --rm --pull=newer \
     -e TOKEN_SECRET \
     -e UUID_FILE \
     -e VALUES_SECRET \
-    "${PKI_HOST_MOUNT_ARGS[@]}" \
+    "${PKI_EXPAND[@]}" \
     -v "$(pwd -P)":"$(pwd -P)" \
     -v "${HOME}":"${HOME}" \
     -v "${HOME}":/pattern-home \
     "${PODMAN_ARGS[@]}" \
-    "${EXTRA_ARGS_ARRAY[@]}" \
+    "${EXTRA_EXPAND[@]}" \
     -w "$(pwd -P)" \
     "$PATTERN_UTILITY_CONTAINER" \
     "$@"
