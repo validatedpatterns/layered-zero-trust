@@ -16,7 +16,7 @@ spire:
 # Define once here; both charts fall back to global.registry.* when their
 # local registry values are empty.  Per-app overrides still take precedence.
 #
-# The gen-byo-container-registry-variants.py script uncomments the matching
+# The gen-feature-variants.py script uncomments the matching
 # OPTION block for each variant.
 # ===========================================================================
 # OPTION 1: Built-in Quay Registry
