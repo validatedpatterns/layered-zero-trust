@@ -1,0 +1,29 @@
+{{- if and .Values.cleanup.enabled (eq (.Values.rhbk.defaultDenyNetworkPolicy.enabled | toString) "true") }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cleanup-keycloak-users-netpol
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  podSelector:
+    matchLabels:
+      app: cleanup-keycloak-users
+  policyTypes:
+  - Egress
+  egress:
+  - ports:
+    - protocol: UDP
+      port: 5353
+    - protocol: TCP
+      port: 5353
+    to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-dns
+  - ports:
+    - protocol: TCP
+      port: 6443
+{{- end }}

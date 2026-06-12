@@ -443,18 +443,18 @@ clusterGroup:
       name: rh-keycloak
       namespace: keycloak-system
       argoProject: hub
-      chart: rhbk
-      chartVersion: 0.0.*
+      path: charts/rh-keycloak
       extraValueFiles:
         - /overrides/values-keycloak-network-policy.yaml
       annotations:
         argocd.argoproj.io/sync-wave: "35"
-      # SPIFFE Identity Provider is enabled by default in the chart.
+      # SPIFFE Identity Provider is enabled by default in the rhbk subchart.
       # Override issuer/jwksUrl only if auto-generated values from cluster domain are not suitable.
+      # Note: overrides must use the rhbk. prefix to reach the subchart.
       # overrides:
-        # - name: keycloak.spiffeIdentityProvider.config.config.issuer
+        # - name: rhbk.keycloak.spiffeIdentityProvider.config.config.issuer
         #   value: "spiffe://apps.example.com"
-        # - name: keycloak.spiffeIdentityProvider.config.config.jwksUrl
+        # - name: rhbk.keycloak.spiffeIdentityProvider.config.config.jwksUrl
         #   value: "https://spire-spiffe-oidc-discovery-provider.apps.example.com/keys"
     rh-cert-manager:
       name: rh-cert-manager

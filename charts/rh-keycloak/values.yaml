@@ -1,0 +1,24 @@
+# PostSync Job deletes the keycloak-users Secret after realm import consumes it.
+cleanup:
+  enabled: true
+  image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+
+# Values passed through to the rhbk subchart.
+# The keycloakUsers ExternalSecret uses a short-lived ArgoCD hook lifecycle:
+# - Created during Sync, deleted by HookSucceeded
+# - Secret survives via creationPolicy: Orphan + deletionPolicy: Retain
+# - PostSync Job removes the Secret for security hygiene
+rhbk:
+  externalSecrets:
+    keycloakUsers:
+      creationPolicy: "Orphan"
+      deletionPolicy: "Retain"
+      refreshPolicy: "OnChange"
+      metadata:
+        annotations:
+          argocd.argoproj.io/hook: Sync
+          argocd.argoproj.io/hook-delete-policy: HookSucceeded
+          argocd.argoproj.io/sync-options: PrunePropagationPolicy=orphan
+      targetMetadata:
+        labels:
+          validatedpatterns.io/cleanup: delete

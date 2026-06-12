@@ -1,0 +1,69 @@
+{{- if .Values.cleanup.enabled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cleanup-keycloak-users
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cleanup-keycloak-users
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["list", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cleanup-keycloak-users
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cleanup-keycloak-users
+subjects:
+- kind: ServiceAccount
+  name: cleanup-keycloak-users
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cleanup-keycloak-users
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 120
+  template:
+    metadata:
+      labels:
+        app: cleanup-keycloak-users
+    spec:
+      serviceAccountName: cleanup-keycloak-users
+      restartPolicy: Never
+      containers:
+      - name: cleanup
+        image: {{ .Values.cleanup.image }}
+        command:
+        - /bin/bash
+        - -ce
+        - |
+          oc delete secret -l "validatedpatterns.io/cleanup=delete" -n "{{ .Release.Namespace }}" --ignore-not-found
+          echo "Cleanup complete."
+{{- end }}
