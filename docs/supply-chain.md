@@ -18,6 +18,11 @@ In this project, we used the [qtodo](https://github.com/validatedpatterns-demos/
 > * `applications.noobaa-mcg` — NooBaa MCG object storage (required by Quay and RHTPA)
 > * `subscriptions.odf` and `subscriptions.quay-operator` and their namespace entries
 >
+> Additionally, uncomment the following Vault JWT roles in `overrides/values-vault-jwt.yaml` so that RHTPA and the pipeline ServiceAccount can authenticate to Vault via SPIFFE:
+>
+> * `rhtpa` role — allows RHTPA to read its OIDC credentials from Vault
+> * `supply-chain` role — allows the Tekton pipeline ServiceAccount to read git credentials, registry credentials, and RHTPA OIDC secrets from Vault
+>
 > If you prefer to use an external image registry instead of Quay, skip the Quay and NooBaa sections and set the registry parameters in the `supply-chain` application overrides accordingly.
 
 ## Components
