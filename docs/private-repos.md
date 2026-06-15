@@ -246,9 +246,10 @@ Expected output: `Synced` (or `OutOfSync` if you have uncommitted changes).
   in a container without your Git host's fingerprint in known_hosts.
 
 * **HTTPS: "x509: certificate signed by unknown authority"** -- This
-  affects internal/self-hosted GitLab instances whose TLS certificates are
-  signed by a corporate CA.  GitHub and public GitLab (`gitlab.com`) use
-  publicly trusted CAs and do not require this step.
+  affects internal/self-hosted Git servers (e.g. Gitea, GitLab) whose TLS
+  certificates are signed by a custom or corporate CA.  GitHub and public
+  GitLab (`gitlab.com`) use publicly trusted CAs and do not require this
+  step.
 
   The corporate CA must be in the cluster trust store **before** install
   because the VP operator needs it to clone the repository.  Add the internal CA
@@ -262,6 +263,18 @@ oc patch proxy/cluster --type=merge \
 ```
 
   Wait a few minutes for operator pods to restart with the updated bundle.
+
+  If the custom CA is added **after** the pattern is already deployed, the
+  `trusted-ca-bundle` ConfigMap will be updated by the cluster CA injector,
+  but the ArgoCD repo-server will **not** pick it up automatically.  The
+  repo-server uses an init container (`fetch-ca`) that copies the CA bundle
+  into an `emptyDir` volume at pod startup; this only runs once.  Restart
+  the repo-server to load the updated bundle:
+
+```shell
+oc rollout restart deployment/vp-gitops-repo-server -n vp-gitops
+oc rollout status  deployment/vp-gitops-repo-server -n vp-gitops
+```
 
   > [!NOTE]
   > After the pattern deploys, the `ztvp-certificates` chart automatically
