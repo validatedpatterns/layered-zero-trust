@@ -48,18 +48,20 @@ Every sync-wave in the repository, in order. **App** = hub-level Argo CD Applica
 | 34 | └ rhtpa-operator | chart | oidc-cli-secret |
 | 34 | └ noobaa-mcg | chart | bucket-class |
 | 35 | rh-keycloak | **App** | |
+| 35 | └ qtodo | chart | udn-user-defined-network (UserDefinedNetwork CR for network isolation) |
 | 36 | noobaa-mcg | **App** | |
 | 36 | └ rhtpa-operator | chart | postgresql-serviceaccount, postgresql-external-secret, object-bucket-claim |
 | 36 | └ keycloak | chart | keycloak.yaml (Keycloak CR) |
 | 36 | └ quay-registry | chart | object-bucket-claim |
 | 36 | └ acs-central | chart | admin-password-secret, central-htpasswd-external-secret, keycloak-client-secret-external-secret |
-| 36 | └ qtodo | chart | truststore-secret-external-secret, registry-external-secret |
 | 36 | └ qtodo-db | chart | postgresql-external-secret |
+| 36 | └ qtodo | chart | udn-network-attachment-definition (NAD), truststore-secret-external-secret, registry-external-secret |
 | 38+0 | └ qtodo | chart | registry-seed SA, ClusterRole, ClusterRoleBinding |
 | 38+5 | └ qtodo | chart (hook) | registry-seed-image (Sync hook Job -- mirrors upstream image to configured registry) |
 | 37 | qtodo-db | **App** | PostgreSQL for qtodo (before qtodo app) |
 | 37 | └ quay-registry | chart | quay-s3-setup-serviceaccount (5 resources) |
 | 37 | └ acs-central | chart | create-htpasswd-field (Job) |
+| 37 | └ qtodo | chart | udn-admin-network-policy (AdminNetworkPolicy for UDN traffic control) |
 | 38 | qtodo | **App** | |
 | 38 | └ quay-registry | chart | quay-config-bundle-secret |
 | 39 | └ rhtpa-operator | chart | s3-credentials-secret |
@@ -284,9 +286,11 @@ Charts marked **(external)** have been externalized to standalone repositories m
 | --- | ---: | ---: |
 | registry-seed-job.yaml (SA, ClusterRole, ClusterRoleBinding) | --- | 0 |
 | registry-seed-job.yaml (Sync hook Job) | --- | 5 |
+| udn-user-defined-network.yaml | --- | 35 |
+| udn-network-attachment-definition.yaml | --- | 36 |
 | truststore-secret-external-secret.yaml | 5 | 36 |
 | registry-external-secret.yaml | --- | 36 |
-| postgresql-external-secret.yaml (SPIFFE-off only) | 5 | 36 |
+| udn-admin-network-policy.yaml (AdminNetworkPolicy) | --- | 37 |
 | qtodo-truststore-config.yaml | 10 | 41 |
 | app-deployment.yaml | 20 | 51 |
 | app-service.yaml | 20 | 51 |

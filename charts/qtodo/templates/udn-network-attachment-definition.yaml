@@ -1,0 +1,23 @@
+{{- if .Values.app.udn.enabled }}
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: '36'
+    description: "Network attachment for qtodo UDN isolation"
+  name: {{ .Values.app.udn.nadName }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  config: |
+    {
+      "cniVersion": "0.4.0",
+      "type": "ovn-k8s-cni-overlay",
+      "name": "{{ .Values.app.udn.name }}",
+      "topology": "{{ lower .Values.app.udn.topology }}",
+      "netAttachDefName": "{{ .Release.Namespace }}/{{ .Values.app.udn.nadName }}",
+      {{- if eq .Values.app.udn.topology "Layer2" }}
+      "subnets": "{{ .Values.app.udn.subnet }}",
+      {{- end }}
+      "mtu": {{ .Values.app.udn.mtu }}
+    }
+{{- end }}
