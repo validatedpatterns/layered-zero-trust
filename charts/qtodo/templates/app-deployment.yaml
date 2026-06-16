@@ -22,6 +22,9 @@ spec:
         checksum/app-spiffe-helper-config: {{ include (print $.Template.BasePath "/spiffe-helper-config.yaml") . | sha256sum }}
         checksum/app-spiffe-vault-client-config: {{ include (print $.Template.BasePath "/spiffe-vault-client-config.yaml") . | sha256sum }}
 {{- end }}
+{{- if .Values.app.udn.enabled }}
+        k8s.v1.cni.cncf.io/networks: {{ .Release.Namespace }}/{{ .Values.app.udn.nadName }}
+{{- end }}
       labels:
         app: qtodo
         deployment: qtodo

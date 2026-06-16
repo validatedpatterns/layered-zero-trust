@@ -114,6 +114,59 @@ app:
     # QTodo truststore password path (app-level isolation)
     vaultPath: "secret/data/apps/qtodo/qtodo-truststore"
 
+  # User-Defined Network (UDN) configuration for network isolation
+  # Provides layer 2/3 network segmentation following Zero Trust principles
+  udn:
+    enabled: false
+    # Network name
+    name: qtodo-isolated-network
+    # NetworkAttachmentDefinition name
+    nadName: qtodo-udn-nad
+    # Topology: Layer2 or Layer3
+    # Layer2: Same subnet, pods can communicate directly
+    # Layer3: Different subnets per node, requires routing
+    topology: Layer2
+    # CIDR for the UDN subnet (Layer2 only)
+    subnet: "10.100.0.0/16"
+    # Join subnet (for Layer3, optional)
+    # joinSubnet: "100.64.0.0/16"
+    # MTU for the network (default: 1400 to avoid fragmentation)
+    mtu: 1400
+    # IPAM configuration
+    ipam:
+      type: static
+    # Network Policy for UDN
+    # UDN requires policies on both primary (cluster network) and secondary (UDN) interfaces
+    networkPolicy:
+      # Enable network policies on the UDN
+      enabled: true
+      # Allowed egress destinations from qtodo pods on the UDN
+      egress:
+        # DNS resolution
+        dns:
+          enabled: true
+          port: 5353
+          namespace: openshift-dns
+        # PostgreSQL database
+        postgresql:
+          enabled: true
+          port: 5432
+        # Vault for secrets (via primary network, not UDN)
+        vault:
+          enabled: true
+          port: 8200
+          namespace: vault
+        # Allow HTTPS connections to any destination, used for OIDCs (via primary network for external route)
+        https:
+          enabled: true
+          port: 443
+      # Allowed ingress sources to qtodo pods on the UDN
+      ingress:
+        # OpenShift router (via primary network, not UDN)
+        router:
+          enabled: true
+          port: 8080
+
 # PostgreSQL database configuration
 postgresql:
   name: qtodo-db

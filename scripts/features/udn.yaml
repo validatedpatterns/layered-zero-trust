@@ -1,0 +1,9 @@
+# User-Defined Network isolation for qtodo application
+# Provides layer 2/3 network segmentation following Zero Trust principles
+clusterGroup:
+  # Merge UDN configuration into existing qtodo application
+  merge_into_applications:
+    qtodo:
+      overrides:
+        - name: app.udn.enabled
+          value: "true"
