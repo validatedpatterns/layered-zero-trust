@@ -171,12 +171,14 @@ spec:
       workspaces:
         - name: output
           workspace: qtodo-source
+{{- if .Values.git.credentials.enabled }}
 {{- if eq (default "https" .Values.git.credentials.authType) "ssh" }}
         - name: ssh-directory
           workspace: git-auth
 {{- else }}
         - name: basic-auth
           workspace: git-auth
+{{- end }}
 {{- end }}
 {{- if and .Values.git.sslCABundle.enabled (ne (default "https" .Values.git.credentials.authType) "ssh") }}
         - name: ssl-ca-directory

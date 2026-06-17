@@ -1,24 +1,572 @@
-# PostSync Job deletes the keycloak-users Secret after realm import consumes it.
+# PostSync Job deletes secrets labeled for cleanup after realm import consumes them.
 cleanup:
   enabled: true
   image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
 
 # Values passed through to the rhbk subchart.
-# The keycloakUsers ExternalSecret uses a short-lived ArgoCD hook lifecycle:
-# - Created during Sync, deleted by HookSucceeded
-# - Secret survives via creationPolicy: Orphan + deletionPolicy: Retain
-# - PostSync Job removes the Secret for security hygiene
 rhbk:
+  defaultDenyNetworkPolicy:
+    enabled: false
+
+  # ArgoCD hook lifecycle for the keycloak-users ExternalSecret:
+  # - Created during Sync, deleted by HookSucceeded
+  # - Secret survives via creationPolicy: Orphan + deletionPolicy: Retain
+  # - PostSync Job removes the Secret for security hygiene
   externalSecrets:
-    keycloakUsers:
-      creationPolicy: "Orphan"
-      deletionPolicy: "Retain"
-      refreshPolicy: "OnChange"
-      metadata:
-        annotations:
-          argocd.argoproj.io/hook: Sync
-          argocd.argoproj.io/hook-delete-policy: HookSucceeded
-          argocd.argoproj.io/sync-options: PrunePropagationPolicy=orphan
-      targetMetadata:
-        labels:
-          validatedpatterns.io/cleanup: delete
+    adminUser:
+      metadata: {}
+      targetMetadata: {}
+    postgresqlDb:
+      metadata: {}
+      targetMetadata: {}
+
+  keycloak:
+    # Keycloak admin password (infra)
+    adminUser:
+      enabled: true
+      username: admin
+      passwordVaultKey: secret/data/hub/infra/keycloak/keycloak
+      secretName: keycloak-admin-user
+
+    # Keycloak DB password (infra)
+    postgresqlDb:
+      database: keycloak
+      passwordVaultKey: secret/data/hub/infra/keycloak/keycloak
+      secretName: postgresql-db
+      username: keycloak
+
+    # SPIFFE Identity Provider — enabled for ZTVP federated client auth
+    spiffeIdentityProvider:
+      enabled: true
+      config:
+        alias: spiffe
+        displayName: SPIFFE Workload Identity
+        providerId: oidc
+        enabled: true
+        hideOnLogin: true
+        config:
+          issuer: ""
+          authorizationUrl: ""
+          tokenUrl: ""
+          jwksUrl: ""
+          clientId: keycloak
+          clientSecret: unused
+          useJwksUrl: "true"
+          validateSignature: "true"
+          supportsClientAssertions: "true"
+          supportsClientAssertionReuse: "true"
+          syncMode: LEGACY
+
+    # ZTVP Realm Definition
+    realms:
+      - realm: ztvp
+        displayName: ZTVP Realm
+        enabled: true
+        registrationAllowed: false
+        clients:
+          - clientId: qtodo-app
+            enabled: true
+            name: qtodo
+            protocol: openid-connect
+            publicClient: false
+            clientAuthenticatorType: federated-jwt
+            serviceAccountsEnabled: true
+            redirectUris:
+              - "*"
+            standardFlowEnabled: true
+            directAccessGrantsEnabled: false
+            webOrigins:
+              - +
+            fullScopeAllowed: true
+            attributes:
+              jwt.credential.issuer: spiffe
+              jwt.credential.sub: ""
+              post.logout.redirect.uris: "+"
+            defaultClientScopes:
+              - web-origins
+              - roles
+              - profile
+              - basic
+              - email
+            optionalClientScopes:
+              - offline_access
+          - clientId: trusted-artifact-signer
+            enabled: true
+            name: Red Hat Trusted Artifact Signer Client
+            protocol: openid-connect
+            publicClient: true
+            redirectUris:
+              - "*"
+              - "urn:ietf:wg:oauth:2.0:oob"
+              - "http://localhost:*/auth/callback"
+            directAccessGrantsEnabled: true
+            standardFlowEnabled: true
+            implicitFlowEnabled: false
+            webOrigins:
+              - +
+            attributes:
+              oauth2.device.authorization.grant.enabled: "true"
+            protocolMappers:
+              - name: audience-mapper
+                protocol: openid-connect
+                protocolMapper: oidc-audience-mapper
+                config:
+                  included.client.audience: trusted-artifact-signer
+                  access.token.claim: "true"
+                  id.token.claim: "false"
+              - name: email-mapper
+                protocol: openid-connect
+                protocolMapper: oidc-hardcoded-claim-mapper
+                consentRequired: false
+                config:
+                  claim.name: email_verified
+                  claim.value: "true"
+                  jsonType.label: boolean
+                  access.token.claim: "true"
+                  id.token.claim: "true"
+                  userinfo.token.claim: "false"
+          # ACS Central OIDC Client
+          - clientId: acs-central
+            enabled: true
+            name: Red Hat Advanced Cluster Security Central
+            protocol: openid-connect
+            publicClient: false
+            secret: ${ACS_CLIENT_SECRET}
+            redirectUris:
+              - "*"
+            directAccessGrantsEnabled: true
+            standardFlowEnabled: true
+            implicitFlowEnabled: false
+            webOrigins:
+              - "*"
+            fullScopeAllowed: true
+            defaultClientScopes:
+              - openid
+              - basic
+              - email
+              - profile
+              - roles
+              - web-origins
+            optionalClientScopes:
+              - address
+              - phone
+              - offline_access
+            protocolMappers:
+              - name: groups
+                protocol: openid-connect
+                protocolMapper: oidc-group-membership-mapper
+                consentRequired: false
+                config:
+                  full.path: "false"
+                  id.token.claim: "true"
+                  access.token.claim: "true"
+                  claim.name: groups
+                  userinfo.token.claim: "true"
+              - name: roles
+                protocol: openid-connect
+                protocolMapper: oidc-usermodel-realm-role-mapper
+                consentRequired: false
+                config:
+                  multivalued: "true"
+                  userinfo.token.claim: "true"
+                  id.token.claim: "true"
+                  access.token.claim: "true"
+                  claim.name: roles
+                  jsonType.label: String
+          # RHTPA CLI Client
+          - clientId: rhtpa-cli
+            enabled: true
+            name: RHTPA CLI Client
+            protocol: openid-connect
+            publicClient: false
+            secret: ${RHTPA_CLI_SECRET}
+            directAccessGrantsEnabled: false
+            standardFlowEnabled: false
+            implicitFlowEnabled: false
+            serviceAccountsEnabled: true
+            fullScopeAllowed: true
+            defaultClientScopes:
+              - basic
+              - email
+              - profile
+              - roles
+              - web-origins
+              - create:document
+              - read:document
+              - update:document
+              - delete:document
+            optionalClientScopes:
+              - address
+              - microprofile-jwt
+              - offline_access
+              - phone
+            attributes:
+              access.token.lifespan: "300"
+              post.logout.redirect.uris: "+"
+          # RHTPA Frontend Client
+          - clientId: rhtpa-frontend
+            enabled: true
+            name: RHTPA Frontend Client
+            protocol: openid-connect
+            publicClient: true
+            redirectUris:
+              - "*"
+            directAccessGrantsEnabled: false
+            standardFlowEnabled: true
+            implicitFlowEnabled: true
+            serviceAccountsEnabled: false
+            webOrigins:
+              - "*"
+            fullScopeAllowed: true
+            defaultClientScopes:
+              - basic
+              - email
+              - profile
+              - roles
+              - web-origins
+              - create:document
+              - read:document
+              - update:document
+              - delete:document
+            optionalClientScopes:
+              - address
+              - microprofile-jwt
+              - offline_access
+              - phone
+            attributes:
+              access.token.lifespan: "300"
+              post.logout.redirect.uris: "+"
+        # Client scopes
+        clientScopes:
+          - name: openid
+            description: OpenID Connect built-in scope
+            protocol: openid-connect
+            attributes:
+              include.in.token.scope: "true"
+              display.on.consent.screen: "false"
+            protocolMappers:
+              - name: sub
+                protocol: openid-connect
+                protocolMapper: oidc-sub-mapper
+                consentRequired: false
+                config:
+                  introspection.token.claim: "true"
+                  access.token.claim: "true"
+                  id.token.claim: "true"
+          - name: basic
+            description: OpenID Connect basic scope
+            protocol: openid-connect
+            attributes:
+              include.in.token.scope: "false"
+              display.on.consent.screen: "false"
+            protocolMappers:
+              - name: sub
+                protocol: openid-connect
+                protocolMapper: oidc-sub-mapper
+                consentRequired: false
+                config:
+                  introspection.token.claim: "true"
+                  access.token.claim: "true"
+          - name: email
+            description: OpenID Connect email scope
+            protocol: openid-connect
+            attributes:
+              include.in.token.scope: "true"
+              display.on.consent.screen: "true"
+              consent.screen.text: "${emailScopeConsentText}"
+            protocolMappers:
+              - name: email
+                protocol: openid-connect
+                protocolMapper: oidc-usermodel-attribute-mapper
+                consentRequired: false
+                config:
+                  userinfo.token.claim: "true"
+                  user.attribute: email
+                  id.token.claim: "true"
+                  access.token.claim: "true"
+                  claim.name: email
+                  jsonType.label: String
+              - name: email verified
+                protocol: openid-connect
+                protocolMapper: oidc-usermodel-attribute-mapper
+                consentRequired: false
+                config:
+                  userinfo.token.claim: "true"
+                  user.attribute: emailVerified
+                  id.token.claim: "true"
+                  access.token.claim: "true"
+                  claim.name: email_verified
+                  jsonType.label: boolean
+          - name: profile
+            description: OpenID Connect profile scope
+            protocol: openid-connect
+            attributes:
+              include.in.token.scope: "true"
+              display.on.consent.screen: "true"
+              consent.screen.text: "${profileScopeConsentText}"
+            protocolMappers:
+              - name: username
+                protocol: openid-connect
+                protocolMapper: oidc-usermodel-attribute-mapper
+                consentRequired: false
+                config:
+                  userinfo.token.claim: "true"
+                  user.attribute: username
+                  id.token.claim: "true"
+                  access.token.claim: "true"
+                  claim.name: preferred_username
+                  jsonType.label: String
+              - name: full name
+                protocol: openid-connect
+                protocolMapper: oidc-full-name-mapper
+                consentRequired: false
+                config:
+                  id.token.claim: "true"
+                  access.token.claim: "true"
+                  userinfo.token.claim: "true"
+          - name: roles
+            description: OpenID Connect roles scope
+            protocol: openid-connect
+            attributes:
+              include.in.token.scope: "false"
+              display.on.consent.screen: "true"
+              consent.screen.text: "${rolesScopeConsentText}"
+            protocolMappers:
+              - name: realm roles
+                protocol: openid-connect
+                protocolMapper: oidc-usermodel-realm-role-mapper
+                consentRequired: false
+                config:
+                  multivalued: "true"
+                  user.attribute: foo
+                  access.token.claim: "true"
+                  claim.name: realm_access.roles
+                  jsonType.label: String
+              - name: audience resolve
+                protocol: openid-connect
+                protocolMapper: oidc-audience-resolve-mapper
+                consentRequired: false
+          - name: web-origins
+            description: OpenID Connect web origins scope
+            protocol: openid-connect
+            attributes:
+              include.in.token.scope: "false"
+              display.on.consent.screen: "false"
+            protocolMappers:
+              - name: allowed web origins
+                protocol: openid-connect
+                protocolMapper: oidc-allowed-origins-mapper
+                consentRequired: false
+                config:
+                  access.token.claim: "true"
+          # RHTPA document permission scopes
+          - name: create:document
+            description: Permission to create documents
+            protocol: openid-connect
+            attributes:
+              include.in.token.scope: "true"
+              display.on.consent.screen: "false"
+          - name: read:document
+            description: Permission to read documents
+            protocol: openid-connect
+            attributes:
+              include.in.token.scope: "true"
+              display.on.consent.screen: "false"
+          - name: update:document
+            description: Permission to update documents
+            protocol: openid-connect
+            attributes:
+              include.in.token.scope: "true"
+              display.on.consent.screen: "false"
+          - name: delete:document
+            description: Permission to delete documents
+            protocol: openid-connect
+            attributes:
+              include.in.token.scope: "true"
+              display.on.consent.screen: "false"
+        defaultDefaultClientScopes:
+          - openid
+          - basic
+          - email
+          - profile
+          - roles
+          - web-origins
+        roles:
+          realm:
+            - description: QTodo App Administrator
+              name: qtodo-admin
+            - description: Read-only access
+              name: viewer
+            - description: RHTPA SBOM Creator
+              name: create:sbom
+            - description: RHTPA Document Creator
+              name: create:document
+            - description: ACS Administrator
+              name: acs-admin
+        users:
+          - createdTimestamp: 1
+            credentials:
+              - temporary: true
+                type: password
+                value: ${QTODO_ADMIN_PASSWORD}
+            email: qtodo-admin@example.com
+            emailVerified: true
+            enabled: true
+            firstName: QTodo
+            lastName: Admin
+            realmRoles:
+              - qtodo-admin
+            requiredActions:
+              - UPDATE_PASSWORD
+            username: qtodo-admin
+          - createdTimestamp: 1
+            credentials:
+              - temporary: true
+                type: password
+                value: ${QTODO_USER1_PASSWORD}
+            email: qtodo-user1@example.com
+            emailVerified: true
+            enabled: true
+            firstName: QTodo
+            lastName: User-1
+            realmRoles:
+              - viewer
+            requiredActions:
+              - UPDATE_PASSWORD
+            username: qtodo-user1
+          - createdTimestamp: 1
+            credentials:
+              - temporary: false
+                type: password
+                value: ${RHTAS_USER_PASSWORD}
+            email: rhtas-user@example.com
+            emailVerified: true
+            enabled: true
+            firstName: RHTAS
+            lastName: Signer
+            realmRoles:
+              - viewer
+            username: rhtas-user
+          - createdTimestamp: 1
+            credentials:
+              - temporary: false
+                type: password
+                value: ${RHTPA_USER_PASSWORD}
+            email: rhtpa-user@example.com
+            emailVerified: true
+            enabled: true
+            firstName: RHTPA
+            lastName: User
+            realmRoles:
+              - viewer
+              - create:sbom
+              - create:document
+            username: rhtpa-user
+          - createdTimestamp: 1
+            credentials:
+              - temporary: false
+                type: password
+                value: ${ACS_ADMIN_PASSWORD}
+            email: acs-admin@example.com
+            emailVerified: true
+            enabled: true
+            firstName: ACS
+            lastName: Administrator
+            realmRoles:
+              - acs-admin
+              - offline_access
+            username: acs-admin
+
+    # Realm import placeholders — maps ${VAR} in realm definition to K8s secrets
+    realmPlaceholders:
+      QTODO_ADMIN_PASSWORD:
+        secret:
+          name: keycloak-users
+          key: qtodo-admin-password
+      QTODO_USER1_PASSWORD:
+        secret:
+          name: keycloak-users
+          key: qtodo-user1-password
+      RHTAS_USER_PASSWORD:
+        secret:
+          name: keycloak-users
+          key: rhtas-user-password
+      RHTPA_USER_PASSWORD:
+        secret:
+          name: keycloak-users
+          key: rhtpa-user-password
+      ACS_ADMIN_PASSWORD:
+        secret:
+          name: keycloak-users
+          key: acs-admin-password
+      RHTPA_CLI_SECRET:
+        secret:
+          name: rhtpa-oidc-cli-secret
+          key: client-secret
+      ACS_CLIENT_SECRET:
+        secret:
+          name: acs-oidc-client-secret
+          key: client-secret
+
+    # Extra ExternalSecrets — replaces the former hardcoded ZTVP templates
+    extraSecrets:
+      # User passwords for realm import
+      - name: keycloak-users
+        creationPolicy: "Orphan"
+        deletionPolicy: "Retain"
+        refreshPolicy: "OnChange"
+        metadata:
+          annotations:
+            argocd.argoproj.io/hook: Sync
+            argocd.argoproj.io/hook-delete-policy: HookSucceeded
+            argocd.argoproj.io/sync-options: PrunePropagationPolicy=orphan
+        targetMetadata:
+          labels:
+            validatedpatterns.io/cleanup: delete
+        data:
+          - secretKey: qtodo_admin_password
+            remoteRef:
+              key: secret/data/hub/infra/users/keycloak-users
+              property: qtodo-admin-password
+          - secretKey: qtodo_user1_password
+            remoteRef:
+              key: secret/data/hub/infra/users/keycloak-users
+              property: qtodo-user1-password
+          - secretKey: rhtas_user_password
+            remoteRef:
+              key: secret/data/hub/infra/users/keycloak-users
+              property: rhtas-user-password
+          - secretKey: rhtpa_user_password
+            remoteRef:
+              key: secret/data/hub/infra/users/keycloak-users
+              property: rhtpa-user-password
+          - secretKey: acs_admin_password
+            remoteRef:
+              key: secret/data/hub/infra/acs/acs-central
+              property: admin-password
+        templateData:
+          qtodo-admin-password: "{{ .qtodo_admin_password }}"
+          qtodo-user1-password: "{{ .qtodo_user1_password }}"
+          rhtas-user-password: "{{ .rhtas_user_password }}"
+          rhtpa-user-password: "{{ .rhtpa_user_password }}"
+          acs-admin-password: "{{ .acs_admin_password }}"
+
+      # ACS Central OIDC client secret
+      - name: acs-oidc-client-secret
+        data:
+          - secretKey: client_secret
+            remoteRef:
+              key: secret/data/hub/infra/acs/acs-central
+              property: admin-password
+        templateData:
+          client-secret: "{{ .client_secret }}"
+
+      # RHTPA CLI OIDC client secret
+      - name: rhtpa-oidc-cli-secret
+        data:
+          - secretKey: client_secret
+            remoteRef:
+              key: secret/data/hub/infra/rhtpa/rhtpa-oidc-cli
+              property: client-secret
+        templateData:
+          client-secret: "{{ .client_secret | trim }}"
