@@ -115,7 +115,7 @@ clusterGroup:
     acm:
       name: advanced-cluster-management
       namespace: open-cluster-management
-      channel: release-2.15
+      channel: release-2.16
       catalogSource: redhat-operators
     eso:
       name: openshift-external-secrets-operator
