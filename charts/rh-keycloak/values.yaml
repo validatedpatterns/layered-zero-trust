@@ -5,6 +5,9 @@ cleanup:
 
 # Values passed through to the rhbk subchart.
 rhbk:
+  global:
+    refreshInterval: 1h0m0s
+
   defaultDenyNetworkPolicy:
     enabled: false
 
