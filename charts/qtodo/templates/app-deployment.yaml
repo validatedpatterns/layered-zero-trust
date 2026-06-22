@@ -198,8 +198,8 @@ spec:
         image: {{ template "qtodo.image" (dict "value" .Values.app.images.main "context" $ "useRegistry" true) }}
         imagePullPolicy: {{ .Values.app.images.main.pullPolicy }}
         ports:
-        - containerPort: 8080
-          name: http
+        - containerPort: {{ template "qtodo.app.port" . }}
+          name: {{ if (include "qtodo.isSecureTermination" .) }}https{{ else }}http{{ end }}
           protocol: TCP
         envFrom:
           - configMapRef:
@@ -219,7 +219,17 @@ spec:
         - name: QUARKUS_HTTP_HOST
           value: '0.0.0.0'
         - name: QUARKUS_HTTP_PORT
-          value: '8080'
+          value: {{ .Values.app.insecurePort | quote }}
+{{- if include "qtodo.isSecureTermination" . }}
+        - name: QUARKUS_HTTP_SSL_PORT
+          value: {{ .Values.app.securePort | quote }}
+        - name: QUARKUS_TLS_KEY_STORE_PEM_QTODO_CERT
+          value: /certs/tls.crt
+        - name: QUARKUS_TLS_KEY_STORE_PEM_QTODO_KEY
+          value: /certs/tls.key
+        - name: QUARKUS_HTTP_INSECURE_REQUESTS
+          value: 'disabled'
+{{- end }}
         - name: QUARKUS_HIBERNATE_ORM_SCHEMA_MANAGEMENT_STRATEGY
           value: 'drop-and-create'
 {{- if not .Values.app.spire.enabled }}
@@ -274,6 +284,11 @@ spec:
             mountPath: /etc/pki/ca-trust/extracted/pem
             readOnly: true
 {{- end }}
+{{- if include "qtodo.isSecureTermination" . }}
+          - name: tls-certs
+            mountPath: /certs
+            readOnly: true  
+{{- end }}
         resources: {}
       serviceAccountName: qtodo
 {{- if .Values.app.spire.enabled }}
@@ -303,5 +318,10 @@ spec:
         - name: qtodo-truststore-java
           configMap:
             name: qtodo-truststore-java
+{{- end }}
+{{- if include "qtodo.isSecureTermination" . }}
+        - name: tls-certs
+          secret:
+            secretName: {{ .Values.app.tls.secret }}
 {{- end }}
 {{- end }}

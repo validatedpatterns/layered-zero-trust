@@ -38,3 +38,23 @@ Generate the JWT Audience
 {{- print .Values.app.vault.audience }}
 {{- end }}
 {{- end }}
+
+{{/*
+Returns true if the termination is secure (https) and false otherwise
+*/}}
+{{- define "qtodo.isSecureTermination" }}
+{{- if or (eq .Values.app.route.termination "reencrypt") (eq .Values.app.route.termination "passthrough") }}
+true
+{{- end }}
+{{- end }}
+
+{{/*
+Returns the port the application should list on
+*/}}
+{{- define "qtodo.app.port" -}}
+{{- if include "qtodo.isSecureTermination" . -}}
+{{ .Values.app.securePort }}
+{{- else -}}
+{{ .Values.app.insecurePort }}
+{{- end -}}
+{{- end -}}

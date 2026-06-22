@@ -17,7 +17,7 @@ spec:
   # to generate the correct ACLs for host-network ingress traffic.
   - ports:
     - protocol: TCP
-      port: 8080
+      port: {{ include "qtodo.app.port" . }}
     from:
     - namespaceSelector:
         matchLabels:

@@ -3,16 +3,19 @@ kind: Service
 metadata:
   annotations:
     argocd.argoproj.io/sync-wave: '51'
+    {{- if eq .Values.app.tls.serviceServing true }}
+    service.beta.openshift.io/serving-cert-secret-name: {{ .Values.app.tls.secret | quote }}
+    {{- end }}
   labels:
     app: qtodo
   name: qtodo
   namespace: qtodo
 spec:
   ports:
-  - name: 8080-tcp
-    port: 8080
+  - name: {{ printf "%s-tcp" (include "qtodo.app.port" .) }}
+    port: {{ template "qtodo.app.port" . }}
     protocol: TCP
-    targetPort: 8080
+    targetPort: {{ template "qtodo.app.port" . }}
   selector:
     app: qtodo
   sessionAffinity: None
