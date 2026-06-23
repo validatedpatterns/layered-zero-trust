@@ -10,20 +10,22 @@ While you may bring your own (BYO) OpenShift cluster, Red Hat associates and par
 
 The following Catalog Item (CI) has been verified and is recommended when provisioning OpenShift clusters as it meets the prerequisites set form within the pattern:
 
-* [Red Hat OpenShift Container Platform Cluster (AWS)](https://catalog.demo.redhat.com/catalog?item=babylon-catalog-prod/sandboxes-gpte.ocp-wksp.prod&utm_source=webapp&utm_medium=share-link)
+* [Red Hat OpenShift Container Platform Cluster (Multi-Cloud)](https://catalog.demo.redhat.com/catalog/all?search=multi+cloud&item=babylon-catalog-prod%2Fpublished.ocp4-cluster.prod)
 
 The following options should be selected:
 
 * Activity: Practice / Enablement
 * Purpose: Trying out a technical solution
 * Salesforce ID: Can be omitted (See note below)
+* Cloud Provider: AWS
 * OpenShift Version: 4.20+
-* Features
-  * Enable Cert Manager
-  * Enable Cert Manager API
-* Control Plane Count: 3
+* Cluster Size: multinode
+* OpenShift Worker count: 5
+* OpenShift Worker instance type: m5a.4xlarge
 
-NOTE: The Salesforce ID requirement is not needed by those that that are members of the RHDP development team.
+NOTE: The Salesforce ID requirement is not needed by those that are members of the RHDP development team.
+
+NOTE: Update the OpenShift Worker Count and instance type based on the desired capacity required.
 
 Once a cluster has been provisioned, there are additional steps which need to be performed in order to avoid overlapping capabilities that are implemented within this pattern:
 
