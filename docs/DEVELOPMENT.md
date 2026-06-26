@@ -18,7 +18,7 @@ The following options should be selected:
 * Purpose: Trying out a technical solution
 * Salesforce ID: Can be omitted (See note below)
 * Cloud Provider: AWS
-* OpenShift Version: 4.20+
+* OpenShift Version: 4.20, 4.21
 * Cluster Size: multinode
 * OpenShift Worker count: 5
 * OpenShift Worker instance type: m5a.4xlarge
