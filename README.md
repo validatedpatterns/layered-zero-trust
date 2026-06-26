@@ -40,9 +40,9 @@ These components are part of every Validated Pattern and are not specific to ZTV
 These components are deployed by default with every ZTVP installation. Components marked with _(externalized chart)_ use Helm charts maintained in the [validatedpatterns](https://github.com/validatedpatterns) organization rather than local charts in this repository.
 
 * OpenShift cluster hardening
-  * [Compliance Operator](https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/security_and_compliance/compliance-operator) _(externalized chart)_
+  * [Compliance Operator](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/security_and_compliance/compliance-operator) _(externalized chart)_
     * Continuously scans the cluster against CIS and other security profiles
-  * [cert-manager](https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/security_and_compliance/cert-manager-operator-for-red-hat-openshift)
+  * [cert-manager](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/security_and_compliance/cert-manager-operator-for-red-hat-openshift)
     * Manages TLS certificates for pattern components
 * [Red Hat Advanced Cluster Management (ACM)](https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes)
   * Provides a management control plane in multi-cluster scenarios
@@ -54,7 +54,7 @@ These components are deployed by default with every ZTVP installation. Component
   * Synchronizes secrets stored in HashiCorp Vault with OpenShift
 * [Red Hat Build of Keycloak (RHBK)](https://access.redhat.com/products/red-hat-build-of-keycloak/) _(externalized chart)_
   * Provides user identities and OIDC authentication for pattern components and workloads
-* [Red Hat Zero Trust Workload Identity Manager (ZTWIM)](https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/security_and_compliance/zero-trust-workload-identity-manager) _(externalized chart)_
+* [Red Hat Zero Trust Workload Identity Manager (ZTWIM)](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/security_and_compliance/zero-trust-workload-identity-manager) _(externalized chart)_
   * Automates provisioning of SPIFFE/SPIRE-based verifiable identities for workloads running within OpenShift
 
 #### Optional ZTVP Components (opt-in)
@@ -63,7 +63,7 @@ These components are commented out in `values-hub.yaml` by default. Uncomment th
 
 * [Red Hat Quay](https://docs.redhat.com/en/documentation/red_hat_quay) _(externalized chart)_
   * Enables a private OCI image registry within the environment
-* [Multicloud Object Gateway (NooBaa MCG)](https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/4.20/html/managing_hybrid_and_multicloud_resources/about-the-multicloud-object-gateway)
+* [Multicloud Object Gateway (NooBaa MCG)](https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/latest/html/managing_hybrid_and_multicloud_resources/about-the-multicloud-object-gateway)
   * Provides S3-compatible object storage for Quay and RHTPA
 * [Red Hat Trusted Artifact Signer (RHTAS)](https://docs.redhat.com/en/documentation/red_hat_trusted_artifact_signer/1.3)
   * Provides cryptographic signing and verification of software artifacts and container images
