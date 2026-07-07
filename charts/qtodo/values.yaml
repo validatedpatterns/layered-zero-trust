@@ -65,6 +65,16 @@ app:
       enabled: false
       name: "oidc-client-secret"
       vaultPath: "secret/data/apps/qtodo/qtodo-oidc-client"
+    # Debug logging for OIDC components (requires oidc.enabled)
+    debug:
+      enabled: false
+      logLevels:
+        oidc: "DEBUG"
+        oidcClient: "DEBUG"
+        oidcRuntime: "TRACE"
+        oidcRuntimeProvider: "TRACE"
+        vertxHttp: "DEBUG"
+        vertxHttpImpl: "TRACE"
     # Entra ID specific configuration
     entraid:
       tenantId: ""

@@ -19,4 +19,12 @@ data:
   QUARKUS_OIDC_CREDENTIALS_JWT_AUDIENCE: "{{ include "qtodo.jwt.audience" . }}"
 {{- end }}
 {{- end }}
+{{- if eq .Values.app.oidc.debug.enabled true }}
+  QUARKUS_LOG_CATEGORY__IO_QUARKUS_OIDC__LEVEL: {{ .Values.app.oidc.debug.logLevels.oidc | quote }}
+  QUARKUS_LOG_CATEGORY__IO_QUARKUS_OIDC_CLIENT__LEVEL: {{ .Values.app.oidc.debug.logLevels.oidcClient | quote }}
+  QUARKUS_LOG_CATEGORY__IO_QUARKUS_OIDC_RUNTIME__LEVEL: {{ .Values.app.oidc.debug.logLevels.oidcRuntime | quote }}
+  QUARKUS_LOG_CATEGORY__IO_QUARKUS_OIDC_RUNTIME_OIDCPROVIDER__LEVEL: {{ .Values.app.oidc.debug.logLevels.oidcRuntimeProvider | quote }}
+  QUARKUS_LOG_CATEGORY__IO_VERTX_CORE_HTTP__LEVEL: {{ .Values.app.oidc.debug.logLevels.vertxHttp | quote }}
+  QUARKUS_LOG_CATEGORY__IO_VERTX_CORE_HTTP_IMPL__LEVEL: {{ .Values.app.oidc.debug.logLevels.vertxHttpImpl | quote }}
+{{- end }}
 {{- end }}
