@@ -1,3 +1,8 @@
+# PreSync Job waits for the ESO webhook to have ready endpoints before syncing ExternalSecrets.
+esoWebhookCheck:
+  enabled: true
+  image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+
 # PostSync Job deletes secrets labeled for cleanup after realm import consumes them.
 cleanup:
   enabled: true

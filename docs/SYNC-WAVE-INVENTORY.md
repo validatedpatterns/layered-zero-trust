@@ -23,11 +23,12 @@ Every sync-wave in the repository, in order. **App** = hub-level Argo CD Applica
 | 26 | └ ztvp-certificates | chart | distribution-policy (3 resources) |
 | 26 | └ openshift-storage | ns | Namespace + OperatorGroup |
 | 26 | └ rhtpa-operator | ns | Namespace + OperatorGroup |
+| 26 | └ external-secrets-operator | ns | Namespace + OperatorGroup |
 | 27 | └ odf | sub | ODF operator install |
 | 27 | └ rhtpa-operator | sub | RHTPA operator install |
+| 27 | └ external-secrets | sub | External Secrets Operator install |
 | 28 | └ quay-operator | sub | Quay operator install |
 | 29 | └ rhtas-operator | sub | RHTAS operator install |
-| 30 | golang-external-secrets | **App** | |
 | 30 | zero-trust-workload-identity-manager | **App** | |
 | 31 | └ rhtpa-operator | chart | ingress-ca-job (SA, Role, RoleBinding, ConfigMap, Job) |
 | 32 | └ rhtpa-operator | chart | operator-rolebinding (2 bindings) |
@@ -101,7 +102,8 @@ Every sync-wave in the repository, in order. **App** = hub-level Argo CD Applica
 | rhtpa-operator (subscription) | -4 | 27 | After OperatorGroup (26) |
 | quay-operator (subscription) | -3 | 28 | After ODF operator |
 | rhtas-operator (subscription) | -2 | 29 | After Quay operator |
-| golang-external-secrets | — | 30 | After Vault (newly added) |
+| external-secrets-operator (OperatorGroup) | — | 26 | Before operator subscription (newly added) |
+| external-secrets (subscription) | — | 27 | After OperatorGroup (26) (newly added) |
 | zero-trust-workload-identity-manager | — | 30 | After Vault/certs (newly added) |
 | quay-enterprise (namespace) | 1 | 32 | Before NooBaa and Quay components |
 | trusted-artifact-signer (namespace) | 1 | 32 | Auto-created by RHTAS operator |
@@ -278,3 +280,4 @@ Resources without an explicit sync-wave default to wave 0. These include: pipeli
 - Template waves are resolved **locally within each app sync**, not globally. A template wave of 32 inside acs-central (app wave 41) does not conflict with a template wave of 32 inside noobaa-mcg (app wave 36); they run independently.
 - Sync waves control **Application creation order**, not readiness. A later wave means the Application resource is submitted to the hub later, but the earlier app's pods may not be fully running yet. For hard readiness gates, use Argo CD health checks or resource hooks.
 - **Externalized charts**: Five charts (certmanager, compliance-scanning, keycloak/RHBK, quay-registry, ZTWIM) are maintained in standalone repositories. Their resource-level sync-wave annotations are managed there and pinned via `chartVersion` in `values-hub.yaml`. Application-level sync-waves remain in this repository.
+- **External Secrets Operator**: The ESO webhook must be ready before applications with ExternalSecret resources sync. The `rh-keycloak` chart includes a PreSync hook Job (`wait-for-eso-webhook`) that polls the webhook endpoints until they are available, preventing ExternalSecret creation failures during initial deployment. Argo CD health checks for `ClusterSecretStore` and `Application` resources provide additional sync-wave ordering guarantees.
