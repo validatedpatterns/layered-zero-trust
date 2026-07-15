@@ -47,7 +47,7 @@ For a quick, automated setup, use the provided script:
 ```bash
 # Set your environment variables
 export CLUSTER_DOMAIN="ztvp.example.com"
-export QTODO_REDIRECT_URI="https://qtodo-qtodo.apps.ztvp.example.com/"
+export QTODO_REDIRECT_URI="https://qtodo-qtodo.apps.${CLUSTER_DOMAIN}/"
 
 # Run the setup script
 ./scripts/entraid/setup-qtodo-entraid.sh

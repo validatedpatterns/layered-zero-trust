@@ -42,6 +42,10 @@ features:
     description: "Azure Entra ID integration"
     depends_on: [supply-chain]
 
+  entra-id-qtodo:
+    description: "Azure Entra ID for qtodo authentication (no supply-chain)"
+    depends_on: []
+
 # Registry options (only used with supply-chain feature)
 # Each maps to a file under registry/ subdirectory.
 registry_options:

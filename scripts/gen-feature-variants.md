@@ -130,6 +130,55 @@ For an **SSH** URL:
 See [Protected Repositories](../docs/supply-chain.md#protected-repositories)
 for the full setup (Vault credentials, ExternalSecret, workspace selection).
 
+## Azure Entra ID Integration
+
+Two features provide Azure Entra ID OIDC integration at different scopes:
+
+| Feature | Scope | Dependencies |
+| --- | --- | --- |
+| `entra-id-qtodo` | qtodo application only | none |
+| `entra-id` | qtodo + RHTAS + RHTPA + supply-chain pipeline | supply-chain (full stack) |
+
+### `entra-id-qtodo` — Standalone qtodo Authentication
+
+Use this feature when you want Entra ID authentication for the qtodo
+application **without** deploying the supply-chain components (RHTAS, RHTPA,
+Tekton Chains, Pipelines):
+
+```bash
+python3 scripts/gen-feature-variants.py --features entra-id-qtodo
+```
+
+This feature:
+
+* Configures qtodo OIDC with Entra ID as the provider (client assertion
+  via SPIFFE JWT)
+* Updates the Vault JWT `qtodo` role audience from the default Keycloak
+  realm URL to `api://AzureADTokenExchange`
+* Has **no dependencies** — qtodo is already defined in the base
+  `values-hub.yaml`
+
+Replace the `<YOUR_TENANT_ID>` and `<QTODO_CLIENT_ID>` placeholders in the
+generated file with your Azure Entra ID values.
+
+### `entra-id` — Full Integration (supply-chain required)
+
+Use this feature when you have the full supply chain deployed and want
+Entra ID across all components:
+
+```bash
+python3 scripts/gen-feature-variants.py \
+    --features supply-chain,entra-id \
+    --registry-option 1
+```
+
+This feature configures OIDC for qtodo, RHTAS (Fulcio issuer), RHTPA
+(frontend and CLI clients), and the supply-chain pipeline. It depends on
+`supply-chain`, which transitively pulls in all required components.
+
+> **Note:** The two features are mutually exclusive — use `entra-id-qtodo`
+> for qtodo-only setups and `entra-id` when the full supply chain is deployed.
+
 ## How It Works
 
 1. The script reads the base `values-hub.yaml`.
