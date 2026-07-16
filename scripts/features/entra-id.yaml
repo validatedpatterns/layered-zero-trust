@@ -84,4 +84,11 @@ clusterGroup:
           value: "<RHTPA_API_CLIENT_ID>"
         - name: rhtpa.oidc.apiId
           value: "<RHTPA_API_CLIENT_ID>"  # UUID only - script prepends api://
-
+    vault:
+      jwt:
+        roles:
+          - name: qtodo
+            audience: api://AzureADTokenExchange
+            subject: spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/qtodo/sa/qtodo
+            policies:
+              - apps-qtodo-jwt-secret
