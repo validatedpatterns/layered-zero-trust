@@ -25,6 +25,8 @@
 # will be automatically restarted when certificates are updated
 rollout:
   enabled: true
+  namespaces:
+    - qtodo
   strategy: labeled
   labelSelector:
     ztvp.io/uses-certificates: "true"

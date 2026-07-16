@@ -138,6 +138,13 @@ proxyCA:
 # After certificate extraction, automatically restart consuming applications
 rollout:
   enabled: true
+
+  # Namespaces where the SA is allowed to restart workloads.
+  # Each entry creates a namespace-scoped RoleBinding referencing the
+  # rollout ClusterRole.  Keep this list minimal — only namespaces that
+  # actually consume the rotated certificates need to be listed.
+  namespaces:
+    - qtodo
   
   # Strategy: how to identify resources to restart
   # - "all": Restart all Deployments/StatefulSets in target namespaces
