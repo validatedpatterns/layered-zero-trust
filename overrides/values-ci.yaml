@@ -1,0 +1,174 @@
+# These overrides are needed in CI system to test everything
+# The CI will pass these overrides with
+# EXTRA_HELM_OPTS='--set clusterGroup.sharedValueFiles[3]=/overrides/values-ci.yaml'
+global:
+  singleArgoCD: true
+  registry:
+    enabled: true
+    domain: quay-registry-quay-quay-enterprise.apps.{{ .Values.global.clusterDomain }}
+    repository: ztvp/qtodo
+    user: quay-user
+    vaultPath: "secret/data/hub/infra/quay/quay-users"
+    passwordVaultKey: "quay-user-password"
+
+clusterGroup:
+  namespaces:
+    openshift-storage:
+      operatorGroup: true
+      targetNamespace: openshift-storage
+      annotations:
+        openshift.io/cluster-monitoring: "true"
+        argocd.argoproj.io/sync-wave: "26"  # Propagated to OperatorGroup by framework
+    quay-enterprise:
+      annotations:
+        argocd.argoproj.io/sync-wave: "32"  # Create before NooBaa and all Quay components
+      labels:
+        openshift.io/cluster-monitoring: "true"
+    trusted-artifact-signer:
+      annotations:
+        argocd.argoproj.io/sync-wave: "32"  # Auto-created by RHTAS operator
+      labels:
+        openshift.io/cluster-monitoring: "true"
+    rhtpa-operator:
+      operatorGroup: true
+      targetNamespace: rhtpa-operator
+      annotations:
+        argocd.argoproj.io/sync-wave: "26"  # Create before operator subscription
+    trusted-profile-analyzer:
+      annotations:
+        argocd.argoproj.io/sync-wave: "32"  # Create before RHTPA components
+      labels:
+        openshift.io/cluster-monitoring: "true"
+    openshift-pipelines:
+  subscriptions:
+    openshift-pipelines:
+      name: openshift-pipelines-operator-rh
+      namespace: openshift-operators
+    odf:
+      name: odf-operator
+      namespace: openshift-storage
+      annotations:
+        argocd.argoproj.io/sync-wave: "27"  # Install after OperatorGroup (26)
+    quay-operator:
+      name: quay-operator
+      namespace: openshift-operators
+      annotations:
+        argocd.argoproj.io/sync-wave: "28"  # Install after ODF operator
+    rhtas-operator:
+      name: rhtas-operator
+      namespace: openshift-operators
+      annotations:
+        argocd.argoproj.io/sync-wave: "29"  # Install after Quay operator, before applications
+      catalogSource: redhat-operators
+    rhtpa-operator:
+      name: rhtpa-operator
+      namespace: rhtpa-operator  # MUST use dedicated namespace (not openshift-operators)
+      catalogSource: redhat-operators
+      annotations:
+        argocd.argoproj.io/sync-wave: "27"  # Install after OperatorGroup (26), before applications
+  applications:
+    noobaa-mcg:
+      name: noobaa-mcg
+      namespace: openshift-storage
+      argoProject: hub
+      path: charts/noobaa-mcg
+      annotations:
+        argocd.argoproj.io/sync-wave: "36"  # Deploy after core services
+    quay-registry:
+      name: quay-registry
+      namespace: quay-enterprise
+      argoProject: hub
+      chart: quay
+      chartVersion: 0.1.*
+      annotations:
+        argocd.argoproj.io/sync-wave: "41"  # Deploy after NooBaa storage backend
+      overrides:
+      - name: job.image
+        value: "registry.redhat.io/openshift4/ose-cli-rhel9:latest"
+      - name: job.resources.limits.memory
+        value: "512Mi"
+    trusted-artifact-signer:
+      name: trusted-artifact-signer
+      namespace: trusted-artifact-signer
+      argoProject: hub
+      path: charts/rhtas-operator
+      annotations:
+        argocd.argoproj.io/sync-wave: "46"  # Deploy after dependencies
+      overrides:
+        - name: rhtas.zeroTrust.spire.enabled
+          value: "true"
+        - name: rhtas.zeroTrust.spire.trustDomain
+          value: "apps.{{ $.Values.global.clusterDomain }}"
+        - name: rhtas.zeroTrust.spire.issuer
+          value: "https://spire-spiffe-oidc-discovery-provider.apps.{{ $.Values.global.clusterDomain }}"
+        - name: rhtas.zeroTrust.email.enabled
+          value: "true"
+        - name: rhtas.zeroTrust.email.issuer
+          value: https://keycloak.apps.{{ $.Values.global.clusterDomain }}/realms/ztvp
+    trusted-profile-analyzer:
+      name: trusted-profile-analyzer
+      namespace: trusted-profile-analyzer
+      argoProject: hub
+      path: charts/rhtpa-operator
+      annotations:
+        argocd.argoproj.io/sync-wave: "41"  # Create chart resources (OBC, DB, etc.)
+      ignoreDifferences:
+        - group: batch
+          kind: Job
+          jsonPointers:
+            - /status
+    qtodo:
+      overrides:
+        - name: app.oidc.enabled
+          value: "true"
+        - name: app.spire.enabled
+          value: "true"
+        - name: app.vault.url
+          value: https://vault.vault.svc.cluster.local:8200
+        - name: app.vault.role
+          value: qtodo
+        - name: app.vault.secretPath
+          value: secret/data/apps/qtodo/qtodo-db
+      extraValueFiles:
+        - '/overrides/values-ci.yaml'
+    tekton-chains:
+      name: tekton-chains
+      project: hub
+      path: charts/tekton-chains
+      annotations:
+        argocd.argoproj.io/sync-wave: "47"
+    supply-chain:
+      name: supply-chain
+      argoProject: hub
+      path: charts/supply-chain
+      annotations:
+        argocd.argoproj.io/sync-wave: "48"
+      ignoreDifferences:
+        - kind: ServiceAccount
+          jqPathExpressions:
+            - .imagePullSecrets[]|select(.name | contains("-dockercfg-"))
+        - group: tekton.dev
+          kind: Task
+          jsonPointers:
+            - /spec/steps
+        - group: tekton.dev
+          kind: Pipeline
+          jsonPointers:
+            - /spec/tasks
+      overrides:
+        - name: quay.enabled
+          value: "true"
+        - name: registry.tlsVerify
+          value: "false"
+        - name: rhtas.enabled
+          value: "true"
+        - name: rhtpa.enabled
+          value: "true"
+        - name: pipelinerun.enabled
+          value: "true"
+    acs-central:
+      overrides:
+        - name: integration.quay.enabled
+          value: "true"
+        - name: integration.quay.url
+          value: "quay-quay-enterprise.apps.{{ .Values.global.domain }}"
