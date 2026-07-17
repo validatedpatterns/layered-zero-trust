@@ -53,7 +53,7 @@ app:
     provider: "keycloak"
     authServerUrl: ""
     realm: "ztvp"
-    clientId: "qtodo-app"
+    clientId: ""
     applicationType: "web-app"
     authenticatedPaths: "/*"
     authenticatedPolicy: "authenticated"

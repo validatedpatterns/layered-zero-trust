@@ -3,6 +3,15 @@ cleanup:
   enabled: true
   image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
 
+# qtodo OIDC client configuration for the Keycloak realm
+qtodo:
+  namespace: qtodo
+  serviceAccount: qtodo
+  oidc:
+    clientId: ""
+    clientAssertion:
+      enabled: true
+
 # Values passed through to the rhbk subchart.
 rhbk:
   global:
@@ -67,7 +76,7 @@ rhbk:
         enabled: true
         registrationAllowed: false
         clients:
-          - clientId: qtodo-app
+          - clientId: ${QTODO_CLIENT_ID}
             enabled: true
             name: qtodo
             protocol: openid-connect
@@ -506,6 +515,10 @@ rhbk:
         secret:
           name: rhtpa-oidc-cli-secret
           key: client-secret
+      QTODO_CLIENT_ID:
+        secret:
+          name: qtodo-client-id
+          key: client-id
       ACS_CLIENT_SECRET:
         secret:
           name: acs-oidc-client-secret

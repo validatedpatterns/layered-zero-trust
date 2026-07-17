@@ -7,7 +7,7 @@ data:
 {{- if eq .Values.app.oidc.enabled true }}
   QUARKUS_OIDC_ENABLED: "true"
   QUARKUS_OIDC_AUTH_SERVER_URL: "{{ include "qtodo.oidc.url" . }}"
-  QUARKUS_OIDC_CLIENT_ID: "{{ .Values.app.oidc.clientId }}"
+  QUARKUS_OIDC_CLIENT_ID: "{{ include "qtodo.oidc.clientId" . }}"
   QUARKUS_OIDC_APPLICATION_TYPE: "{{ .Values.app.oidc.applicationType }}"
   QUARKUS_HTTP_AUTH_PERMISSION_AUTHENTICATED_PATHS: "{{ .Values.app.oidc.authenticatedPaths }}"
   QUARKUS_HTTP_AUTH_PERMISSION_AUTHENTICATED_POLICY: "{{ .Values.app.oidc.authenticatedPolicy }}"

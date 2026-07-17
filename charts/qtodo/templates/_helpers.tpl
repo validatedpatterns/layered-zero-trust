@@ -34,6 +34,21 @@ Generate the URL of the OIDC service
 {{- end }}
 
 {{/*
+Generate the OIDC Client ID based on provider and authentication method
+*/}}
+{{- define "qtodo.oidc.clientId" }}
+{{- if .Values.app.oidc.clientId }}
+{{- print .Values.app.oidc.clientId }}
+{{- else if eq .Values.app.oidc.provider "entraid" }}
+{{- fail "app.oidc.clientId is required when using Entra ID provider" }}
+{{- else if .Values.app.oidc.clientAssertion.enabled }}
+{{- printf "spiffe://apps.%s/ns/%s/sa/qtodo" .Values.global.clusterDomain .Release.Namespace }}
+{{- else }}
+{{- print "qtodo-app" }}
+{{- end }}
+{{- end }}
+
+{{/*
 Generate the JWT Audience for SPIFFE authentication
 */}}
 {{- define "qtodo.jwt.audience" }}
