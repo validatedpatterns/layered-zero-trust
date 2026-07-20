@@ -126,6 +126,15 @@ job:
 # ConfigMap name that will be created in global.namespace
 configMapName: ztvp-trusted-ca
 
+# Namespaces from which the CA extraction Job reads secrets and configmaps.
+# A namespace-scoped Role + RoleBinding pair is created for each entry.
+caReader:
+  namespaces:
+    - openshift-ingress-operator
+    - openshift-ingress
+    - openshift-config
+    - openshift-config-managed
+
 # Proxy CA configuration
 # Configures the OpenShift cluster proxy trustedCA so custom CAs (ingress, service)
 # are auto-injected into all workloads via the cluster network operator.

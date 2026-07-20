@@ -42,7 +42,7 @@ subjects:
   name: {{ include "ztvp-certificates.serviceAccountName" . }}
   namespace: {{ .Values.global.namespace }}
 {{- /* Namespace-scoped Roles for secrets/configmaps access (least-privilege: only the namespaces the Job reads from) */ -}}
-{{- range $ns := (list "openshift-ingress-operator" "openshift-ingress" "openshift-config" "openshift-config-managed") }}
+{{- range $ns := .Values.caReader.namespaces }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
