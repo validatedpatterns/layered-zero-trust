@@ -1,8 +1,8 @@
 {{- if and .Values.enabled .Values.proxyCA.enabled }}
 {{- /*
-  Set proxy/cluster trustedCA declaratively via ArgoCD instead of
+  Set proxy/cluster trustedCA declaratively via Argo CD instead of
   patching from the extraction Job SA.  The SA only needs proxies:[get]
-  to read the current trustedCA name; ArgoCD applies this resource
+  to read the current trustedCA name; Argo CD applies this resource
   with its own cluster-admin-scoped SA.
 */ -}}
 ---

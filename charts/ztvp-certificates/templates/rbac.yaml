@@ -90,7 +90,7 @@ rules:
 - apiGroups: ["operator.openshift.io"]
   resources: ["ingresscontrollers"]
   verbs: ["get", "list"]
-# Read-only access to cluster proxy; trustedCA is managed declaratively by ArgoCD
+# Read-only access to cluster proxy; trustedCA is managed declaratively by Argo CD
 - apiGroups: ["config.openshift.io"]
   resources: ["proxies"]
   resourceNames: ["cluster"]

@@ -410,7 +410,7 @@ fi
 # ===================================================================
 # PHASE 8.6: Verify Cluster Proxy trustedCA (declaratively managed)
 # ===================================================================
-# proxy/cluster trustedCA is managed declaratively by ArgoCD
+# proxy/cluster trustedCA is managed declaratively by Argo CD
 # (proxy-trustedca.yaml template) instead of being patched by this Job.
 # The SA only needs read access to the proxy object.
 
@@ -421,8 +421,8 @@ if [[ "$CURRENT_TRUSTED_CA" == "{{ .Values.proxyCA.configMapName }}" ]]; then
   log "Proxy trustedCA correctly set to {{ .Values.proxyCA.configMapName }}"
 elif [[ -n "$CURRENT_TRUSTED_CA" && "$CURRENT_TRUSTED_CA" != "{{ .Values.proxyCA.configMapName }}" ]]; then
   # Merge any CAs from the existing proxy ConfigMap into our bundle so
-  # nothing is lost when ArgoCD takes over trustedCA management.
-  log "Existing proxy trustedCA ConfigMap: $CURRENT_TRUSTED_CA (will be replaced by ArgoCD)"
+  # nothing is lost when Argo CD takes over trustedCA management.
+  log "Existing proxy trustedCA ConfigMap: $CURRENT_TRUSTED_CA (will be replaced by Argo CD)"
   EXISTING_CA_DATA=$(oc get configmap "$CURRENT_TRUSTED_CA" -n {{ .Values.global.namespace }} \
     -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null || echo "")
   if [[ -n "$EXISTING_CA_DATA" ]]; then
@@ -447,10 +447,10 @@ data:
 $(cat "${TEMP_DIR}/proxy-ca-bundle.pem" | sed 's/^/      /')
 MERGEEOF
   fi
-  log "Proxy trustedCA will be updated to {{ .Values.proxyCA.configMapName }} by ArgoCD on next sync"
+  log "Proxy trustedCA will be updated to {{ .Values.proxyCA.configMapName }} by Argo CD on next sync"
 else
   if [[ $PROXY_BUNDLE_SIZE -gt 100 ]]; then
-    log "Proxy trustedCA will be set to {{ .Values.proxyCA.configMapName }} by ArgoCD on next sync"
+    log "Proxy trustedCA will be set to {{ .Values.proxyCA.configMapName }} by Argo CD on next sync"
   else
     log "WARNING: No proxy CA bundle available"
   fi
