@@ -2,7 +2,7 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: cleanup-keycloak-users-netpol
+  name: cleanup-keycloak-setup-netpol
   namespace: {{ .Release.Namespace }}
   annotations:
     argocd.argoproj.io/hook: PostSync
@@ -10,7 +10,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app: cleanup-keycloak-users
+      app: cleanup-keycloak-setup
   policyTypes:
   - Egress
   egress:

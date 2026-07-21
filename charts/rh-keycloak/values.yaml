@@ -574,6 +574,17 @@ rhbk:
 
       # ACS Central OIDC client secret
       - name: acs-oidc-client-secret
+        creationPolicy: "Orphan"
+        deletionPolicy: "Retain"
+        refreshPolicy: "OnChange"
+        metadata:
+          annotations:
+            argocd.argoproj.io/hook: Sync
+            argocd.argoproj.io/hook-delete-policy: HookSucceeded
+            argocd.argoproj.io/sync-options: PrunePropagationPolicy=orphan
+        targetMetadata:
+          labels:
+            validatedpatterns.io/cleanup: delete
         data:
           - secretKey: client_secret
             remoteRef:
@@ -584,6 +595,17 @@ rhbk:
 
       # RHTPA CLI OIDC client secret
       - name: rhtpa-oidc-cli-secret
+        creationPolicy: "Orphan"
+        deletionPolicy: "Retain"
+        refreshPolicy: "OnChange"
+        metadata:
+          annotations:
+            argocd.argoproj.io/hook: Sync
+            argocd.argoproj.io/hook-delete-policy: HookSucceeded
+            argocd.argoproj.io/sync-options: PrunePropagationPolicy=orphan
+        targetMetadata:
+          labels:
+            validatedpatterns.io/cleanup: delete
         data:
           - secretKey: client_secret
             remoteRef:
