@@ -126,7 +126,7 @@ spec:
               sed -i "s|CLAIM_ROLES_PLACEHOLDER|$(escape_sed "$CLAIM_ROLES")|g" /tmp/oidc-config.json
 
               echo "OIDC Configuration JSON (client_secret redacted):"
-              sed 's/"client_secret":"[^"]*"/"client_secret":"***"/g' /tmp/oidc-config.json
+              sed 's/"client_secret": *"[^"]*"/"client_secret": "***"/g' /tmp/oidc-config.json
               echo ""
 
               # --- Create OIDC auth provider with TLS retry logic ---
