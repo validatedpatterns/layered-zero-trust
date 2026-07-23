@@ -1,0 +1,14 @@
+apiVersion: v2
+name: netobserv
+description: OpenShift Network Observability (NooBaa-backed LokiStack + FlowCollector) for ZTVP
+type: application
+version: 0.1.0
+appVersion: "1.12"
+keywords:
+  - network-observability
+  - zero-trust
+maintainers:
+  - name: Validated Patterns Team
+home: https://validatedpatterns.io/patterns/layered-zero-trust/
+sources:
+  - https://github.com/validatedpatterns/layered-zero-trust

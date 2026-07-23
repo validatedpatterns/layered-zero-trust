@@ -1,0 +1,27 @@
+{{- if .Values.enabled }}
+apiVersion: flows.netobserv.io/v1beta2
+kind: FlowCollector
+metadata:
+  name: {{ .Values.flowcollector.name }}
+  labels:
+    {{- include "netobserv.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "42"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  namespace: {{ .Values.flowcollector.namespace }}
+  deploymentModel: {{ .Values.flowcollector.deploymentModel }}
+  agent:
+    type: {{ .Values.flowcollector.agent.type }}
+    ebpf:
+      sampling: {{ .Values.flowcollector.agent.sampling }}
+      privileged: {{ .Values.flowcollector.agent.privileged }}
+  loki:
+    enable: {{ .Values.flowcollector.loki.enable }}
+    mode: {{ .Values.flowcollector.loki.mode }}
+    lokiStack:
+      name: {{ .Values.loki.name }}
+      namespace: {{ .Values.loki.namespace }}
+  consolePlugin:
+    enable: {{ .Values.flowcollector.consolePlugin.enable }}
+{{- end }}

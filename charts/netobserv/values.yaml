@@ -1,0 +1,40 @@
+enabled: true
+
+loki:
+  enabled: true
+  namespace: netobserv-loki
+  name: loki
+  size: 1x.extra-small
+  storageClassName: gp3-csi
+  storageSecretName: loki-s3
+  objectBucketClaim:
+    name: netobserv-loki-obc
+    bucketName: netobserv-loki
+    storageClass: openshift-storage.noobaa.io
+  # NooBaa MCG default region used in remapped secret
+  region: us-east-1
+
+flowcollector:
+  name: cluster
+  namespace: netobserv
+  deploymentModel: Direct
+  agent:
+    type: eBPF
+    sampling: 50
+    privileged: false
+  loki:
+    enable: true
+    mode: LokiStack
+  consolePlugin:
+    enable: true
+
+credentialsJob:
+  image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+  backoffLimit: 5
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi

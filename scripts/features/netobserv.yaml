@@ -1,0 +1,49 @@
+# Network Observability
+# Depends on: storage (NooBaa MCG for Loki object storage)
+clusterGroup:
+  namespaces:
+    openshift-operators-redhat:
+      operatorGroup: true
+      targetNamespaces: []
+      annotations:
+        argocd.argoproj.io/sync-wave: "26"
+    openshift-netobserv-operator:
+      operatorGroup: true
+      targetNamespaces: []
+      labels:
+        openshift.io/cluster-monitoring: "true"
+      annotations:
+        argocd.argoproj.io/sync-wave: "26"
+    netobserv-loki:
+      annotations:
+        argocd.argoproj.io/sync-wave: "26"
+    netobserv:
+      labels:
+        openshift.io/cluster-monitoring: "true"
+      annotations:
+        argocd.argoproj.io/sync-wave: "26"
+
+  subscriptions:
+    loki-operator:
+      name: loki-operator
+      namespace: openshift-operators-redhat
+      channel: stable-6.6
+      source: redhat-operators
+      annotations:
+        argocd.argoproj.io/sync-wave: "27"
+    netobserv-operator:
+      name: netobserv-operator
+      namespace: openshift-netobserv-operator
+      channel: stable
+      source: redhat-operators
+      annotations:
+        argocd.argoproj.io/sync-wave: "28"
+
+  applications:
+    netobserv:
+      name: netobserv
+      namespace: netobserv
+      project: hub
+      path: charts/netobserv
+      annotations:
+        argocd.argoproj.io/sync-wave: "42"

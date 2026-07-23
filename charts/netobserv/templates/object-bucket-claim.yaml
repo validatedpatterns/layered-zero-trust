@@ -1,0 +1,15 @@
+{{- if and .Values.enabled .Values.loki.enabled }}
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: {{ .Values.loki.objectBucketClaim.name }}
+  namespace: {{ .Values.loki.namespace }}
+  labels:
+    {{- include "netobserv.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "36"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  generateBucketName: {{ .Values.loki.objectBucketClaim.bucketName }}
+  storageClassName: {{ .Values.loki.objectBucketClaim.storageClass }}
+{{- end }}

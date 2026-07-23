@@ -45,6 +45,9 @@ python3 scripts/gen-feature-variants.py --list-features
 # Enable a single feature (dependencies are resolved automatically)
 python3 scripts/gen-feature-variants.py --features rhtpa
 
+# Network Observability (auto-resolves: storage -> netobserv)
+python3 scripts/gen-feature-variants.py --features netobserv
+
 # Enable multiple features
 python3 scripts/gen-feature-variants.py --features rhtpa,rhtas
 
