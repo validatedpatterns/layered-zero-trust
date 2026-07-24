@@ -13,7 +13,6 @@ clusterGroup:
     odf:
       name: odf-operator
       namespace: openshift-storage
-      channel: stable-4.20
       annotations:
         argocd.argoproj.io/sync-wave: "27"
 

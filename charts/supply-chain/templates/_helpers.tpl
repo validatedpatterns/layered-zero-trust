@@ -73,21 +73,9 @@ Sigstore environment variables used in Pipeline Tasks
   value: $(params.cli-server-url)
 - name: TUF_URL
   value: $(params.tuf-url)
-- name: COSIGN_MIRROR
-  value: $(params.tuf-url)
-- name: COSIGN_ROOT
-  value: $(params.tuf-url)/root.json
 - name: FULCIO_URL
   value: $(params.fulcio-url)
-- name: COSIGN_FULCIO_URL
-  value: $(params.fulcio-url)
-- name: SIGSTORE_FULCIO_URL
-  value: $(params.fulcio-url)
 - name: REKOR_URL
-  value: $(params.rekor-url)
-- name: COSIGN_REKOR_URL
-  value: $(params.rekor-url)
-- name: SIGSTORE_REKOR_URL
   value: $(params.rekor-url)
 - name: CA_FILE
   value: $(params.ca-file)
@@ -98,12 +86,6 @@ Sigstore environment variables used in Pipeline Tasks
 - name: OIDC_ISSUER
   value: $(params.oidc-issuer)
 - name: OIDC_ISSUER_URL
-  value: $(params.oidc-issuer)
-- name: COSIGN_OIDC_ISSUER
-  value: $(params.oidc-issuer)
-- name: COSIGN_CERTIFICATE_OIDC_ISSUER
-  value: $(params.oidc-issuer)
-- name: SIGSTORE_OIDC_ISSUER
   value: $(params.oidc-issuer)
 {{- if eq .Values.rhtas.oidc.enabled true }}
 - name: OIDC_CLIENT_ID

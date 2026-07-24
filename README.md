@@ -78,7 +78,9 @@ Utilize the following steps to prepare your machine and complete any and all pre
 
 ### Prerequisites
 
-1. An OpenShift Container Platform 4.20 or 4.21 cluster with:
+For a full list of validated component versions, see the [Support Matrix](docs/support-matrix.md).
+
+1. An OpenShift Container Platform 4.20, 4.21 or 4.22 cluster with:
     1. Publicly signed certificates for Ingress
     2. A default `StorageClass` which provides dynamic `PersistentVolume` storage
 2. To customize the provided default configuration, a GitHub account and a token for it with repositories permissions, to read from and write to your forks, is required.
