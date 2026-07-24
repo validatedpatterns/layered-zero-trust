@@ -8,9 +8,9 @@ This pattern is tested and supported on the following OpenShift Container Platfo
 
 | OCP Stream | Status | Notes |
 |---|---|---|
+| **< 4.20** | Usupported | |
 | **4.20** | Supported | Tested and verified |
 | **4.21** | Supported | Tested and verified |
-| **4.22** | Supported | Tested and verified |
 
 Running the pattern on untested OCP versions may result in operator subscription failures or NetworkPolicy-related deployment issues.
 
@@ -30,7 +30,7 @@ The following options should be selected:
 * Purpose: Trying out a technical solution
 * Salesforce ID: Can be omitted (See note below)
 * Cloud Provider: AWS
-* OpenShift Version: 4.20, 4.21, 4.22
+* OpenShift Version: 4.20, 4.21
 * Cluster Size: multinode
 * OpenShift Worker count: 5
 * OpenShift Worker instance type: m5a.4xlarge
