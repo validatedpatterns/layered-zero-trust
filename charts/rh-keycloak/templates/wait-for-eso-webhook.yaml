@@ -65,7 +65,7 @@ spec:
           echo "Waiting for ESO webhook endpoints in external-secrets namespace..."
           until oc get endpointslice -n external-secrets \
             -l=kubernetes.io/service-name=external-secrets-webhook \
-            -o jsonpath='{.items[0].endpoints[0].addresses[0]}' 2>/dev/null
+            -o jsonpath='{.items[0].endpoints[?(@.conditions.ready==true)].addresses[0]}' 2>/dev/null | grep -q .
           do
             echo "ESO webhook not ready, retrying in 5s..."
             sleep 5
