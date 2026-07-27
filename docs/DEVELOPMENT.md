@@ -2,6 +2,18 @@
 
 This document describes recommended practices for developing and testing against this pattern.
 
+## Supported OCP Versions
+
+This pattern is tested and supported on the following OpenShift Container Platform versions:
+
+| OCP Stream | Status | Notes |
+|---|---|---|
+| **< 4.20** | Usupported | |
+| **4.20** | Supported | Tested and verified |
+| **4.21** | Supported | Tested and verified |
+
+Running the pattern on untested OCP versions may result in operator subscription failures or NetworkPolicy-related deployment issues.
+
 ## Testing Environments
 
 While you may bring your own (BYO) OpenShift cluster, Red Hat associates and partners may utilize [Red Hat Demo Platform (RHDP)](https://catalog.demo.redhat.com) to provision OpenShift environments for use as targets for pattern development and testing.
