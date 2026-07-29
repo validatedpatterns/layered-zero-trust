@@ -11,9 +11,12 @@ settingsRef:
   kind: ScanSetting
   apiGroup: compliance.openshift.io/v1alpha1
   name: {{ .Values.compliance.scanSetting.name }}
-# Profiles to bind to this scan setting
+# Profiles to bind to this scan setting.
+# profileKind is Profile for a stock baseline, or TailoredProfile when binding a
+# tailored one (see templates/tailored-profile.yaml). A TailoredProfile must
+# already exist when the binding is created, hence its earlier sync-wave.
 profiles:
   - name: {{ .Values.compliance.scanSettingBinding.profile }}
-    kind: Profile
+    kind: {{ .Values.compliance.scanSettingBinding.profileKind | default "Profile" }}
     apiGroup: compliance.openshift.io/v1alpha1
 
