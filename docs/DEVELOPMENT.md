@@ -11,6 +11,7 @@ This pattern is tested and supported on the following OpenShift Container Platfo
 | **< 4.20** | Usupported | |
 | **4.20** | Supported | Tested and verified |
 | **4.21** | Supported | Tested and verified |
+| **4.22** | Supported | Tested and verified |
 
 Running the pattern on untested OCP versions may result in operator subscription failures or NetworkPolicy-related deployment issues.
 

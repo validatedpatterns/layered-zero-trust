@@ -12,7 +12,6 @@ clusterGroup:
     rhtas-operator:
       name: rhtas-operator
       namespace: openshift-operators
-      channel: stable-v1.3
       annotations:
         argocd.argoproj.io/sync-wave: "29"
       catalogSource: redhat-operators

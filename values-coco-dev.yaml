@@ -156,7 +156,6 @@ clusterGroup:
     # quay-operator:
     #   name: quay-operator
     #   namespace: openshift-operators
-    #   channel: stable-3.15
     #   annotations:
     #     argocd.argoproj.io/sync-wave: "28"  # Install after ODF operator
     # RHTAS operator subscription (required when RHTAS application is enabled)
@@ -164,7 +163,6 @@ clusterGroup:
     # rhtas-operator:
     #   name: rhtas-operator
     #   namespace: openshift-operators
-    #   channel: stable-v1.3
     #   annotations:
     #     argocd.argoproj.io/sync-wave: "29"  # Install after Quay operator, before applications
     #   catalogSource: redhat-operators
