@@ -6,7 +6,7 @@ metadata:
   name: rhtpa-operator-job-manager
   namespace: {{ .Values.rhtpa.namespace }}
   annotations:
-    argocd.argoproj.io/sync-wave: "1"  # Create early, before CR
+    argocd.argoproj.io/sync-wave: "32"  # Create early, before CR
 rules:
 - apiGroups: ["batch"]
   resources: ["jobs"]
@@ -30,7 +30,7 @@ metadata:
   name: rhtpa-operator-job-manager
   namespace: {{ .Values.rhtpa.namespace }}
   annotations:
-    argocd.argoproj.io/sync-wave: "1"  # Create early, before CR
+    argocd.argoproj.io/sync-wave: "32"  # Create early, before CR
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

@@ -7,7 +7,7 @@ metadata:
   name: default
   namespace: {{ .Values.global.namespace }}
   annotations:
-    argocd.argoproj.io/sync-wave: "-6"
+    argocd.argoproj.io/sync-wave: "25"
   labels:
     {{- include "ztvp-certificates.labels" . | nindent 4 }}
 spec:

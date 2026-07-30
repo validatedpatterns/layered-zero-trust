@@ -1,0 +1,32 @@
+# OPTION 3: Embedded OpenShift Image Registry
+# Enables global.registry pointing to the built-in OpenShift image registry.
+# Adds embeddedOpenShift overrides to supply-chain app.
+# Adds imagePullTrust to ztvp-certificates for node-level kubelet trust.
+global:
+  registry:
+    enabled: true
+    domain: "default-route-openshift-image-registry.apps.{{ .Values.global.clusterDomain }}"
+    # Placeholders auto-replaced by the generator (supply-chain defines org=ztvp, image_name=qtodo)
+    repository: org/image-name
+    user: _token
+    vaultPath: "secret/data/hub/infra/registry/registry-user"
+    passwordVaultKey: "registry-password"
+
+clusterGroup:
+  merge_into_applications:
+    supply-chain:
+      overrides:
+        - name: registry.embeddedOpenShift.ensureImageNamespaceRBAC
+          value: "true"
+        - name: registry.embeddedOpenShift.tokenRefresher.enabled
+          value: "true"
+        - name: rhtas.enabled
+          value: "true"
+        - name: rhtpa.enabled
+          value: "true"
+    ztvp-certificates:
+      overrides:
+        - name: imagePullTrust.enabled
+          value: "true"
+        - name: imagePullTrust.registries[0]
+          value: "default-route-openshift-image-registry.apps.{{ $.Values.global.clusterDomain }}"

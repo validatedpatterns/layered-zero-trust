@@ -1,0 +1,27 @@
+# Override the default values for the trustee chart
+# This lists the secret resources that are uploaded to your chosen ESO backend (default: Vault).
+# It does not contain the secrets themselves, only references to Vault paths.
+#
+# NOTE: When adding new CoCo workloads to coco.workloads, you must also add
+# corresponding spire-cert-{workload} and spire-key-{workload} entries here
+
+# Secret store configuration for External Secrets Operator
+# Points to the ClusterSecretStore that knows how to connect to Vault
+secretStore:
+  name: vault-backend
+  kind: ClusterSecretStore
+
+global:
+  coco:
+    secured: true
+
+kbs:
+  secretResources:
+    - name: "passphrase"
+      key: "secret/data/hub/passphrase"
+  # SPIRE x509pop certificates per workload type
+  # Created by the generate-certs imperative job directly as K8s Secrets
+  # in trustee-operator-system (not managed by Vault/ESO)
+  extraSecrets:
+    - spire-cert-qtodo
+    - spire-key-qtodo

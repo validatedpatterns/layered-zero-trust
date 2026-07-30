@@ -1,0 +1,164 @@
+# SPIRE Agent with x509pop attestation running in CoCo peer pod.
+# Uses CDH sealed secrets for agent credentials (cert/key fetched from KBS after TEE attestation).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: spire-agent-cc
+  namespace: zero-trust-workload-identity-manager
+  labels:
+    app: spire-agent-cc
+spec:
+  runtimeClassName: kata-remote
+  # shareProcessNamespace allows SPIRE agent to inspect workload processes for unix attestation
+  # This is secure because the real isolation boundary is the confidential VM (peer-pod with TEE),
+  # not individual containers. All containers in this pod are part of the same trust boundary.
+  shareProcessNamespace: true
+  serviceAccountName: spire-agent
+  imagePullSecrets:
+  - name: pull-secret
+
+  containers:
+  # SPIRE Agent Sidecar
+  - name: spire-agent
+    image: registry.redhat.io/zero-trust-workload-identity-manager/spiffe-spire-agent-rhel9@sha256:4073ef462525c2ea1326f3c44ec630e33cbab4b428e8314a85d38756c2460831
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        echo "=== DEBUG: Checking /sealed mount ==="
+        ls -laR /sealed || echo "/sealed does not exist"
+        echo "=== DEBUG: Content of cert.pem (first 200 bytes) ==="
+        head -c 200 /sealed/cert.pem 2>&1 || echo "Cannot read cert.pem"
+        echo "=== DEBUG: Testing network connectivity to KBS (cluster-internal) ==="
+        curl -k -I https://kbs-service.trustee-operator-system.svc.cluster.local:8080 2>&1 | head -20
+        echo "=== DEBUG: Testing if CDH is running (HTTP on localhost:8006) ==="
+        curl -v http://127.0.0.1:8006/cdh/resource/default/spire-cert-qtodo/cert 2>&1 | head -50
+        echo "=== DEBUG: Starting spire-agent ==="
+        /spire-agent run -config /opt/spire/conf/agent/agent.conf
+    env:
+    - name: PATH
+      value: "/opt/spire/bin:/bin"
+    - name: MY_NODE_NAME
+      value: "coco-vm-node"  # Virtual node name for CoCo
+    ports:
+    - containerPort: 9982
+      name: healthz
+      protocol: TCP
+    livenessProbe:
+      httpGet:
+        path: /live
+        port: healthz
+        scheme: HTTP
+      initialDelaySeconds: 15
+      periodSeconds: 60
+    readinessProbe:
+      httpGet:
+        path: /ready
+        port: healthz
+        scheme: HTTP
+      initialDelaySeconds: 10
+      periodSeconds: 30
+    volumeMounts:
+    - name: spire-config
+      mountPath: /opt/spire/conf/agent
+      readOnly: true
+    - name: spire-bundle
+      mountPath: /run/spire/bundle
+      readOnly: true
+    - name: spire-socket
+      mountPath: /tmp/spire-agent/public
+    - name: spire-persistence
+      mountPath: /var/lib/spire
+    - name: sealed-creds
+      mountPath: /sealed
+      readOnly: true
+    securityContext:
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+      seccompProfile:
+        type: RuntimeDefault
+
+  # SPIFFE Helper Sidecar
+  - name: spiffe-helper
+    image: ghcr.io/spiffe/spiffe-helper:0.10.1
+    imagePullPolicy: IfNotPresent
+    args:
+      - "-config"
+      - "/etc/helper.conf"
+    volumeMounts:
+      - name: spiffe-helper-config
+        readOnly: true
+        mountPath: /etc/helper.conf
+        subPath: helper.conf
+      - name: spire-socket
+        readOnly: true
+        mountPath: /tmp/spire-agent/public
+      - name: svids
+        mountPath: /svids
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+      readOnlyRootFilesystem: false
+      seccompProfile:
+        type: RuntimeDefault
+
+  # Test Workload Container
+  - name: test-workload
+    image: registry.redhat.io/ubi9/ubi-minimal:latest
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        echo "=== SPIRE Agent CoCo Test Started ==="
+        echo "Waiting for SPIFFE certificates..."
+
+        # Wait for SPIFFE certificates
+        while [ ! -f /svids/svid.pem ]; do
+          echo "Waiting for SPIFFE certificates..."
+          sleep 2
+        done
+
+        echo "SPIFFE certificates found!"
+        ls -la /svids/
+
+        echo "=== Testing SPIFFE X.509 certificates ==="
+        echo "Certificate details:"
+        openssl x509 -in /svids/svid.pem -text -noout | head -20
+
+        echo "=== Sleeping for manual inspection ==="
+        sleep 3600
+    volumeMounts:
+    - name: svids
+      mountPath: /svids
+      readOnly: true
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+      readOnlyRootFilesystem: false
+      seccompProfile:
+        type: RuntimeDefault
+
+  volumes:
+  - name: spire-config
+    configMap:
+      name: spire-agent-coco
+  - name: spiffe-helper-config
+    configMap:
+      name: spiffe-helper-config
+  - name: spire-bundle
+    configMap:
+      name: spire-bundle
+  - name: spire-socket
+    emptyDir: {}
+  - name: spire-persistence
+    emptyDir: {}
+  - name: sealed-creds
+    secret:
+      secretName: {{ .Values.sealedSecret.name }}
+  - name: svids
+    emptyDir: {}

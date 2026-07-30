@@ -1,0 +1,102 @@
+---
+# Generate SPIRE x509pop certificates for CoCo integration
+# Creates CA certificate and agent certificates for all workloads
+
+- name: Generate SPIRE x509pop certificates
+  become: false
+  connection: local
+  hosts: localhost
+  gather_facts: false
+  vars:
+    spire_namespace: "zero-trust-workload-identity-manager"
+    trustee_namespace: "trustee-operator-system"
+    ca_configmap_name: "spire-x509pop-ca"
+    ca_secret_name: "spire-x509pop-ca-key"
+    cert_dir: "/tmp/spire-certs"
+    # Workloads list - should match coco.workloads
+    workloads:
+      - name: "qtodo"
+        namespace: "qtodo"
+  tasks:
+    - name: Create temporary certificate directory
+      ansible.builtin.file:
+        path: "{{ cert_dir }}"
+        state: directory
+        mode: '0700'
+
+    # Generate CA certificate
+    - name: Generate CA certificate
+      ansible.builtin.include_tasks:
+        file: generate-certificate.yaml
+      vars:
+        cert_name: "{{ ca_configmap_name }}"
+        cert_type: "ca"
+        cert_namespace: "{{ spire_namespace }}"
+        output_configmap: true
+        output_secret: true
+        common_name: "SPIRE x509pop CA"
+        organization: "Validated Patterns"
+        country: "US"
+        validity_days: 3650  # 10 years
+        key_usage:
+          - keyCertSign
+          - cRLSign
+
+    # Retrieve CA for signing agent certificates
+    - name: Get CA certificate from ConfigMap # noqa: syntax-check[unknown-module]
+      kubernetes.core.k8s_info:
+        kind: ConfigMap
+        namespace: "{{ spire_namespace }}"
+        name: "{{ ca_configmap_name }}"
+      register: ca_configmap
+
+    - name: Get CA private key from Secret # noqa: syntax-check[unknown-module]
+      kubernetes.core.k8s_info:
+        kind: Secret
+        namespace: "{{ spire_namespace }}"
+        name: "{{ ca_secret_name }}"
+      register: ca_secret
+
+    - name: Write CA certificate to temp file
+      ansible.builtin.copy:
+        content: "{{ ca_configmap.resources[0].data['ca-bundle.pem'] }}"
+        dest: "{{ cert_dir }}/ca-cert.pem"
+        mode: '0600'
+
+    - name: Write CA private key to temp file
+      ansible.builtin.copy:
+        content: "{{ ca_secret.resources[0].data['ca-key.pem'] | b64decode }}"
+        dest: "{{ cert_dir }}/ca-key.pem"
+        mode: '0600'
+
+    # Generate agent certificates for each workload
+    - name: Generate agent certificate for each workload
+      ansible.builtin.include_tasks:
+        file: generate-certificate.yaml
+      vars:
+        cert_name: "spire-{{ workload.name }}"
+        cert_secret_name: "spire-cert-{{ workload.name }}"
+        key_secret_name: "spire-key-{{ workload.name }}"
+        cert_type: "agent"
+        cert_namespace: "{{ trustee_namespace }}"
+        output_configmap: false
+        output_secret: true
+        ca_cert_path: "{{ cert_dir }}/ca-cert.pem"
+        ca_key_path: "{{ cert_dir }}/ca-key.pem"
+        common_name: "spire-agent-{{ workload.name }}"
+        organization: "Validated Patterns"
+        country: "US"
+        validity_days: 365  # 1 year
+        key_usage:
+          - digitalSignature
+          - keyEncipherment
+        extended_key_usage:
+          - clientAuth
+      loop: "{{ workloads }}"
+      loop_control:
+        loop_var: workload
+
+    - name: Cleanup temporary files
+      ansible.builtin.file:
+        path: "{{ cert_dir }}"
+        state: absent

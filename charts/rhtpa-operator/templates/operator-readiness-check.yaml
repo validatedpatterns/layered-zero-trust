@@ -10,7 +10,7 @@ metadata:
   labels:
     {{- include "rhtpa-operator.labels" . | nindent 4 }}
   annotations:
-    argocd.argoproj.io/sync-wave: "40"  # Before CR creation (wave 50)
+    argocd.argoproj.io/sync-wave: "71"  # Before CR creation (wave 81)
     policy.open-cluster-management.io/standards: NIST SP 800-53
     policy.open-cluster-management.io/categories: CM Configuration Management
     policy.open-cluster-management.io/controls: CM-2 Baseline Configuration
@@ -59,7 +59,7 @@ metadata:
   labels:
     {{- include "rhtpa-operator.labels" . | nindent 4 }}
   annotations:
-    argocd.argoproj.io/sync-wave: "40"
+    argocd.argoproj.io/sync-wave: "71"
 placementRef:
   name: placement-policy-rhtpa-operator-ready
   kind: PlacementRule
@@ -77,7 +77,7 @@ metadata:
   labels:
     {{- include "rhtpa-operator.labels" . | nindent 4 }}
   annotations:
-    argocd.argoproj.io/sync-wave: "40"
+    argocd.argoproj.io/sync-wave: "71"
 spec:
   clusterConditions:
     - status: "True"

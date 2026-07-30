@@ -1,0 +1,98 @@
+{{- if and (eq .Values.rhtpa.zeroTrust.oidc.enabled true) (ne .Values.rhtpa.zeroTrust.oidc.clients.cli.apiId "") }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: server-entra-auth
+  namespace: {{ .Release.Namespace }}
+data:
+  auth.yaml: |
+    authentication:
+      clients:
+        # Microsoft Entra ID Frontend Client (for user sign-in)
+        - clientId: {{ .Values.rhtpa.zeroTrust.oidc.clients.frontend.clientId }}
+          issuerUrl: {{ .Values.rhtpa.zeroTrust.oidc.authServerUrl }}
+          requiredAudience: {{ .Values.rhtpa.zeroTrust.oidc.clients.cli.apiId }}
+          scopeMappings:
+            "read:document":
+              - "ai"
+              - "read.sbom"
+              - "read.advisory"
+              - "read.importer"
+              - "read.metadata"
+              - "read.sbomGroup"
+              - "read.weakness"
+              - "read.systemInformation"
+            "create:document":
+              - "create.sbom"
+              - "create.advisory"
+              - "create.importer"
+              - "create.metadata"
+              - "create.sbomGroup"
+              - "create.weakness"
+              - "update.sbom"
+              - "update.advisory"
+              - "update.importer"
+              - "update.metadata"
+              - "update.sbomGroup"
+              - "update.weakness"
+              - "upload.dataset"
+            "update:document":
+              - "update.sbom"
+              - "update.advisory"
+              - "update.importer"
+              - "update.metadata"
+              - "update.sbomGroup"
+              - "update.weakness"
+            "delete:document":
+              - "delete.sbom"
+              - "delete.advisory"
+              - "delete.importer"
+              - "delete.metadata"
+              - "delete.sbomGroup"
+              - "delete.vulnerability"
+              - "delete.weakness"
+        # Microsoft Entra ID CLI/API Client (for client credentials)
+        - clientId: {{ .Values.rhtpa.zeroTrust.oidc.clients.cli.clientId }}
+          issuerUrl: {{ .Values.rhtpa.zeroTrust.oidc.authServerUrl }}
+          requiredAudience: {{ .Values.rhtpa.zeroTrust.oidc.clients.cli.apiId }}
+          scopeSelector: "$['scope','scp','roles']"
+          scopeMappings:
+            "App.Read.Document":
+              - "ai"
+              - "read.sbom"
+              - "read.advisory"
+              - "read.importer"
+              - "read.metadata"
+              - "read.sbomGroup"
+              - "read.weakness"
+              - "read.systemInformation"
+            "App.Create.Document":
+              - "create.sbom"
+              - "create.advisory"
+              - "create.importer"
+              - "create.metadata"
+              - "create.sbomGroup"
+              - "create.weakness"
+              - "update.sbom"
+              - "update.advisory"
+              - "update.importer"
+              - "update.metadata"
+              - "update.sbomGroup"
+              - "update.weakness"
+              - "upload.dataset"
+            "App.Update.Document":
+              - "update.sbom"
+              - "update.advisory"
+              - "update.importer"
+              - "update.metadata"
+              - "update.sbomGroup"
+              - "update.weakness"
+            "App.Delete.Document":
+              - "delete.sbom"
+              - "delete.advisory"
+              - "delete.importer"
+              - "delete.metadata"
+              - "delete.sbomGroup"
+              - "delete.vulnerability"
+              - "delete.weakness"
+{{- end }}

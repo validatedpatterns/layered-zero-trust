@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: qtodo-db-network-policy
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: qtodo-db
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # PostgreSQL — only from qtodo app pods in the same namespace
+  - ports:
+    - protocol: TCP
+      port: 5432
+    from:
+    - podSelector:
+        matchLabels:
+          app: qtodo
+  egress:
+  # DNS resolution via CoreDNS — OCP uses port 5353 (not 53)
+  - ports:
+    - protocol: UDP
+      port: 5353
+    - protocol: TCP
+      port: 5353
+    to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-dns

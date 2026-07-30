@@ -4,10 +4,19 @@ global:
   secretStore:
     name: "vault-backend"
     kind: "ClusterSecretStore"
+  registry:
+    enabled: false
+    domain: ""
+    repository: ""
+    user: ""
+    vaultPath: ""
+    passwordVaultKey: ""
 
 # QTodo application configuration
 app:
   name: qtodo
+  insecurePort: 8080
+  securePort: 8443
   images:
     main:
       name: quay.io/validatedpatterns/qtodo
@@ -15,13 +24,16 @@ app:
       # Modified to Always to force a pull so we can test changes to the container image without requiring manual deletion of images or restarts of argo
       pullPolicy: Always
       registry:
+        # Set to true to create registry auth secret for image pulls
+        # (also enabled when global.registry.enabled=true)
         auth: false
         secretName: qtodo-registry-auth
-        user: quay-user
-        # domain: quay-registry-quay-quay-enterprise.apps.example.com
-        # Registry credentials - stored in quay path
-        vaultPath: secret/data/hub/infra/quay/quay-users
-        passwordVaultKey: quay-user-password
+        # Falls back to global.registry.user
+        user: ""
+        # domain: registry.example.com  # REQUIRED when auth is enabled
+        # Vault path and key for registry password (set for your scenario)
+        vaultPath: ""
+        passwordVaultKey: ""
     spiffeHelper:
       name: registry.redhat.io/zero-trust-workload-identity-manager/spiffe-helper-rhel9
       version: v0.10.0
@@ -37,36 +49,67 @@ app:
 
   oidc:
     enabled: false  # Will be enabled when SPIFFE is enabled
+    # OIDC Provider: keycloak or entraid
+    provider: "keycloak"
     authServerUrl: ""
-    clientId: qtodo-app
+    realm: "ztvp"
+    clientId: ""
     applicationType: "web-app"
     authenticatedPaths: "/*"
     authenticatedPolicy: "authenticated"
+    # Federated client assertion using SPIFFE JWT SVID
+    clientAssertion:
+      enabled: true
+      jwtTokenPath: "/svids/jwt.token"
+    clientSecret:
+      enabled: false
+      name: "oidc-client-secret"
+      vaultPath: "secret/data/apps/qtodo/qtodo-oidc-client"
+    # Debug logging for OIDC components (requires oidc.enabled)
+    debug:
+      enabled: false
+      logLevels:
+        oidc: "DEBUG"
+        oidcClient: "DEBUG"
+        oidcRuntime: "TRACE"
+        oidcRuntimeProvider: "TRACE"
+        vertxHttp: "DEBUG"
+        vertxHttpImpl: "TRACE"
+    # Entra ID specific configuration
+    entraid:
+      tenantId: ""
+      audience: "api://AzureADTokenExchange"
 
-  # Keycloak realm configuration
-  keycloak:
-    realm: "ztvp"
+  # Route configuration
+  route:
+    termination: reencrypt
 
   spire:
     enabled: true   # Enable SPIFFE + OIDC integration by default
     sidecars: true
-    audiences:
-      - qtodo
+
+  # TLS Configuration
+  tls:
+    secret: qtodo-tls
+    serviceServing: true
 
   # Vault configuration for SPIFFE integration
   # Uses SPIFFE JWT to authenticate and fetch DB password
   vault:
     url: ""
     role: "qtodo"
+    # JWT Audience (auto-generated if not set)
+    # audience: "<URI for the audience>"
     # QTodo secrets path (app-level isolation)
     secretPath: "secret/data/apps/qtodo/qtodo-db"
 
-  # OIDC External Secret configuration
-  oidcSecret:
-    enabled: true
-    name: "oidc-client-secret"
-    # QTodo OIDC secret path (app-level isolation)
-    vaultPath: "secret/data/apps/qtodo/qtodo-oidc-client"
+  # Seed image Job: mirrors the upstream qtodo image into the configured
+  # registry so the deployment can pull before the supply-chain pipeline runs.
+  seedImage:
+    enabled: false
+    source: "quay.io/validatedpatterns/qtodo:latest"
+    tag: "latest"
+    image: "registry.redhat.io/openshift4/ose-tools-rhel9:latest"
 
   # Truststore configuration for Java CA certificates (PKCS12 format)
   truststore:

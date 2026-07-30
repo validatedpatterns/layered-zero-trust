@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spire-agent-coco
+  namespace: zero-trust-workload-identity-manager
+data:
+  agent.conf: |
+    {
+      "agent": {
+        "data_dir": "/var/lib/spire",
+        "log_level": "debug",
+        "retry_bootstrap": true,
+        "server_address": "spire-server.zero-trust-workload-identity-manager",
+        "server_port": "443",
+        "socket_path": "/tmp/spire-agent/public/spire-agent.sock",
+        "trust_bundle_path": "/run/spire/bundle/bundle.crt",
+        "trust_domain": "apps.{{ .Values.global.clusterDomain }}"
+      },
+      "health_checks": {
+        "bind_address": "0.0.0.0",
+        "bind_port": 9982,
+        "listener_enabled": true,
+        "live_path": "/live",
+        "ready_path": "/ready"
+      },
+      "plugins": {
+        "KeyManager": [
+          {
+            "disk": {
+              "plugin_data": {
+                "directory": "/var/lib/spire"
+              }
+            }
+          }
+        ],
+        "NodeAttestor": [
+          {
+            "x509pop": {
+              "plugin_data": {
+                "private_key_path": "/sealed/key.pem",
+                "certificate_path": "/sealed/cert.pem"
+              }
+            }
+          }
+        ],
+        "WorkloadAttestor": [
+          {
+            "unix": {
+              "plugin_data": {}
+            }
+          }
+        ]
+      },
+      "telemetry": {
+        "Prometheus": {
+          "host": "0.0.0.0",
+          "port": "9402"
+        }
+      }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spiffe-helper-config
+  namespace: zero-trust-workload-identity-manager
+data:
+  helper.conf: |-
+    agent_address = "/tmp/spire-agent/public/spire-agent.sock"
+    cmd = ""
+    cmd_args = ""
+    cert_dir = "/svids"
+    renew_signal = ""
+    svid_file_name = "svid.pem"
+    svid_key_file_name = "svid_key.pem"
+    svid_bundle_file_name = "svid_bundle.pem"

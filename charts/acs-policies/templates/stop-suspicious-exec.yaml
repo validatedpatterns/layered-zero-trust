@@ -1,0 +1,42 @@
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: stop-suspicious-exec
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  policyName: "Stop Suspicious Exec"
+  description: "Stops a pod if a suspicious command is executed"
+  remediation: "Review the pod's security context and command execution history."
+  {{- if .Values.policies.stopSuspiciousExec.disabled }}
+  disabled: true
+  {{- end }}
+  categories:
+    - "Security Best Practices"
+    - "Zero Trust"
+  lifecycleStages:
+    - "RUNTIME"
+  eventSource: "DEPLOYMENT_EVENT"
+  severity: "CRITICAL_SEVERITY"
+  enforcementActions:
+    - "KILL_POD_ENFORCEMENT"
+
+  scope:
+    - label: {}
+      namespace: "qtodo"
+
+  policySections:
+    - sectionName: "Suspicious Command Execution"
+      policyGroups:
+        - fieldName: "Process Name"
+          booleanOperator: "OR"
+          values:
+            - value: "ncat"
+            - value: "nmap"
+            - value: "nc"
+            - value: "netcat"
+            # curl and wget removed -- too broadly used by system components
+            # (router, keepalived, prometheus, build tasks) to be kill triggers.
+            # Re-enable only with tight namespace scoping and specific image exclusions.
+            # - value: "curl"
+            # - value: "wget"

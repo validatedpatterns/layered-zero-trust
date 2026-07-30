@@ -5,7 +5,7 @@ metadata:
   name: {{ .Values.noobaa.bucketClass.name }}
   namespace: {{ .Values.noobaa.namespace }}
   annotations:
-    argocd.argoproj.io/sync-wave: "3"  # Layer 1: Create BucketClass
+    argocd.argoproj.io/sync-wave: "34"  # Layer 1: Create BucketClass
 spec:
   placementPolicy:
     tiers:

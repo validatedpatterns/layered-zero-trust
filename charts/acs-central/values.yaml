@@ -1,0 +1,198 @@
+# Default values for ACS Central Services
+# This chart deploys the Central and Scanner components
+#
+# Cluster name for CRS (Cluster Registration Secret) registration
+clusterName: ""  # Will be set from global.localClusterName by pattern framework
+
+global:
+  pattern: layered-zero-trust
+  clusterDomain: cluster.local
+  localClusterDomain: apps.example.com
+  targetRevision: main
+  secretStore:
+    name: vault-backend
+    kind: ClusterSecretStore
+central:
+  # Enable/disable Central deployment
+  enabled: true
+
+  # Central configuration
+  adminPassword:
+    # Use external secret from Vault
+    useExternalSecret: true
+    secretName: central-admin-htpasswd
+    secretKey: password
+
+  # Image configuration
+  image:
+    registry: registry.redhat.io
+    repository: advanced-cluster-security/rhacs-main-rhel8
+    tag: "4.9.0"
+    pullPolicy: IfNotPresent
+
+  # Resource requirements
+  #resources:
+  #  requests:
+  #    cpu: 1500m
+  #    memory: 4Gi
+  #  limits:
+  #    cpu: 4000m
+  #    memory: 8Gi
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+
+  # Persistence configuration
+  persistence:
+    enabled: true
+    storageClass: ""  # Use default storage class
+    size: 100Gi
+    # Existing PVC if available
+    existingClaim: ""
+
+  # Database configuration
+  db:
+    enabled: true
+    persistence:
+      enabled: true
+      storageClass: ""
+      size: 100Gi
+    resources:
+      requests:
+        cpu: 200m
+        memory: 2Gi
+      limits:
+        cpu: 500m
+        memory: 4Gi
+
+  # Exposure configuration
+  exposure:
+    route:
+      enabled: true
+      host: "" # Autogenerate if not specified
+      tls:
+        enabled: true
+        termination: passthrough
+      reencrypt:
+        enabled: true
+        host: "" # Autogenerate if not specified
+    loadBalancer:
+      enabled: false
+
+  # Monitoring integration
+  monitoring:
+    enabled: true
+    openshift:
+      enabled: true
+
+scanner:
+  # Enable/disable Scanner deployment
+  enabled: true
+
+  # Scanner V4 configuration (recommended)
+  scannerV4:
+    enabled: true
+
+    # Indexer component
+    indexer:
+      replicas: 1 # default 3
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+
+      # Auto-scaling configuration
+      autoscaling:
+        enabled: true
+        minReplicas: 1 # default 2
+        maxReplicas: 2 # default 5
+        targetCPUUtilizationPercentage: 70
+
+    # Matcher component
+    matcher:
+      replicas: 1 # default 2
+      resources:
+        requests:
+          cpu: 250m
+          memory: 500Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+
+    # Database
+    db:
+      persistence:
+        enabled: true
+        storageClass: ""
+        size: 100Gi
+      resources:
+        requests:
+          cpu: 200m
+          memory: 2Gi
+        limits:
+          cpu: 500m
+          memory: 4Gi
+
+# Integration with other pattern components
+integration:
+  # Quay registry integration
+  quay:
+    enabled: false
+    url: ""
+    robotAccountToken:
+      secretName: quay-integration
+      secretKey: token
+
+  # Vault integration for secrets
+  vault:
+    enabled: true
+    role: acs-central
+
+  # Keycloak SSO integration
+  keycloak:
+    enabled: true
+    realm: ztvp
+    clientId: acs-central
+    clientSecret:
+      secretName: keycloak-acs-client
+      secretKey: secret
+    # OIDC claim mappings - these map identity provider claims to ACS attributes
+    # Different identity providers may use different claim names
+    claimMappings:
+      name: preferred_username    # Keycloak default; Azure AD might use "upn" or "unique_name"
+      email: email                # Standard claim across most providers
+      groups: groups              # Keycloak/Okta use "groups"; Azure AD might use "groups" or custom claim
+      roles: roles                # Custom claim for role-based access control
+    # Container image for the auth provider configuration job
+    # Uses OpenShift CLI tools (curl, oc, jq, etc.)
+    jobImage:
+      registry: registry.redhat.io
+      repository: openshift4/ose-cli-rhel9
+      tag: latest
+      pullPolicy: IfNotPresent
+    # Service account used by jobs (init bundle, auth provider, htpasswd)
+    serviceAccountName: create-cluster-init
+
+# Network policies
+networkPolicies:
+  enabled: true
+  # Allow traffic from secured clusters
+  allowFromSecuredClusters: true
+
+# Security context
+securityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+# Node selector and tolerations
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -1,0 +1,144 @@
+---
+# Configure SPIRE Server to support x509pop node attestation for CoCo pods
+# The Red Hat SPIRE Operator's SpireServer CRD does not expose x509pop plugin configuration
+# This job patches the operator-generated ConfigMap and StatefulSet to add x509pop support
+#
+# IMPORTANT: The operator must have CREATE_ONLY_MODE=true env var set (via subscription
+# config) to prevent it from reverting our manual patches. Without this, the operator
+# continuously reconciles and overwrites x509pop changes.
+# Note: In v0.2.0 (tech-preview) this was done via a CR annotation
+# (ztwim.openshift.io/create-only). In v1.0.0 (GA) it changed to the env var.
+
+- name: Configure SPIRE Server for x509pop attestation
+  become: false
+  connection: local
+  hosts: localhost
+  gather_facts: false
+  vars:
+    spire_namespace: "zero-trust-workload-identity-manager"
+    configmap_name: "spire-server"
+    statefulset_name: "spire-server"
+    ca_configmap_name: "spire-x509pop-ca"
+    ca_mount_path: "/run/spire/x509pop-ca"
+  tasks:
+    - name: Get ZeroTrustWorkloadIdentityManager CR to determine expected cluster name # noqa: syntax-check[unknown-module]
+      kubernetes.core.k8s_info:
+        api_version: operator.openshift.io/v1alpha1
+        kind: ZeroTrustWorkloadIdentityManager
+        name: cluster
+      register: ztwim_cr
+      retries: 30
+      delay: 10
+      until: ztwim_cr.resources | length > 0
+
+    - name: Extract expected cluster name from ZTWIM CR
+      ansible.builtin.set_fact:
+        expected_cluster_name: "{{ ztwim_cr.resources[0].spec.clusterName }}"
+
+    - name: Display expected cluster name
+      ansible.builtin.debug:
+        msg: "Expected cluster name from ZTWIM CR: {{ expected_cluster_name }}"
+
+    - name: Wait for SPIRE Server ConfigMap with correct cluster name # noqa: syntax-check[unknown-module]
+      kubernetes.core.k8s_info:
+        kind: ConfigMap
+        namespace: "{{ spire_namespace }}"
+        name: "{{ configmap_name }}"
+      register: spire_configmap
+      retries: 60
+      delay: 5
+      until: >
+        spire_configmap.resources | length > 0 and
+        (spire_configmap.resources[0].data['server.conf'] | from_json
+        ).plugins.NodeAttestor[0].k8s_psat.plugin_data.clusters[0][expected_cluster_name] is defined
+
+    - name: ConfigMap has correct cluster name
+      ansible.builtin.debug:
+        msg: "ConfigMap verified with correct cluster name: {{ expected_cluster_name }}"
+
+    - name: Get current SPIRE Server configuration # noqa: syntax-check[unknown-module]
+      kubernetes.core.k8s_info:
+        kind: ConfigMap
+        namespace: "{{ spire_namespace }}"
+        name: "{{ configmap_name }}"
+      register: spire_config
+
+    - name: Parse server configuration
+      ansible.builtin.set_fact:
+        server_conf: "{{ spire_config.resources[0].data['server.conf'] | from_json }}"
+
+    - name: Check if x509pop already configured
+      ansible.builtin.set_fact:
+        x509pop_exists: "{{ server_conf.plugins.NodeAttestor | selectattr('x509pop', 'defined') | list | length > 0 }}"
+
+    - name: Add x509pop NodeAttestor plugin # noqa: syntax-check[unknown-module]
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: "{{ configmap_name }}"
+            namespace: "{{ spire_namespace }}"
+          data:
+            server.conf: >-
+              {{ server_conf | combine({'plugins': {'NodeAttestor':
+              server_conf.plugins.NodeAttestor + [{'x509pop': {'plugin_data':
+              {'ca_bundle_path': '/run/spire/x509pop-ca/ca-bundle.pem'}}}]}},
+              recursive=True) | to_json }}
+      when: not x509pop_exists
+
+    - name: Wait for SPIRE Server StatefulSet to exist # noqa: syntax-check[unknown-module]
+      kubernetes.core.k8s_info:
+        kind: StatefulSet
+        namespace: "{{ spire_namespace }}"
+        name: "{{ statefulset_name }}"
+      register: spire_statefulset
+      retries: 30
+      delay: 10
+      until: spire_statefulset.resources | length > 0
+
+    - name: Check if CA volume already mounted
+      ansible.builtin.set_fact:
+        ca_volume_exists: "{{ spire_statefulset.resources[0].spec.template.spec.volumes | selectattr('name', 'equalto', 'x509pop-ca') | list | length > 0 }}"
+
+    - name: Add CA volume to SPIRE Server StatefulSet # noqa: syntax-check[unknown-module]
+      kubernetes.core.k8s:
+        state: patched
+        kind: StatefulSet
+        namespace: "{{ spire_namespace }}"
+        name: "{{ statefulset_name }}"
+        definition:
+          spec:
+            template:
+              spec:
+                volumes:
+                  - name: x509pop-ca
+                    configMap:
+                      name: "{{ ca_configmap_name }}"
+                containers:
+                  - name: spire-server
+                    volumeMounts:
+                      - name: x509pop-ca
+                        mountPath: "{{ ca_mount_path }}"
+                        readOnly: true
+      when: not ca_volume_exists
+
+    - name: Restart SPIRE Server to apply configuration # noqa: syntax-check[unknown-module]
+      kubernetes.core.k8s:
+        state: absent
+        kind: Pod
+        namespace: "{{ spire_namespace }}"
+        label_selectors:
+          - app.kubernetes.io/name=server
+      when: (not x509pop_exists) or (not ca_volume_exists)
+
+    - name: Configuration status
+      ansible.builtin.debug:
+        msg: >-
+          {{ 'x509pop already configured' if (x509pop_exists and ca_volume_exists)
+          else 'x509pop NodeAttestor plugin and CA volume mount configured successfully' }}
+
+    - name: Final status
+      ansible.builtin.debug:
+        msg: "x509pop configuration complete. CREATE_ONLY_MODE env var on the operator prevents reverts."

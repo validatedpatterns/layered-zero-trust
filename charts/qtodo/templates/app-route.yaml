@@ -7,10 +7,10 @@ metadata:
   name: qtodo
 spec:
   port:
-    targetPort: 8080-tcp
+    targetPort: {{ printf "%s-tcp" (include "qtodo.app.port" .) }}
   tls:
     insecureEdgeTerminationPolicy: Redirect
-    termination: edge
+    termination: {{ .Values.app.route.termination }}
   to:
     kind: Service
     name: qtodo

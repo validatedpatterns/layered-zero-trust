@@ -1,0 +1,42 @@
+# Tekton Chains Configuration for ZTVP
+# Configures the TektonConfig CR to enable Tekton Chains with RHTAS keyless signing
+
+global:
+  hubClusterDomain: apps.example.com
+
+chains:
+  enabled: true
+
+  artifacts:
+    taskrun:
+      format: in-toto
+      storage: oci
+      signer: x509
+    pipelinerun:
+      format: in-toto
+      storage: oci
+      signer: x509
+      enableDeepInspection: true
+    oci:
+      format: simplesigning
+      storage: oci
+      signer: x509
+
+  transparency:
+    enabled: true
+
+  signers:
+    x509:
+      fulcio:
+        enabled: true
+        provider: spiffe
+      tuf:
+        enabled: true
+
+  tuf:
+    name: tuf
+    mountPath: /tuf
+
+  spiffe:
+    socketMount: /spiffe-workload-api
+    socketFile: spire-agent.sock

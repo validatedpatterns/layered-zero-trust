@@ -1,0 +1,57 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: qtodo-network-policy
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: qtodo
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Only allow inbound traffic from the OpenShift router.
+  # Router pods use hostNetwork:true so traffic arrives from node IPs, not pod IPs.
+  # OVN-K requires the policy-group.network.openshift.io/ingress label (empty value)
+  # to generate the correct ACLs for host-network ingress traffic.
+  - ports:
+    - protocol: TCP
+      port: {{ include "qtodo.app.port" . }}
+    from:
+    - namespaceSelector:
+        matchLabels:
+          policy-group.network.openshift.io/ingress: ""
+  egress:
+  # DNS resolution via CoreDNS — OCP uses port 5353 (not 53)
+  - ports:
+    - protocol: UDP
+      port: 5353
+    - protocol: TCP
+      port: 5353
+    to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-dns
+  # PostgreSQL — qtodo-db pod in the same namespace
+  - ports:
+    - protocol: TCP
+      port: 5432
+    to:
+    - podSelector:
+        matchLabels:
+          app: qtodo-db
+  # Vault API — SPIFFE JWT auth for DB credentials retrieval
+  - ports:
+    - protocol: TCP
+      port: 8200
+    to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: vault
+  # Keycloak OIDC back-channel — external Route resolves to the router's load-balancer IP,
+  # which is not a pod IP in any namespace. namespaceSelector cannot match external IPs,
+  # so a port-only rule is required for the code-to-token exchange POST to work.
+  - ports:
+    - protocol: TCP
+      port: 443

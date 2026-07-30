@@ -1,0 +1,122 @@
+{{- if and (index .Values.registry "embeddedOpenShift") (index .Values.registry.embeddedOpenShift "ensureImageNamespaceRBAC") }}
+{{- $repository := .Values.registry.repository | default .Values.global.registry.repository }}
+{{- $imageNamespace := index (splitList "/" $repository) 0 }}
+# When using the embedded OpenShift image registry, the pipeline pushes to a
+# namespace that matches the first path component of registry.repository
+# (e.g. "ztvp" from "ztvp/qtodo"). This ensures that namespace exists and the
+# pipeline SA has system:image-builder so the push succeeds.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $imageNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pipeline-image-builder
+  namespace: {{ $imageNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:image-builder
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.pipelineServiceAccount }}
+    namespace: {{ .Values.global.namespace }}
+---
+# Enable the default route on the embedded OpenShift image registry so that
+# the pipeline can push and external clients can pull images via the route.
+# Uses a Job because the imageregistry config is a cluster-singleton managed
+# by the image-registry operator; declarative ownership would conflict.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.registry.embeddedOpenShift.routeEnablerServiceAccount }}
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Values.global.namespace }}-registry-route-enabler
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+rules:
+- apiGroups: ["imageregistry.operator.openshift.io"]
+  resources: ["configs"]
+  verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Values.global.namespace }}-registry-route-enabler
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Values.global.namespace }}-registry-route-enabler
+subjects:
+- kind: ServiceAccount
+  name: {{ .Values.registry.embeddedOpenShift.routeEnablerServiceAccount }}
+  namespace: {{ .Values.global.namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: enable-registry-default-route
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      serviceAccountName: {{ .Values.registry.embeddedOpenShift.routeEnablerServiceAccount }}
+      restartPolicy: Never
+      containers:
+      - name: enable-route
+        image: {{ .Values.images.ubi }}
+        command:
+        - /bin/sh
+        - -ce
+        - |
+          APISERVER="https://kubernetes.default.svc"
+          TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+          CACERT="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+          RESOURCE_URL="${APISERVER}/apis/imageregistry.operator.openshift.io/v1/configs/cluster"
+          AUTH_HEADER="Authorization: Bearer ${TOKEN}"
+
+          echo "Checking current defaultRoute status..."
+          BODY=$(curl -sS --cacert "${CACERT}" -H "${AUTH_HEADER}" "${RESOURCE_URL}")
+          rc=$?; if [ $rc -ne 0 ]; then echo "ERROR: GET failed (curl rc=${rc})"; exit 1; fi
+
+          # Parse defaultRoute from JSON without jq/grep dependency
+          case "${BODY}" in
+            *'"defaultRoute":true'*) echo "Default route already enabled, nothing to do."; exit 0 ;;
+          esac
+
+          echo "Enabling default route on embedded OpenShift image registry..."
+          RESP=$(curl -sS -w "\n%{http_code}" --cacert "${CACERT}" \
+            -H "${AUTH_HEADER}" \
+            -H "Content-Type: application/merge-patch+json" \
+            -X PATCH -d '{"spec":{"defaultRoute":true}}' \
+            "${RESOURCE_URL}")
+          HTTP_CODE=$(echo "${RESP}" | tail -1)
+
+          if [ "${HTTP_CODE}" -ge 200 ] 2>/dev/null && [ "${HTTP_CODE}" -lt 300 ] 2>/dev/null; then
+            echo "Default route enabled successfully (HTTP ${HTTP_CODE})."
+          else
+            echo "ERROR: PATCH failed (HTTP ${HTTP_CODE})."
+            echo "${RESP}" | head -5
+            exit 1
+          fi
+{{- end }}

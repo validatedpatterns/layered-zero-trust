@@ -1,0 +1,94 @@
+# Azure Entra ID integration
+# Depends on: supply-chain
+#
+# Replace placeholders with your actual Azure Entra ID values:
+#   - <YOUR_TENANT_ID>: Directory (tenant) ID from Azure Portal
+#   - <QTODO_CLIENT_ID>: Application (client) ID for qtodo
+#   - <RHTAS_CLIENT_ID>: Application (client) ID for RHTAS
+#   - <RHTPA_FRONTEND_CLIENT_ID>: Application (client) ID for RHTPA frontend
+#   - <RHTPA_API_CLIENT_ID>: Application (client) ID for RHTPA API/CLI
+#   - <YOUR_ENTRAID_EMAIL>: Your email address for RHTAS identity
+#
+clusterGroup:
+  merge_into_applications:
+    qtodo:
+      overrides:
+        # Enable OIDC authentication
+        - name: app.oidc.enabled
+          value: "true"
+        # Set Entra ID as the OIDC provider (enables client assertion)
+        - name: app.oidc.provider
+          value: "entraid"
+        # Entra ID tenant ID (from Azure portal)
+        - name: app.oidc.entraid.tenantId
+          value: "<YOUR_TENANT_ID>"
+        # Application (client) ID from Azure portal
+        - name: app.oidc.clientId
+          value: "<QTODO_CLIENT_ID>"
+        # API identifier (Application ID URI) - used as JWT audience for client assertion
+        - name: app.oidc.entraid.audience
+          value: "api://AzureADTokenExchange"
+        # Enable client assertion (SPIFFE JWT) - recommended for zero-trust
+        - name: app.oidc.clientAssertion.enabled
+          value: "true"
+        # Disable client secret when using client assertion
+        - name: app.oidc.clientSecret.enabled
+          value: "false"
+        # Alternative: Use client secret instead of client assertion (not recommended)
+        # Uncomment these and comment out the client assertion settings above
+        # - name: app.oidc.provider
+        #   value: "entraid"
+        # - name: app.oidc.entraid.tenantId
+        #   value: "<YOUR_TENANT_ID>"
+        # - name: app.oidc.clientSecret.enabled
+        #   value: "true"
+        # - name: app.oidc.clientSecret.vaultPath
+        #   value: "secret/data/apps/qtodo/qtodo-oidc-entraid"
+        # - name: app.oidc.clientAssertion.enabled
+        #   value: "false"
+    trusted-artifact-signer:
+      overrides:
+        - name: rhtas.zeroTrust.email.issuer
+          value: "https://login.microsoftonline.com/<YOUR_TENANT_ID>/v2.0"
+        - name: rhtas.fulcio.oidcIssuers.email.clientID
+          value: "<RHTAS_CLIENT_ID>"
+    trusted-profile-analyzer:
+        overrides:
+          - name: rhtpa.zeroTrust.oidc.authServerUrl
+            value: "https://login.microsoftonline.com/<YOUR_TENANT_ID>/v2.0"
+          - name: rhtpa.zeroTrust.oidc.clients.frontend.clientId
+            value: "<RHTPA_FRONTEND_CLIENT_ID>"
+          - name: rhtpa.zeroTrust.oidc.clients.cli.clientId
+            value: "<RHTPA_API_CLIENT_ID>"
+          - name: rhtpa.zeroTrust.oidc.clients.cli.apiId
+            value: "<RHTPA_API_CLIENT_ID>"  # UUID only - Helm template prepends api://
+    supply-chain:
+      overrides:
+        - name: rhtas.spire.enabled
+          value: "false"
+        - name: rhtas.oidc.enabled
+          value: "true"
+        - name: rhtas.oidc.url
+          value: "https://login.microsoftonline.com/<YOUR_TENANT_ID>/v2.0"
+        - name: rhtas.oidc.clientId
+          value: "<RHTAS_CLIENT_ID>"
+        - name: rhtas.oidc.clientSecretName
+          value: ""
+        - name: rhtas.oidc.issuer
+          value: "https://login.microsoftonline.com/<YOUR_TENANT_ID>/v2.0"
+        - name: rhtas.oidc.identity
+          value: "<YOUR_ENTRAID_EMAIL>"
+        - name: rhtpa.oidc.url
+          value: "https://login.microsoftonline.com/<YOUR_TENANT_ID>"  # Do not include /v2.0
+        - name: rhtpa.oidc.clientId
+          value: "<RHTPA_API_CLIENT_ID>"
+        - name: rhtpa.oidc.apiId
+          value: "<RHTPA_API_CLIENT_ID>"  # UUID only - script prepends api://
+    vault:
+      jwt:
+        roles:
+          - name: qtodo
+            audience: api://AzureADTokenExchange
+            subject: spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/qtodo/sa/qtodo
+            policies:
+              - apps-qtodo-jwt-secret

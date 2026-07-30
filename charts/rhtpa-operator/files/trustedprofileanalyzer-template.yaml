@@ -15,7 +15,8 @@
     spec:
       appDomain: "APP_DOMAIN"
       TLS_CONFIG
-      OIDC_CONFIG
+OIDC_CONFIG
+AUTHENTICATOR_CONFIG
       createDatabase:
         name: DATABASE_NAME
         username: rhtpa
@@ -25,7 +26,7 @@
               name: rhtpa-db-secret
               key: password
       migrateDatabase: {}
-      MODULES_CONFIG
+MODULES_CONFIG
       SIGSTORE_CONFIG
       database:
         host: rhtpa-db.RHTPA_NAMESPACE.svc.cluster.local

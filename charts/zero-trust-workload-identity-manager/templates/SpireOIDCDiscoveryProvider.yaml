@@ -1,7 +1,0 @@
-apiVersion: operator.openshift.io/v1alpha1
-kind: SpireOIDCDiscoveryProvider
-metadata:
-  name: cluster
-spec:
-  jwtIssuer: {{ include "zero-trust-workload-identity-manager.jwtIssuer" . }}
-  managedRoute: {{ (.Values.spire.oidcDiscoveryProvider.ingress.operatorManaged | default true) | quote }}

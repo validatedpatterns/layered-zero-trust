@@ -1,0 +1,76 @@
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: prevent-runtime-privilege-escalation
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  policyName: "Prevent Runtime Privilege Escalation"
+  description: "Detects and stops containers attempting to escalate privileges at runtime"
+  remediation: |
+    This pod was terminated because it attempted to escalate privileges at runtime.
+
+    Common causes:
+    1. Container running sudo, su, or pkexec commands
+    2. Exploitation attempt using privilege escalation vulnerability
+    3. Misconfigured application trying to run privileged operations
+
+    Required actions:
+    1. Review pod security context - ensure runAsNonRoot: true
+    2. Remove privileged binaries from container image
+    3. Use proper RBAC and service accounts instead of privilege escalation
+    4. Investigate if this indicates a security incident
+  {{- if .Values.policies.preventRuntimePrivilegeEscalation.disabled }}
+  disabled: true
+  {{- end }}
+  categories:
+    - "Security Best Practices"
+    - "Zero Trust"
+  lifecycleStages:
+    - "RUNTIME"
+  eventSource: "DEPLOYMENT_EVENT"
+  severity: "CRITICAL_SEVERITY"
+  enforcementActions:
+    - "KILL_POD_ENFORCEMENT"
+
+  scope:
+    - label: {}
+      namespace: "qtodo"
+
+  policySections:
+    - sectionName: "Privilege Escalation Binary Execution"
+      policyGroups:
+        # Detect common privilege escalation commands
+        - fieldName: "Process Name"
+          booleanOperator: "OR"
+          values:
+            - value: "sudo"
+            - value: "su"
+            - value: "pkexec"
+            - value: "doas"
+            - value: "runuser"
+
+    - sectionName: "Setuid Binary Execution"
+      policyGroups:
+        # Detect execution of setuid binaries
+        - fieldName: "Process Name"
+          booleanOperator: "OR"
+          values:
+            - value: "passwd"
+            - value: "chsh"
+            - value: "chfn"
+            - value: "gpasswd"
+            - value: "newgrp"
+            - value: "mount"
+            - value: "umount"
+
+    - sectionName: "Container Escape Indicators"
+      policyGroups:
+        # Detect common container escape techniques
+        - fieldName: "Process Arguments"
+          booleanOperator: "OR"
+          values:
+            - value: ".*nsenter.*"
+            - value: ".*unshare.*"
+            - value: ".*chroot /host.*"
+            - value: ".*/proc/sys/kernel.*"

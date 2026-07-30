@@ -4,7 +4,7 @@ metadata:
   name: noobaa-default-backing-store
   namespace: {{ .Values.noobaa.namespace }}
   annotations:
-    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-wave: "32"
 spec:
   type: pv-pool
   pvPool:

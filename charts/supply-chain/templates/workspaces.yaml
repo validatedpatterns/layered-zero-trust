@@ -7,7 +7,7 @@ metadata:
   name: {{ .name }}
   namespace: {{ .namespace | default $.Values.global.namespace }}
   annotations:
-    argocd.argoproj.io/sync-wave: '20'
+    argocd.argoproj.io/sync-wave: '51'
   labels:
     app.kubernetes.io/component: storage
 spec:

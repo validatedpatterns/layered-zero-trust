@@ -1,0 +1,6 @@
+# Platform override: VSphere
+# vSphere clusters typically use self-signed ingress certificates, so workloads
+# (e.g. ACS Central → Keycloak) need the ingress CA injected via the
+# cluster proxy trustedCA mechanism.
+proxyCA:
+  enabled: true

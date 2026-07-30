@@ -1,9 +1,11 @@
 import logging
 import os
 import subprocess
+import tempfile
 import time
 
 import requests
+from jinja2 import Template
 from ocp_resources.pod import Pod
 from ocp_resources.project_project_openshift_io import Project
 from ocp_resources.replica_set import ReplicaSet
@@ -163,32 +165,10 @@ def wait_for(
     return rsp
 
 
-def run_shell_script(script_path, args=None, cwd=None, timeout=300):
-    """
-    Run a shell script and return its result.
-
-    Args:
-        script_path: Path to the shell script to execute
-        args: Optional list of arguments to pass to the script
-        cwd: Optional working directory for script execution
-        timeout: Maximum time in seconds to wait for script completion (default: 300)
-
-    Returns:
-        A dictionary containing:
-            - returncode: The exit code of the script
-            - stdout: Standard output from the script
-            - stderr: Standard error from the script
-            - success: Boolean indicating if returncode was 0
-    """
-    logger.info(f"Running shell script: {script_path}")
-
-    cmd = [script_path]
-    if args:
-        cmd.extend(args)
-
+def run_cmds(cmds, cwd=None, timeout=300):
     try:
         result = subprocess.run(
-            cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout
+            cmds, cwd=cwd, capture_output=True, text=True, timeout=timeout
         )
 
         logger.debug(f"Script exit code: {result.returncode}")
@@ -208,3 +188,69 @@ def run_shell_script(script_path, args=None, cwd=None, timeout=300):
     except Exception as e:
         logger.error(f"Failed to execute script: {e}")
         raise
+
+
+def run_shell_script(script_path, args=None, cwd=None, timeout=300):
+    """
+    Run a shell script and return its result.
+
+    Args:
+        script_path: Path to the shell script to execute
+        args: Optional list of arguments to pass to the script
+        cwd: Optional working directory for script execution
+        timeout: Maximum time in seconds to wait for script completion (default: 300)
+
+    Returns:
+        A dictionary containing:
+            - returncode: The exit code of the script
+            - stdout: Standard output from the script
+            - stderr: Standard error from the script
+            - success: Boolean indicating if returncode was 0
+    """
+    logger.info(f"Running shell script: {script_path}")
+
+    cmds = [script_path]
+    if args:
+        cmds.extend(args)
+
+    try:
+        return run_cmds(cmds, cwd=cwd, timeout=timeout)
+    except Exception:
+        raise
+
+
+def render_yaml_template(yaml_file_path, template_vars=None, delete=True):
+    """
+    Read a YAML file, render it as a Jinja template, and write to a temporary file.
+
+    Args:
+        yaml_file_path: Path to the YAML template file
+        template_vars: Dictionary of variables to substitute in the template
+        delete: If True, temp file will be deleted when closed (default: True)
+
+    Returns:
+        A NamedTemporaryFile object containing the rendered YAML.
+        The caller is responsible for closing/deleting the file if delete=False.
+    """
+    if template_vars is None:
+        template_vars = {}
+
+    logger.info(f"Reading YAML template from: {yaml_file_path}")
+
+    with open(yaml_file_path, "r") as f:
+        template_content = f.read()
+
+    template = Template(template_content)
+    rendered_content = template.render(template_vars)
+
+    logger.debug(f"Rendered YAML content:\n{rendered_content}")
+
+    temp_file = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".yaml", delete=delete, prefix="rendered_"
+    )
+    temp_file.write(rendered_content)
+    temp_file.flush()
+
+    logger.info(f"Rendered YAML written to temporary file: {temp_file.name}")
+
+    return temp_file

@@ -38,6 +38,18 @@ customCA:
   #   oc create secret generic <name> --from-file=ca.crt=/path/to/cert.crt -n openshift-config
   # Configure via overrides/values-ztvp-certificates.yaml (using extraValueFiles)
   additionalCertificates: []
+
+  # Remote host CA extraction: fetch TLS CA chains directly from remote hosts.
+  # No authentication needed -- CA certificates are part of the public TLS handshake.
+  # The extraction Job runs openssl s_client against each host on port 443 and
+  # saves the full certificate chain. Useful for internal Git servers, registries,
+  # or any service behind a corporate CA.
+  # The CronJob keeps the extracted CAs fresh automatically.
+  remoteHosts: []
+  # Example:
+  # remoteHosts:
+  #   - gitlab.cee.redhat.com
+  #   - registry.internal.example.com
   # Example:
   # additionalCertificates:
   #   - name: corporate-root-ca
@@ -91,7 +103,7 @@ job:
   # Container image for CA extraction
   image:
     registry: registry.redhat.io
-    repository: openshift4/ose-cli
+    repository: openshift4/ose-cli-rhel9
     tag: latest
     pullPolicy: IfNotPresent
   
@@ -114,10 +126,34 @@ job:
 # ConfigMap name that will be created in global.namespace
 configMapName: ztvp-trusted-ca
 
+# Namespaces from which the CA extraction Job reads secrets and configmaps.
+# A namespace-scoped Role + RoleBinding pair is created for each entry.
+caReader:
+  namespaces:
+    - openshift-ingress-operator
+    - openshift-ingress
+    - openshift-config
+    - openshift-config-managed
+
+# Proxy CA configuration
+# Configures the OpenShift cluster proxy trustedCA so custom CAs (ingress, service)
+# are auto-injected into all workloads via the cluster network operator.
+# Required for workloads that verify TLS of routes (e.g., ACS Central reaching Keycloak).
+proxyCA:
+  enabled: true
+  configMapName: ztvp-proxy-ca
+
 # Automatic rollout configuration
 # After certificate extraction, automatically restart consuming applications
 rollout:
   enabled: true
+
+  # Namespaces where the SA is allowed to restart workloads.
+  # Each entry creates a namespace-scoped RoleBinding referencing the
+  # rollout ClusterRole.  Keep this list minimal — only namespaces that
+  # actually consume the rotated certificates need to be listed.
+  namespaces:
+    - qtodo
   
   # Strategy: how to identify resources to restart
   # - "all": Restart all Deployments/StatefulSets in target namespaces
@@ -176,6 +212,25 @@ distribution:
   # Distribution method: ACM Policy distributes ConfigMaps to target namespaces
   # Requires: ManagedClusterSetBinding in the namespace
   method: "acm-policy"
+
+# Node-level image pull trust for kubelet
+# Configures image.config.openshift.io/cluster additionalTrustedCA so that
+# kubelet can pull images from registries behind the cluster's ingress (e.g.
+# built-in Quay). Without this, kubelet image pulls fail with
+# "x509: certificate signed by unknown authority" when the ingress uses a
+# self-signed or cluster-internal CA.
+imagePullTrust:
+  # Set to true to create the registry-CA ConfigMap and patch image.config
+  enabled: false
+  # ConfigMap name created in openshift-config for image.config additionalTrustedCA
+  configMapName: ztvp-registry-cas
+  # Registry hostnames that need the ingress CA for image pulls.
+  # Each becomes a key in the ConfigMap with the ingress CA as the value.
+  # Use {{ .Values.global.hubClusterDomain }} in values-hub.yaml overrides.
+  registries: []
+  # Example (built-in Quay):
+  # registries:
+  #   - quay-registry-quay-quay-enterprise.apps.example.com
 
 # Debugging options
 debug:

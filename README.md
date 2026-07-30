@@ -11,33 +11,66 @@
 
 Showcases the Zero Trust capabilities across Red Hat's product portfolio in a reproducible manner.
 
+### Architecture Overview
+
+The pattern is structured in layers, each building on the one below it:
+
+* **Validated Patterns Framework** — bootstraps the cluster using OpenShift GitOps (Argo CD) and the Validated Patterns Operator. All subsequent components are deployed and reconciled by Argo CD.
+* **Layer 0 — Foundations** — establishes a secure cluster baseline: TLS certificate management, compliance scanning, advanced cluster management, and runtime security enforcement.
+* **Layer 1 — Feature Sets** — provisions workload identities (SPIFFE/SPIRE), manages secrets (Vault + ESO), and provides user authentication (Keycloak). Optionally includes a private image registry (Quay + NooBaa).
+* **Layer 2 — Mapping** — deploys the demo application (qtodo) and, optionally, the full secure supply chain pipeline (RHTAS, RHTPA, OpenShift Pipelines).
+
+See `docs/diagrams/` for logical and schematic diagrams of the pattern.
+
 ### Components
 
-The following components are included in the Layered Zero Trust Pattern
+Components are grouped by their origin and whether they are always deployed or opt-in.
+
+#### Validated Patterns Framework (provided by the VP project)
+
+These components are part of every Validated Pattern and are not specific to ZTVP. Their Helm charts live in the [validatedpatterns](https://github.com/validatedpatterns) organization.
+
+* [OpenShift GitOps (Argo CD)](https://docs.redhat.com/en/documentation/red_hat_openshift_gitops)
+  * Deploys and continuously reconciles all pattern components via GitOps
+* [Validated Patterns Operator](https://validatedpatterns.io)
+  * Bootstraps the pattern, manages the Hub/Spoke lifecycle, and drives imperative jobs
+
+#### Core ZTVP Components (always deployed)
+
+These components are deployed by default with every ZTVP installation. Components marked with _(externalized chart)_ use Helm charts maintained in the [validatedpatterns](https://github.com/validatedpatterns) organization rather than local charts in this repository.
 
 * OpenShift cluster hardening
-  * [Compliance Operator](https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/security_and_compliance/compliance-operator)
-* [Red Hat Build of Keycloak](https://access.redhat.com/products/red-hat-build-of-keycloak/)
-  * Identities to access pattern components
-  * OIDC client to authenticate uses to a web application
-* [Red Hat Zero Trust Workload Identity Manager](https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/security_and_compliance/zero-trust-workload-identity-manager)
-  * Provides identities to workloads running within OpenShift
+  * [Compliance Operator](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/security_and_compliance/compliance-operator) _(externalized chart)_
+    * Continuously scans the cluster against CIS and other security profiles
+  * [cert-manager](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/security_and_compliance/cert-manager-operator-for-red-hat-openshift)
+    * Manages TLS certificates for pattern components
+* [Red Hat Advanced Cluster Management (ACM)](https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes)
+  * Provides a management control plane in multi-cluster scenarios
+* [Red Hat Advanced Cluster Security (ACS)](https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_security_for_kubernetes)
+  * Provides runtime security policy enforcement and image vulnerability scanning
 * [HashiCorp Vault](https://www.hashicorp.com/en/products/vault)
-  * Secure storage of sensitive assets
+  * Secure storage of sensitive assets and dynamic secret generation
 * [External Secrets Operator (ESO)](https://external-secrets.io)
   * Synchronizes secrets stored in HashiCorp Vault with OpenShift
-* [Red Hat Advanced Cluster Management (ACM)](https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.14)
-  * Provides a management control in multi-cluster scenarios
-* [Red Hat Quay](https://docs.redhat.com/en/documentation/red_hat_quay/3.15)
-  * Enables a private repository for OCI images within the environment
-* [Multicloud Object Gateway](https://docs.redhat.com/en/documentation/red_hat_openshift_container_storage/4.8/html/managing_hybrid_and_multicloud_resources/index)
-  * Provides an object storage service for OpenShift
+* [Red Hat Build of Keycloak (RHBK)](https://access.redhat.com/products/red-hat-build-of-keycloak/) _(externalized chart)_
+  * Provides user identities and OIDC authentication for pattern components and workloads
+* [Red Hat Zero Trust Workload Identity Manager (ZTWIM)](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/security_and_compliance/zero-trust-workload-identity-manager) _(externalized chart)_
+  * Automates provisioning of SPIFFE/SPIRE-based verifiable identities for workloads running within OpenShift
+
+#### Optional ZTVP Components (opt-in)
+
+These components are commented out in `values-hub.yaml` by default. Uncomment the relevant sections to enable them. See [Deploy the pattern](#deploy-the-pattern) for details.
+
+* [Red Hat Quay](https://docs.redhat.com/en/documentation/red_hat_quay) _(externalized chart)_
+  * Enables a private OCI image registry within the environment
+* [Multicloud Object Gateway (NooBaa MCG)](https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/latest/html/managing_hybrid_and_multicloud_resources/about-the-multicloud-object-gateway)
+  * Provides S3-compatible object storage for Quay and RHTPA
 * [Red Hat Trusted Artifact Signer (RHTAS)](https://docs.redhat.com/en/documentation/red_hat_trusted_artifact_signer/1.3)
   * Provides cryptographic signing and verification of software artifacts and container images
-* [Red Hat Trusted Profile Analyzer (RHTPA)](https://docs.redhat.com/es/documentation/red_hat_trusted_profile_analyzer/2.2)
-  * Provides the storage and management means for _Software Bill of Materials_ (SBOMs), with cross-referencing capabilities between SBOMs and CVEs/Security Advisories
+* [Red Hat Trusted Profile Analyzer (RHTPA)](https://docs.redhat.com/en/documentation/red_hat_trusted_profile_analyzer)
+  * Stores and manages _Software Bill of Materials_ (SBOMs) with cross-referencing against CVEs and Security Advisories
 * [Red Hat OpenShift Pipelines](https://docs.redhat.com/en/documentation/red_hat_openshift_pipelines/1.20)
-  * Enables a native CI/CD solution in OpenShift
+  * Enables the native CI/CD pipeline for the secure supply chain use case
 
 ## Getting Started
 
@@ -45,7 +78,7 @@ Utilize the following steps to prepare your machine and complete any and all pre
 
 ### Prerequisites
 
-1. An OpenShift Container Platform 4.20+ cluster with:
+1. An OpenShift Container Platform 4.20 or 4.21 cluster with:
     1. Publicly signed certificates for Ingress
     2. A default `StorageClass` which provides dynamic `PersistentVolume` storage
 2. To customize the provided default configuration, a GitHub account and a token for it with repositories permissions, to read from and write to your forks, is required.
@@ -75,7 +108,7 @@ Utilize the following steps to prepare your machine and complete any and all pre
 4. Run the following command to set the upstream repository:
 
     ```shell
-    git remote add -f upstream git@github.com/validatedpatterns/layered-zero-trust.git
+    git remote add -f upstream git@github.com:validatedpatterns/layered-zero-trust.git
     ```
 
 5. Verify the setup of your remote repositories by running the following command:
@@ -171,6 +204,8 @@ If all of the Argo CD applications are reporting healthy, the pattern has been d
 
 * [Secure Multi-tier Application](./docs/multi-tier.md)
 * [Secure Supply Chain](./docs/supply-chain.md)
+* [ACS Deployment Details](./docs/acs-deployment.md)
+* [Confidential Containers (CoCo)](./docs/CONFIDENTIAL-CONTAINERS.md)
 
 ### Importing existing clusters
 

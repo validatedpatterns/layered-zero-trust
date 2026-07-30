@@ -11,3 +11,6 @@ metadata:
     argocd.argoproj.io/syncOptions: ServerSideApply=true
 secrets:
   - name: qtodo-registry-auth
+{{- if .Values.git.credentials.enabled }}
+  - name: qtodo-git-credentials
+{{- end }}

@@ -1,0 +1,47 @@
+# Red Hat Trusted Profile Analyzer (RHTPA) with SPIFFE Integration
+# Depends on: storage (NooBaa MCG), Vault, SPIRE, Keycloak
+clusterGroup:
+  namespaces:
+    rhtpa-operator:
+      operatorGroup: true
+      targetNamespace: rhtpa-operator
+      annotations:
+        argocd.argoproj.io/sync-wave: "26"
+    trusted-profile-analyzer:
+      annotations:
+        argocd.argoproj.io/sync-wave: "32"
+      labels:
+        openshift.io/cluster-monitoring: "true"
+
+  subscriptions:
+    rhtpa-operator:
+      name: rhtpa-operator
+      namespace: rhtpa-operator
+      channel: stable-v1.1
+      catalogSource: redhat-operators
+      annotations:
+        argocd.argoproj.io/sync-wave: "27"
+
+  applications:
+    trusted-profile-analyzer:
+      name: trusted-profile-analyzer
+      namespace: trusted-profile-analyzer
+      project: hub
+      path: charts/rhtpa-operator
+      annotations:
+        argocd.argoproj.io/sync-wave: "41"
+      ignoreDifferences:
+        - group: batch
+          kind: Job
+          jsonPointers:
+            - /status
+
+  merge_into_applications:
+    vault:
+      jwt:
+        roles:
+          - name: rhtpa
+            audience: rhtpa
+            subject: "spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/trusted-profile-analyzer/sa/rhtpa"
+            policies:
+              - hub-infra-rhtpa-jwt-secret

@@ -22,6 +22,7 @@ log "ZTVP CA Certificate Extraction"
 log "==========================================="
 log "Auto-detect: {{ .Values.autoDetect }}"
 log "Custom CA: {{ .Values.customCA.secretRef.enabled }}"
+log "Remote hosts: {{ len .Values.customCA.remoteHosts }}"
 log "Namespace: {{ .Values.global.namespace }}"
 log "ConfigMap: {{ .Values.configMapName }}"
 
@@ -44,6 +45,30 @@ else
   error "Custom secret not found: {{ .Values.customCA.secretRef.namespace }}/{{ .Values.customCA.secretRef.name }}"
   exit 1
 fi
+{{- end }}
+
+# ===================================================================
+# PHASE 1.5: Extract CA chains from remote hosts (if configured)
+# No authentication required -- CAs are part of the public TLS handshake.
+# ===================================================================
+
+{{- if .Values.customCA.remoteHosts }}
+REMOTE_HOST_COUNT=0
+{{- range $host := .Values.customCA.remoteHosts }}
+log "Extracting CA chain from remote host: {{ $host }}:443"
+REMOTE_CERTS=$(openssl s_client -connect {{ $host }}:443 -showcerts </dev/null 2>/dev/null \
+  | awk '/BEGIN CERTIFICATE/,/END CERTIFICATE/')
+if [[ -n "$REMOTE_CERTS" ]]; then
+  SAFE_NAME=$(echo "{{ $host }}" | tr '.:' '-')
+  echo "$REMOTE_CERTS" > "${TEMP_DIR}/remote-${SAFE_NAME}.crt"
+  REMOTE_HOST_COUNT=$((REMOTE_HOST_COUNT + 1))
+  CUSTOM_CA_FOUND=true
+  log "OK: Extracted CA chain from {{ $host }}"
+else
+  error "Failed to extract CA chain from {{ $host }}:443 (is the host reachable?)"
+fi
+{{- end }}
+log "Extracted CA chains from $REMOTE_HOST_COUNT remote host(s)"
 {{- end }}
 
 # ===================================================================
@@ -298,6 +323,7 @@ metadata:
     ztvp.io/auto-detect: "{{ .Values.autoDetect }}"
     ztvp.io/custom-ca-enabled: "{{ .Values.customCA.secretRef.enabled }}"
     ztvp.io/custom-ca-found: "${CUSTOM_CA_FOUND}"
+    ztvp.io/remote-hosts: "{{ len .Values.customCA.remoteHosts }}"
     ztvp.io/ingress-ca-found: "${INGRESS_CA_FOUND}"
     ztvp.io/service-ca-found: "${SERVICE_CA_FOUND}"
     ztvp.io/cluster-ca-found: "${CLUSTER_CA_FOUND}"
@@ -336,7 +362,175 @@ else
 fi
 
 # ===================================================================
-# PHASE 9: Automatic Rollout (if enabled)
+# PHASE 8.5: Create Proxy CA ConfigMap (if enabled)
+# ===================================================================
+
+{{- if .Values.proxyCA.enabled }}
+log "Creating proxy CA ConfigMap for cluster trustedCA injection"
+
+# Build the proxy CA bundle with ALL extracted custom CAs so that workloads
+# trusting the injected bundle can reach both cluster-internal services
+# (via ingress/service CA) and external hosts behind corporate CAs
+# (via additionalCertificates / customCA).
+# The Cluster Network Operator merges these with the system (Mozilla) CAs.
+> "${TEMP_DIR}/proxy-ca-bundle.pem"
+for cert_file in "${TEMP_DIR}"/ingress-ca-*.crt "${TEMP_DIR}/service-ca.crt" "${TEMP_DIR}/custom-ca.crt" "${TEMP_DIR}"/*.crt; do
+  [[ -f "$cert_file" ]] || continue
+  # Deduplicate: skip if already appended (the *.crt glob may re-match earlier files)
+  if grep -qF "$(head -2 "$cert_file")" "${TEMP_DIR}/proxy-ca-bundle.pem" 2>/dev/null; then
+    continue
+  fi
+  cat "$cert_file" >> "${TEMP_DIR}/proxy-ca-bundle.pem"
+  echo "" >> "${TEMP_DIR}/proxy-ca-bundle.pem"
+done
+
+PROXY_BUNDLE_SIZE=$(wc -c < "${TEMP_DIR}/proxy-ca-bundle.pem" 2>/dev/null || echo 0)
+if [[ $PROXY_BUNDLE_SIZE -gt 100 ]]; then
+  cat <<PROXYEOF | oc apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.proxyCA.configMapName }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- range $key, $value := .Values.configMapLabels }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+data:
+  ca-bundle.crt: |
+$(cat "${TEMP_DIR}/proxy-ca-bundle.pem" | sed 's/^/      /')
+PROXYEOF
+
+  log "OK: Proxy CA ConfigMap {{ .Values.proxyCA.configMapName }} created ($PROXY_BUNDLE_SIZE bytes)"
+else
+  log "WARNING: No custom CAs found for proxy ConfigMap (ingress or service CA missing)"
+fi
+{{- end }}
+
+# ===================================================================
+# PHASE 8.6: Verify Cluster Proxy trustedCA (declaratively managed)
+# ===================================================================
+# proxy/cluster trustedCA is managed declaratively by Argo CD
+# (proxy-trustedca.yaml template) instead of being patched by this Job.
+# The SA only needs read access to the proxy object.
+
+{{- if .Values.proxyCA.enabled }}
+CURRENT_TRUSTED_CA=$(oc get proxy/cluster -o jsonpath='{.spec.trustedCA.name}' 2>/dev/null || echo "")
+
+if [[ "$CURRENT_TRUSTED_CA" == "{{ .Values.proxyCA.configMapName }}" ]]; then
+  log "Proxy trustedCA correctly set to {{ .Values.proxyCA.configMapName }}"
+elif [[ -n "$CURRENT_TRUSTED_CA" && "$CURRENT_TRUSTED_CA" != "{{ .Values.proxyCA.configMapName }}" ]]; then
+  # Merge any CAs from the existing proxy ConfigMap into our bundle so
+  # nothing is lost when Argo CD takes over trustedCA management.
+  log "Existing proxy trustedCA ConfigMap: $CURRENT_TRUSTED_CA (will be replaced by Argo CD)"
+  EXISTING_CA_DATA=$(oc get configmap "$CURRENT_TRUSTED_CA" -n {{ .Values.global.namespace }} \
+    -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null || echo "")
+  if [[ -n "$EXISTING_CA_DATA" ]]; then
+    echo "$EXISTING_CA_DATA" > "${TEMP_DIR}/existing-proxy-ca.crt"
+    while IFS= read -r line; do
+      echo "$line"
+    done < "${TEMP_DIR}/existing-proxy-ca.crt" >> "${TEMP_DIR}/proxy-ca-bundle.pem"
+    PROXY_BUNDLE_SIZE=$(wc -c < "${TEMP_DIR}/proxy-ca-bundle.pem" 2>/dev/null || echo 0)
+    log "Merged existing proxy CAs into {{ .Values.proxyCA.configMapName }}"
+    cat <<MERGEEOF | oc apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.proxyCA.configMapName }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- range $key, $value := .Values.configMapLabels }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+data:
+  ca-bundle.crt: |
+$(cat "${TEMP_DIR}/proxy-ca-bundle.pem" | sed 's/^/      /')
+MERGEEOF
+  fi
+  log "Proxy trustedCA will be updated to {{ .Values.proxyCA.configMapName }} by Argo CD on next sync"
+else
+  if [[ $PROXY_BUNDLE_SIZE -gt 100 ]]; then
+    log "Proxy trustedCA will be set to {{ .Values.proxyCA.configMapName }} by Argo CD on next sync"
+  else
+    log "WARNING: No proxy CA bundle available"
+  fi
+fi
+{{- end }}
+
+# ===================================================================
+# PHASE 9: Configure Node-Level Image Pull Trust (if enabled)
+# Creates a ConfigMap with registry-hostname keys containing the ingress CA,
+# then patches image.config.openshift.io/cluster to reference it.
+# This allows kubelet to pull images from registries behind the cluster ingress
+# (e.g. built-in Quay) without "x509: certificate signed by unknown authority".
+# ===================================================================
+
+{{- if .Values.imagePullTrust.enabled }}
+{{- if .Values.imagePullTrust.registries }}
+log "Configuring node-level image pull trust"
+
+if [[ "$INGRESS_CA_FOUND" != "true" ]]; then
+  error "imagePullTrust is enabled but no ingress CA was extracted. Cannot configure image pull trust."
+  error "Ensure autoDetect is true or provide a custom ingress CA source."
+  exit 1
+fi
+
+# Build the ConfigMap data with registry hostnames as keys
+# Each key is a registry hostname, value is the ingress CA PEM
+REGISTRY_CM_DATA=""
+{{- range .Values.imagePullTrust.registries }}
+log "Adding registry trust: {{ tpl . $ }}"
+{{- end }}
+
+log "Creating ConfigMap: {{ .Values.global.namespace }}/{{ .Values.imagePullTrust.configMapName }}"
+
+# Combine all ingress CA files into one PEM for registry trust
+COMBINED_INGRESS_CA="${TEMP_DIR}/combined-ingress-ca.pem"
+> "${COMBINED_INGRESS_CA}"
+for f in "${TEMP_DIR}"/ingress-ca-*.crt; do
+  [[ -f "$f" ]] || continue
+  cat "$f" >> "${COMBINED_INGRESS_CA}"
+  echo "" >> "${COMBINED_INGRESS_CA}"
+done
+
+# Create the ConfigMap with registry hostnames as keys
+cat <<'CMEOF' > "${TEMP_DIR}/registry-cas-cm.yaml"
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.imagePullTrust.configMapName }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app.kubernetes.io/name: ztvp-certificates
+    app.kubernetes.io/component: image-pull-trust
+    app.kubernetes.io/managed-by: ztvp-certificate-manager
+data: {}
+CMEOF
+
+oc apply -f "${TEMP_DIR}/registry-cas-cm.yaml"
+
+# Patch each registry hostname as a key with the ingress CA PEM
+{{- range .Values.imagePullTrust.registries }}
+log "Patching ConfigMap key: {{ tpl . $ }}"
+oc create configmap {{ $.Values.imagePullTrust.configMapName }} \
+  -n {{ $.Values.global.namespace }} \
+  --from-file="{{ tpl . $ }}=${COMBINED_INGRESS_CA}" \
+  --dry-run=client -o yaml | oc apply -f -
+{{- end }}
+
+# Patch image.config.openshift.io/cluster to reference the ConfigMap
+log "Patching image.config.openshift.io/cluster additionalTrustedCA"
+oc patch image.config.openshift.io/cluster --type merge \
+  -p "{\"spec\":{\"additionalTrustedCA\":{\"name\":\"{{ .Values.imagePullTrust.configMapName }}\"}}}"
+
+log "Node-level image pull trust configured successfully"
+log "Note: MCO will roll this out to nodes (may take a few minutes)"
+
+{{- end }}
+{{- end }}
+
+# ===================================================================
+# PHASE 10: Automatic Rollout (if enabled)
 # ===================================================================
 
 {{- if .Values.rollout.enabled }}
@@ -362,8 +556,8 @@ fi
 {{- end }}
 
 {{- else }}
-# Strategy: all or labeled - restart resources in distribution target namespaces
-{{- range $ns := .Values.distribution.targetNamespaces }}
+# Strategy: all or labeled - restart resources in rollout-permitted namespaces
+{{- range $ns := .Values.rollout.namespaces }}
 log "Processing namespace: {{ $ns }}"
 
 {{- range $kind := $.Values.rollout.resourceKinds }}

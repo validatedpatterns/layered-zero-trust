@@ -1,0 +1,154 @@
+rhbk:
+  defaultDenyNetworkPolicy:
+    enabled: true
+
+  networkPolicy:
+    keycloak:
+      enabled: true
+      egress:
+        # DNS resolution via CoreDNS — OCP uses port 5353
+        - ports:
+          - protocol: UDP
+            port: 5353
+          - protocol: TCP
+            port: 5353
+          to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: openshift-dns
+        # PostgreSQL backend database
+        - ports:
+          - protocol: TCP
+            port: 5432
+          to:
+          - podSelector:
+              matchLabels:
+                app: postgresql-db
+        # JGroups cluster discovery and failure detection (multi-instance clustering)
+        - ports:
+          - protocol: TCP
+            port: 7800
+          - protocol: TCP
+            port: 57800
+          to:
+          - podSelector:
+              matchLabels:
+                app: keycloak
+                app.kubernetes.io/instance: keycloak
+                app.kubernetes.io/managed-by: keycloak-operator
+        # Kubernetes API server — JDBC_PING discovery reads endpoints
+        # Endpoints are node IPs after DNAT, port-only rule required
+        - ports:
+          - protocol: TCP
+            port: 6443
+        # SPIRE OIDC discovery provider — Keycloak fetches JWKS for federated
+        # client auth (spiffe feature). Traffic goes via the OCP router external
+        # IP, port-only rule required
+        - ports:
+          - protocol: TCP
+            port: 443
+
+    realmImport:
+      enabled: true
+      podSelector:
+        app: keycloak-realm-import
+      egress:
+        # DNS resolution via CoreDNS
+        - ports:
+          - protocol: UDP
+            port: 5353
+          - protocol: TCP
+            port: 5353
+          to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: openshift-dns
+        # PostgreSQL — realm import writes realm data to the database
+        - ports:
+          - protocol: TCP
+            port: 5432
+          to:
+          - podSelector:
+              matchLabels:
+                app: postgresql-db
+        # Kubernetes API server — reads secrets referenced in KeycloakRealmImport CR
+        - ports:
+          - protocol: TCP
+            port: 6443
+        # Keycloak HTTPS API — admin API calls during realm import
+        - ports:
+          - protocol: TCP
+            port: 8443
+          to:
+          - podSelector:
+              matchLabels:
+                app: keycloak
+                app.kubernetes.io/instance: keycloak
+                app.kubernetes.io/managed-by: keycloak-operator
+
+    postgresql:
+      enabled: true
+      ingress:
+        # Accept connections from Keycloak pods and realm import jobs
+        - ports:
+          - protocol: TCP
+            port: 5432
+          from:
+          - podSelector:
+              matchLabels:
+                app: keycloak
+                app.kubernetes.io/instance: keycloak
+                app.kubernetes.io/managed-by: keycloak-operator
+          - podSelector:
+              matchLabels:
+                app: keycloak-realm-import
+      egress:
+        # DNS resolution via CoreDNS
+        - ports:
+          - protocol: UDP
+            port: 5353
+          - protocol: TCP
+            port: 5353
+          to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: openshift-dns
+
+    operator:
+      enabled: true
+      # No ingress rules — operator only initiates outbound connections
+      egress:
+        # DNS resolution via CoreDNS
+        - ports:
+          - protocol: UDP
+            port: 5353
+          - protocol: TCP
+            port: 5353
+          to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: openshift-dns
+        # Kubernetes API server — operator watches CRs and manages resources
+        - ports:
+          - protocol: TCP
+            port: 6443
+        # Keycloak management endpoint — health checks and reconciliation
+        - ports:
+          - protocol: TCP
+            port: 9000
+          to:
+          - podSelector:
+              matchLabels:
+                app: keycloak
+                app.kubernetes.io/instance: keycloak
+                app.kubernetes.io/managed-by: keycloak-operator
+        # Keycloak HTTPS API — admin API calls during realm/client reconciliation
+        - ports:
+          - protocol: TCP
+            port: 8443
+          to:
+          - podSelector:
+              matchLabels:
+                app: keycloak
+                app.kubernetes.io/instance: keycloak
+                app.kubernetes.io/managed-by: keycloak-operator

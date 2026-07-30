@@ -1,0 +1,45 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Values.integration.keycloak.serviceAccountName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "acs-central.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "32"
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+      - create
+      - patch
+      - update
+  - apiGroups:
+      - platform.stackrox.io
+    resources:
+      - securedclusters
+    verbs:
+      - get
+      - list
+      - patch
+      - update
+  - apiGroups:
+      - route.openshift.io
+    resources:
+      - routes
+    verbs:
+      - get
+      - list
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+    verbs:
+      - get
+      - list
+      - watch
+      - patch

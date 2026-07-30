@@ -1,0 +1,53 @@
+vault_jwt_config: true
+vault_jwt_policies:
+  # ============================================================
+  # JWT/SPIFFE Auth Policies (for application workloads)
+  # These are used by apps authenticating via SPIFFE JWT tokens
+  # Only define policies for apps that need direct Vault access
+  # K8s auth policies (<prefix>-k8s-secret) are auto-created by Ansible
+  # ============================================================
+  - name: apps-qtodo-jwt-secret
+    policy: |
+      path "secret/data/apps/qtodo/*" {
+        capabilities = ["read"]
+      }
+  - name: hub-infra-rhtpa-jwt-secret
+    policy: |
+      path "secret/data/hub/infra/rhtpa/*" {
+        capabilities = ["read"]
+      }
+  - name: hub-supply-chain-jwt-secret
+    policy: |
+      path "secret/data/hub/infra/quay/*" {
+        capabilities = ["read"]
+      }
+      path "secret/data/hub/infra/registry/*" {
+        capabilities = ["read", "create", "update"]
+      }
+      path "secret/data/hub/infra/rhtpa/rhtpa-oidc-cli" {
+        capabilities = ["read"]
+      }
+      path "secret/data/hub/supply-chain/*" {
+        capabilities = ["read"]
+      }
+vault_jwt_roles:
+  - name: qtodo
+    audience: https://keycloak.apps.{{ $.Values.global.clusterDomain }}/realms/ztvp
+    subject: spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/qtodo/sa/qtodo
+    policies:
+      - apps-qtodo-jwt-secret
+  # RHTPA vault role
+  # - name: rhtpa
+  #   audience: rhtpa
+  #   subject: spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/trusted-profile-analyzer/sa/rhtpa
+  #   policies:
+  #     - hub-infra-rhtpa-jwt-secret
+  # Supply chain vault role (for Tekton pipelines; enable with supply-chain app / Option 3 or BYO registry)
+  # - name: supply-chain
+  #   audience: supply-chain
+  #   subject: spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/{{ $.Values.global.pattern }}-hub/sa/pipeline
+  #   policies:
+  #     - hub-supply-chain-jwt-secret
+oidc_discovery_url: https://spire-spiffe-oidc-discovery-provider.zero-trust-workload-identity-manager.svc.cluster.local
+#  oidcDiscoveryCa: /run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+#  defaultRole: qtodo

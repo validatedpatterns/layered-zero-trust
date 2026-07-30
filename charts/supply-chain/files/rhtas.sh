@@ -88,9 +88,28 @@ sign_artifact() {
   log_msg "REKOR_URL: ${REKOR_URL}"
   log_msg "bundle: ${bundle}"
 
+  if [ -v OIDC_CLIENT_ID ]; then
+    log_msg "OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}"
+  fi
+  if [ -v OIDC_ISSUER ]; then
+    log_msg "OIDC_ISSUER: ${OIDC_ISSUER}"
+  fi
+  if [ -v OIDC_IDENTITY ]; then
+    log_msg "OIDC_IDENTITY: ${OIDC_IDENTITY}"
+  fi
+  if [ -v OIDC_CLIENT_SECRET_FILE ]; then
+    log_msg "OIDC_CLIENT_SECRET_FILE: ${OIDC_CLIENT_SECRET_FILE}"
+    if ! [ -f "${OIDC_CLIENT_SECRET_FILE}" ]; then
+      log_msg "ERROR: ${OIDC_CLIENT_SECRET_FILE} not found"
+      exit 1
+    fi
+  fi
+
   cosign sign-blob "${1}" \
     --fulcio-url "${FULCIO_URL}" \
     --rekor-url "${REKOR_URL}" \
+    ${OIDC_CLIENT_ID:+"--oidc-client-id=${OIDC_CLIENT_ID}"} \
+    ${OIDC_CLIENT_SECRET_FILE:+"--oidc-client-secret-file=${OIDC_CLIENT_SECRET_FILE}"} \
     --bundle "${bundle}" \
     --yes
 }
@@ -107,9 +126,28 @@ sign_image() {
   log_msg "REKOR_URL: ${REKOR_URL}"
   log_msg "image_ref: ${image_ref}"
 
+  if [ -v OIDC_CLIENT_ID ]; then
+    log_msg "OIDC_CLIENT_ID: ${OIDC_CLIENT_ID}"
+  fi
+  if [ -v OIDC_ISSUER ]; then
+    log_msg "OIDC_ISSUER: ${OIDC_ISSUER}"
+  fi
+  if [ -v OIDC_IDENTITY ]; then
+    log_msg "OIDC_IDENTITY: ${OIDC_IDENTITY}"
+  fi
+  if [ -v OIDC_CLIENT_SECRET_FILE ]; then
+    log_msg "OIDC_CLIENT_SECRET_FILE: ${OIDC_CLIENT_SECRET_FILE}"
+    if ! [ -f "${OIDC_CLIENT_SECRET_FILE}" ]; then
+      log_msg "ERROR: ${OIDC_CLIENT_SECRET_FILE} not found"
+      exit 1
+    fi
+  fi
+
   cosign sign "${image_ref}" \
     --fulcio-url "${FULCIO_URL}" \
     --rekor-url "${REKOR_URL}" \
+    ${OIDC_CLIENT_ID:+"--oidc-client-id=${OIDC_CLIENT_ID}"} \
+    ${OIDC_CLIENT_SECRET_FILE:+"--oidc-client-secret-file=${OIDC_CLIENT_SECRET_FILE}"} \
     --yes
 }
 

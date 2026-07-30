@@ -1,0 +1,172 @@
+{{- if and .Values.chains.enabled .Values.chains.signers.x509.fulcio.enabled }}
+{{- if eq .Values.chains.signers.x509.fulcio.provider "spiffe" }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tekton-chains-spire-config
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "48"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tekton-chains-spire-config
+  annotations:
+    argocd.argoproj.io/sync-wave: "48"
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["list"]
+- apiGroups: ["spire.spiffe.io"]
+  resources: ["clusterstaticentries"]
+  verbs: ["get", "list", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tekton-chains-spire-config
+  annotations:
+    argocd.argoproj.io/sync-wave: "48"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: tekton-chains-spire-config
+subjects:
+- kind: ServiceAccount
+  name: tekton-chains-spire-config
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tekton-chains-spire-config
+  namespace: zero-trust-workload-identity-manager
+  annotations:
+    argocd.argoproj.io/sync-wave: "48"
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  resourceNames: ["spire-controller-manager"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tekton-chains-spire-config
+  namespace: zero-trust-workload-identity-manager
+  annotations:
+    argocd.argoproj.io/sync-wave: "48"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: tekton-chains-spire-config
+subjects:
+- kind: ServiceAccount
+  name: tekton-chains-spire-config
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tekton-chains-spire-entries
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "48"
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+  labels:
+    {{- include "tekton-chains.labels" . | nindent 4 }}
+spec:
+  backoffLimit: 5
+  template:
+    metadata:
+      labels:
+        {{- include "tekton-chains.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: tekton-chains-spire-config
+      restartPolicy: Never
+      containers:
+      - name: create-entries
+        image: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 512Mi
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          set -euo pipefail
+
+          TRUST_DOMAIN=$(oc get configmap spire-controller-manager \
+            -n zero-trust-workload-identity-manager \
+            -o jsonpath='{.data.controller-manager-config\.yaml}' \
+            | grep trustDomain | awk '{print $2}')
+          CLUSTER_NAME=$(oc get configmap spire-controller-manager \
+            -n zero-trust-workload-identity-manager \
+            -o jsonpath='{.data.controller-manager-config\.yaml}' \
+            | grep 'clusterName:' | awk '{print $2}')
+          CLASS_NAME=$(oc get configmap spire-controller-manager \
+            -n zero-trust-workload-identity-manager \
+            -o jsonpath='{.data.controller-manager-config\.yaml}' \
+            | grep 'className:' | head -1 | awk '{print $2}')
+
+          echo "Trust domain: $TRUST_DOMAIN"
+          echo "Cluster name: $CLUSTER_NAME"
+          echo "Class name:   $CLASS_NAME"
+
+          NODES=$(oc get nodes -o jsonpath='{range .items[*]}{.metadata.name} {.metadata.uid}{"\n"}{end}')
+          echo ""
+          echo "Nodes:"
+          echo "$NODES"
+
+          echo "$NODES" | while read -r NODE_NAME NODE_UID; do
+            [ -z "$NODE_NAME" ] && continue
+            ENTRY_NAME="tekton-chains-controller-${NODE_NAME}"
+            PARENT_ID="spiffe://${TRUST_DOMAIN}/spire/agent/k8s_psat/${CLUSTER_NAME}/${NODE_UID}"
+            SPIFFE_ID="spiffe://${TRUST_DOMAIN}/ns/openshift-pipelines/sa/tekton-chains-controller"
+
+            echo ""
+            echo "Creating ClusterStaticEntry: $ENTRY_NAME"
+            echo "  parentID: $PARENT_ID"
+
+            oc apply -f - <<ENTRY_EOF
+          apiVersion: spire.spiffe.io/v1alpha1
+          kind: ClusterStaticEntry
+          metadata:
+            name: ${ENTRY_NAME}
+            labels:
+              app.kubernetes.io/part-of: tekton-chains
+              app.kubernetes.io/managed-by: tekton-chains-spire-config
+          spec:
+            className: ${CLASS_NAME}
+            parentID: "${PARENT_ID}"
+            spiffeID: "${SPIFFE_ID}"
+            selectors:
+            - "k8s:ns:openshift-pipelines"
+            - "k8s:sa:tekton-chains-controller"
+          ENTRY_EOF
+          done
+
+          echo ""
+          echo "Cleaning up stale entries..."
+          EXISTING=$(oc get clusterstaticentries -l app.kubernetes.io/managed-by=tekton-chains-spire-config -o name 2>/dev/null || true)
+          for entry in $EXISTING; do
+            ENTRY_SHORT=$(echo "$entry" | sed 's|clusterstaticentry.spire.spiffe.io/||')
+            NODE_PART=$(echo "$ENTRY_SHORT" | sed 's|tekton-chains-controller-||')
+            if ! echo "$NODES" | grep -q "^${NODE_PART} "; then
+              echo "Removing stale entry: $ENTRY_SHORT"
+              oc delete "$entry" || true
+            fi
+          done
+
+          echo ""
+          echo "Done. Current entries:"
+          oc get clusterstaticentries -l app.kubernetes.io/managed-by=tekton-chains-spire-config
+{{- end }}
+{{- end }}

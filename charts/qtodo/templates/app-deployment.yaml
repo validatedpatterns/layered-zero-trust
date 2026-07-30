@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    argocd.argoproj.io/sync-wave: '20'
+    argocd.argoproj.io/sync-wave: '51'
   labels:
     app: qtodo
     ztvp.io/uses-certificates: "true"
@@ -55,6 +55,7 @@ spec:
           - name: qtodo-truststore-java
             mountPath: /usr/local/bin
 {{- end }}
+{{- if and .Values.app.oidc.enabled (contains "keycloak" (include "qtodo.oidc.url" .)) }}
       - name: wait-for-keycloak
         image: registry.redhat.io/openshift4/ose-tools-rhel9:latest
         imagePullPolicy: IfNotPresent
@@ -63,7 +64,7 @@ spec:
           - -c
           - |
             echo "Waiting for Keycloak OIDC endpoint to be available..."
-            KEYCLOAK_URL="{{ default (printf "https://keycloak.%s/realms/ztvp/.well-known/openid-configuration" .Values.global.localClusterDomain) .Values.app.oidc.authServerUrl }}/.well-known/openid-configuration"
+            KEYCLOAK_URL="{{ include "qtodo.oidc.url" . }}/.well-known/openid-configuration"
             # Remove duplicate .well-known if authServerUrl already contains realm
             KEYCLOAK_URL=$(echo "$KEYCLOAK_URL" | sed 's|/.well-known/openid-configuration/.well-known/openid-configuration|/.well-known/openid-configuration|')
             
@@ -87,6 +88,7 @@ spec:
           - name: ztvp-trusted-ca
             mountPath: /etc/pki/ca-trust/extracted/pem
             readOnly: true
+{{- end }}
       - name: init-spiffe-helper
         image: {{ template "qtodo.image" (dict "value" .Values.app.images.spiffeHelper "context" $) }}
         imagePullPolicy: {{ .Values.app.images.spiffeHelper.pullPolicy }}
@@ -123,7 +125,7 @@ spec:
           - name: CREDENTIALS_FILE
             value: /run/secrets/db-credentials/credentials.properties
           - name: JWT_TOKEN_FILE
-            value: /svids/jwt.token
+            value: {{ .Values.app.oidc.clientAssertion.jwtTokenPath }}
           - name: ZTVP_CA_BUNDLE
             value: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
         volumeMounts:
@@ -176,7 +178,7 @@ spec:
         - name: CREDENTIALS_FILE
           value: /run/secrets/db-credentials/credentials.properties
         - name: JWT_TOKEN_FILE
-          value: /svids/jwt.token
+          value: {{ .Values.app.oidc.clientAssertion.jwtTokenPath }}
         - name: ZTVP_CA_BUNDLE
           value: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
         volumeMounts:
@@ -193,11 +195,11 @@ spec:
           readOnly: true
 {{- end }}
       - name: qtodo
-        image: {{ template "qtodo.image" (dict "value" .Values.app.images.main "context" $) }}
+        image: {{ template "qtodo.image" (dict "value" .Values.app.images.main "context" $ "useRegistry" true) }}
         imagePullPolicy: {{ .Values.app.images.main.pullPolicy }}
         ports:
-        - containerPort: 8080
-          name: http
+        - containerPort: {{ template "qtodo.app.port" . }}
+          name: {{ if (include "qtodo.isSecureTermination" .) }}https{{ else }}http{{ end }}
           protocol: TCP
         envFrom:
           - configMapRef:
@@ -217,7 +219,17 @@ spec:
         - name: QUARKUS_HTTP_HOST
           value: '0.0.0.0'
         - name: QUARKUS_HTTP_PORT
-          value: '8080'
+          value: {{ .Values.app.insecurePort | quote }}
+{{- if include "qtodo.isSecureTermination" . }}
+        - name: QUARKUS_HTTP_SSL_PORT
+          value: {{ .Values.app.securePort | quote }}
+        - name: QUARKUS_TLS_KEY_STORE_PEM_QTODO_CERT
+          value: /certs/tls.crt
+        - name: QUARKUS_TLS_KEY_STORE_PEM_QTODO_KEY
+          value: /certs/tls.key
+        - name: QUARKUS_HTTP_INSECURE_REQUESTS
+          value: 'disabled'
+{{- end }}
         - name: QUARKUS_HIBERNATE_ORM_SCHEMA_MANAGEMENT_STRATEGY
           value: 'drop-and-create'
 {{- if not .Values.app.spire.enabled }}
@@ -234,11 +246,13 @@ spec:
 {{- else }}
         - name: QUARKUS_CONFIG_LOCATIONS
           value: file:/run/secrets/db-credentials/credentials.properties
+{{- if .Values.app.oidc.clientSecret.enabled }}
         - name: QUARKUS_OIDC_CREDENTIALS_SECRET
           valueFrom:
             secretKeyRef:
-              name: oidc-client-secret
+              name: {{ .Values.app.oidc.clientSecret.name }}
               key: client-secret
+{{- end }}
 {{- if .Values.app.truststore.enabled }}
         # Truststore password from Vault secret
         - name: TRUSTSTORE_PASSWORD
@@ -255,6 +269,11 @@ spec:
         volumeMounts:
           - name: db-credentials
             mountPath: /run/secrets/db-credentials
+{{- if .Values.app.oidc.clientAssertion.enabled }}
+          - name: svids
+            mountPath: /svids
+            readOnly: true
+{{- end }}
 {{- if .Values.app.truststore.enabled }}
           - name: truststore
             mountPath: /run/secrets/truststore
@@ -264,6 +283,11 @@ spec:
           - name: ztvp-trusted-ca
             mountPath: /etc/pki/ca-trust/extracted/pem
             readOnly: true
+{{- end }}
+{{- if include "qtodo.isSecureTermination" . }}
+          - name: tls-certs
+            mountPath: /certs
+            readOnly: true  
 {{- end }}
         resources: {}
       serviceAccountName: qtodo
@@ -294,5 +318,10 @@ spec:
         - name: qtodo-truststore-java
           configMap:
             name: qtodo-truststore-java
+{{- end }}
+{{- if include "qtodo.isSecureTermination" . }}
+        - name: tls-certs
+          secret:
+            secretName: {{ .Values.app.tls.secret }}
 {{- end }}
 {{- end }}

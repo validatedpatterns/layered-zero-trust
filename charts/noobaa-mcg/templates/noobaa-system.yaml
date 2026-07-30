@@ -5,7 +5,7 @@ metadata:
   name: {{ .Values.noobaa.system.name }}
   namespace: {{ .Values.noobaa.namespace }}
   annotations:
-    argocd.argoproj.io/sync-wave: "2"  # Layer 1: Deploy NooBaa System
+    argocd.argoproj.io/sync-wave: "33"  # Layer 1: Deploy NooBaa System
 spec:
   tolerations:
     - key: "node.ocs.openshift.io/storage"

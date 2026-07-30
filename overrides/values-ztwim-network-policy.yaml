@@ -1,0 +1,103 @@
+defaultDenyNetworkPolicy:
+  enabled: true
+
+networkPolicy:
+  spireServer:
+    enabled: true
+    ingress:
+      # gRPC API — from spire-agents (hostNetwork, node IPs — port-only rule required)
+      - ports:
+        - protocol: TCP
+          port: 8081
+      # Federation bundle endpoint — from OCP router
+      - ports:
+        - protocol: TCP
+          port: 8443
+        from:
+        - namespaceSelector:
+            matchLabels:
+              policy-group.network.openshift.io/ingress: ""
+      # Controller-manager webhook — from K8s API (node IPs after DNAT — port-only rule)
+      - ports:
+        - protocol: TCP
+          port: 9443
+      # Prometheus metrics
+      - ports:
+        - protocol: TCP
+          port: 9402
+    egress:
+      # DNS resolution via CoreDNS
+      - ports:
+        - protocol: UDP
+          port: 5353
+        - protocol: TCP
+          port: 5353
+        to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+      # Kubernetes API server — k8s_psat token validation, k8sbundle notifier
+      - ports:
+        - protocol: TCP
+          port: 6443
+
+  oidcDiscoveryProvider:
+    enabled: true
+    ingress:
+      # HTTPS — from OCP router (reencrypt route for JWKS/OIDC discovery)
+      # Consumed by Vault (JWT auth) and Keycloak (SPIFFE IdP) via external route
+      - ports:
+        - protocol: TCP
+          port: 8443
+        from:
+        - namespaceSelector:
+            matchLabels:
+              policy-group.network.openshift.io/ingress: ""
+    egress:
+      # DNS resolution via CoreDNS
+      - ports:
+        - protocol: UDP
+          port: 5353
+        - protocol: TCP
+          port: 5353
+        to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+
+  csiDriver:
+    enabled: true
+    egress:
+      # DNS resolution via CoreDNS
+      - ports:
+        - protocol: UDP
+          port: 5353
+        - protocol: TCP
+          port: 5353
+        to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+
+  operator:
+    enabled: true
+    ingress:
+      # Metrics
+      - ports:
+        - protocol: TCP
+          port: 8443
+    egress:
+      # DNS resolution via CoreDNS
+      - ports:
+        - protocol: UDP
+          port: 5353
+        - protocol: TCP
+          port: 5353
+        to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+      # Kubernetes API server — manages SPIRE CRs, watches resources
+      - ports:
+        - protocol: TCP
+          port: 6443
