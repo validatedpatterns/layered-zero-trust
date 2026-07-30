@@ -30,5 +30,8 @@ pytest -lv --disable-warnings test_validate_layer_1_ztwim.py --kubeconfig $KUBEC
 
 pytest -lv --disable-warnings test_validate_layer_1_quay.py --kubeconfig $KUBECONFIG --junit-xml $WORKSPACE/test_validate_layer_1_quay.xml
 
+pytest -lv --disable-warnings test_validate_layer_1_rhtas.py --kubeconfig $KUBECONFIG --junit-xml $WORKSPACE/test_validate_layer_1_rhtas.xml
+
+pytest -lv --disable-warnings test_validate_layer_1_rhtas_integration.py --kubeconfig $KUBECONFIG --junit-xml $WORKSPACE/test_validate_layer_1_rhtas_integration.xml
 
 python3 create_ci_badge.py

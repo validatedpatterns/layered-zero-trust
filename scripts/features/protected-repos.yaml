@@ -1,0 +1,34 @@
+# Protected repository support for the supply-chain pipeline.
+# Enables git-clone to authenticate against private Git repositories
+# using credentials stored in Vault (ExternalSecret -> secret).
+#
+# Supports two authentication modes (auto-detected from --git-repo URL):
+#   https  - basic-auth via .git-credentials (username + PAT)
+#   ssh    - SSH key pair (ssh-privatekey + known_hosts)
+#
+# For internal Git hosts (corporate CA), the generator auto-enables
+# customCA.remoteHosts and git.sslCABundle so the pipeline trusts the
+# server's TLS certificate without manual CA provisioning.
+#
+# Requires the git-credentials secret in values-secret.yaml.template
+# to be uncommented and populated with the appropriate credentials.
+clusterGroup:
+  merge_into_applications:
+    supply-chain:
+      overrides:
+        - name: git.credentials.enabled
+          value: "true"
+        - name: git.credentials.authType
+          value: "REPLACE_WITH_GIT_AUTH_TYPE"
+        - name: git.credentials.host
+          value: "REPLACE_WITH_GIT_HOST"
+        - name: git.credentials.vaultPath
+          value: "secret/data/hub/supply-chain/git-credentials"
+        - name: git.sslCABundle.enabled
+          value: "REPLACE_WITH_SSL_CA_ENABLED"
+        - name: qtodo.repository
+          value: "REPLACE_WITH_GIT_REPO_URL"
+    ztvp-certificates:
+      overrides:
+        - name: "customCA.remoteHosts[0]"
+          value: "REPLACE_WITH_GIT_HOSTNAME"

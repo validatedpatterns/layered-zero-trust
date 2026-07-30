@@ -1,8 +1,0 @@
-apiVersion: operator.openshift.io/v1alpha1
-kind: ZeroTrustWorkloadIdentityManager
-metadata:
- name: cluster
-spec:
- trustDomain: {{ tpl .Values.spire.trustDomain $ }}
- clusterName: {{ .Values.spire.clusterName }}
- bundleConfigMap: {{ .Values.spire.bundleConfigMap }}

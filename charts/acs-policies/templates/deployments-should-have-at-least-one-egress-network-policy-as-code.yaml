@@ -1,0 +1,31 @@
+apiVersion: config.stackrox.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: deployments-should-have-at-least-one-egress-network-policy-as-code
+spec:
+  policyName: Deployments should have at least one egress Network Policy - AS Code
+  description: Alerts if deployments are missing an egress Network Policy
+  rationale: Pods that lack engress Network Policies have unrestricted reachability on the network and may leveraged for a data exfiltration attack or as a jumpoing board to move laterally across the namespace or cluster.
+  remediation: "Create and apply an appropriate Network Policy of type engress to all Deployments. \nAs a best practice, all namespaces should have a default deny-all rule, that way individual deployments do not need a network policy unless the deployment has egress  communication requirements \nSee https://kubernetes.io/docs/concepts/services-networking/network-policies/ for details"
+  {{- if .Values.policies.deploymentsShouldHaveAtLeastOneEgressNetworkPolicyAsCode.disabled }}
+  disabled: true
+  {{- end }}
+  categories:
+    - Security Best Practices
+    - Zero Trust
+  lifecycleStages:
+    - DEPLOY
+  eventSource: NOT_APPLICABLE
+  severity: MEDIUM_SEVERITY
+
+  scope:
+    - label: {}
+      namespace: "qtodo"
+
+  policySections:
+    - sectionName: Alert on missing egress Network Policy
+      policyGroups:
+        - fieldName: Has Egress Network Policy
+          booleanOperator: OR
+          values:
+            - value: "false"

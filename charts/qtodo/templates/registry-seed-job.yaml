@@ -1,0 +1,202 @@
+{{- if .Values.app.seedImage.enabled }}
+{{- $regDomain := .Values.global.registry.domain }}
+{{- $regRepository := .Values.global.registry.repository }}
+{{- $isEmbedded := and (hasKey .Values.global.registry "user") (eq (default "" .Values.global.registry.user) "_token") }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: registry-seed
+  namespace: {{ .Release.Namespace | default "qtodo" }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Namespace | default "qtodo" }}-registry-seed
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+rules:
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "create"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["rolebindings"]
+  verbs: ["get", "create"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["clusterroles"]
+  verbs: ["bind"]
+  resourceNames: ["system:image-builder"]
+- apiGroups: ["imageregistry.operator.openshift.io"]
+  resources: ["configs"]
+  verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Namespace | default "qtodo" }}-registry-seed
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Release.Namespace | default "qtodo" }}-registry-seed
+subjects:
+- kind: ServiceAccount
+  name: registry-seed
+  namespace: {{ .Release.Namespace | default "qtodo" }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: registry-seed-image
+  namespace: {{ .Release.Namespace | default "qtodo" }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 600
+  template:
+    spec:
+      serviceAccountName: registry-seed
+      restartPolicy: Never
+{{- if not $isEmbedded }}
+      volumes:
+      - name: registry-auth
+        secret:
+          secretName: {{ .Values.app.images.main.registry.secretName }}
+          optional: true
+{{- end }}
+      containers:
+      - name: seed
+        image: {{ .Values.app.seedImage.image }}
+        env:
+        - name: SOURCE_IMAGE
+          value: {{ .Values.app.seedImage.source | quote }}
+        - name: TAG
+          value: {{ .Values.app.seedImage.tag | quote }}
+        - name: REGISTRY_DOMAIN
+          value: {{ tpl (required "global.registry.domain is required" $regDomain) $ | quote }}
+        - name: REGISTRY_REPOSITORY
+          value: {{ $regRepository | quote }}
+        - name: IS_EMBEDDED
+          value: {{ $isEmbedded | quote }}
+{{- if not $isEmbedded }}
+        volumeMounts:
+        - name: registry-auth
+          mountPath: /var/run/secrets/registry
+          readOnly: true
+{{- end }}
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Best-effort seed: this job must NEVER fail because a Sync hook
+          # failure triggers ArgoCD retry loops that block the entire app sync.
+          # The supply-chain pipeline is the authoritative image builder;
+          # this seed is only an optimisation for first-install UX.
+          seed_image() {
+            set -euo pipefail
+            APISERVER="https://kubernetes.default.svc"
+            SA_TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+            CACERT="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+
+            TARGET_IMAGE="${REGISTRY_DOMAIN}/${REGISTRY_REPOSITORY}:${TAG}"
+
+            if [ "${IS_EMBEDDED}" = "true" ]; then
+              PUSH_REGISTRY="image-registry.openshift-image-registry.svc:5000"
+              PUSH_IMAGE="${PUSH_REGISTRY}/${REGISTRY_REPOSITORY}:${TAG}"
+
+              IMAGE_NS=$(echo "${REGISTRY_REPOSITORY}" | cut -d/ -f1)
+              echo "Ensuring namespace '${IMAGE_NS}' exists..."
+              NS_BODY="{\"apiVersion\":\"v1\",\"kind\":\"Namespace\",\"metadata\":{\"name\":\"${IMAGE_NS}\"}}"
+              HTTP=$(curl -sS -o /dev/null -w "%{http_code}" --cacert "${CACERT}" \
+                -H "Authorization: Bearer ${SA_TOKEN}" \
+                -H "Content-Type: application/json" \
+                -X POST -d "${NS_BODY}" \
+                "${APISERVER}/api/v1/namespaces" 2>/dev/null)
+              case "${HTTP}" in
+                20[0-9]|409) echo "Namespace ready (HTTP ${HTTP})." ;;
+                *) echo "WARNING: namespace create returned HTTP ${HTTP}, continuing..." ;;
+              esac
+
+              echo "Granting system:image-builder to registry-seed SA..."
+              RB_BODY="{\"apiVersion\":\"rbac.authorization.k8s.io/v1\",\"kind\":\"RoleBinding\",\"metadata\":{\"name\":\"seed-image-builder\",\"namespace\":\"${IMAGE_NS}\"},\"roleRef\":{\"apiGroup\":\"rbac.authorization.k8s.io\",\"kind\":\"ClusterRole\",\"name\":\"system:image-builder\"},\"subjects\":[{\"kind\":\"ServiceAccount\",\"name\":\"registry-seed\",\"namespace\":\"{{ .Release.Namespace | default "qtodo" }}\"}]}"
+              HTTP=$(curl -sS -o /dev/null -w "%{http_code}" --cacert "${CACERT}" \
+                -H "Authorization: Bearer ${SA_TOKEN}" \
+                -H "Content-Type: application/json" \
+                -X POST -d "${RB_BODY}" \
+                "${APISERVER}/apis/rbac.authorization.k8s.io/v1/namespaces/${IMAGE_NS}/rolebindings" 2>/dev/null)
+              case "${HTTP}" in
+                20[0-9]|409) echo "RoleBinding ready (HTTP ${HTTP})." ;;
+                *) echo "WARNING: RoleBinding create returned HTTP ${HTTP}, continuing..." ;;
+              esac
+
+              mkdir -p /tmp/auth
+              AUTH_TOKEN=$(echo -n "ignored:${SA_TOKEN}" | base64 -w0)
+              printf '{"auths":{"%s":{"auth":"%s"}}}' "${PUSH_REGISTRY}" "${AUTH_TOKEN}" > /tmp/auth/config.json
+              AUTH_ARGS="-a /tmp/auth/config.json"
+            else
+              PUSH_REGISTRY="${REGISTRY_DOMAIN}"
+              PUSH_IMAGE="${TARGET_IMAGE}"
+
+              if [ -f /var/run/secrets/registry/.dockerconfigjson ]; then
+                AUTH_ARGS="-a /var/run/secrets/registry/.dockerconfigjson"
+              else
+                echo "INFO: Registry auth secret not yet available (expected on first install)."
+                echo "Skipping seed -- the supply-chain pipeline will push the image later."
+                return 0
+              fi
+            fi
+
+            echo "Waiting for registry at ${PUSH_REGISTRY} to become reachable..."
+            MAX_WAIT=480
+            WAITED=0
+            while [ ${WAITED} -lt ${MAX_WAIT} ]; do
+              if [ "${IS_EMBEDDED}" = "true" ]; then
+                HTTP=$(curl -sk -o /dev/null -w "%{http_code}" \
+                  -H "Authorization: Bearer ${SA_TOKEN}" \
+                  "https://${PUSH_REGISTRY}/v2/" 2>/dev/null)
+              else
+                HTTP=$(curl -sk -o /dev/null -w "%{http_code}" "https://${PUSH_REGISTRY}/v2/" 2>/dev/null)
+              fi
+              if [ "${HTTP}" = "200" ] || [ "${HTTP}" = "401" ] || [ "${HTTP}" = "301" ]; then
+                echo "Registry is reachable (HTTP ${HTTP})."
+                break
+              fi
+              echo "Registry not ready (HTTP ${HTTP}), retrying in 15s... (${WAITED}/${MAX_WAIT}s)"
+              sleep 15
+              WAITED=$((WAITED + 15))
+            done
+            if [ ${WAITED} -ge ${MAX_WAIT} ]; then
+              echo "WARNING: Registry not reachable after ${MAX_WAIT}s."
+              return 1
+            fi
+
+            echo "Checking if image already exists at ${PUSH_IMAGE}..."
+            if oc image info "${PUSH_IMAGE}" --insecure=true 2>/dev/null; then
+              echo "Image already exists, skipping seed."
+              return 0
+            fi
+
+            echo "Mirroring ${SOURCE_IMAGE} -> ${PUSH_IMAGE}..."
+            oc image mirror "${SOURCE_IMAGE}" "${PUSH_IMAGE}" \
+              --insecure=true --skip-missing=true \
+              ${AUTH_ARGS} \
+              --filter-by-os="linux/amd64" \
+              --keep-manifest-list=false
+
+            echo "Seed image push complete."
+          }
+
+          if seed_image; then
+            echo "SUCCESS: Seed image job finished."
+          else
+            echo "WARNING: Seed image job could not push the image (best-effort)."
+            echo "The supply-chain pipeline will build and push the image later."
+          fi
+          exit 0
+{{- end }}

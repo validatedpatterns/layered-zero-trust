@@ -1,0 +1,17 @@
+apiVersion: v2
+name: acs-central
+description: Red Hat Advanced Cluster Security Central Services
+type: application
+version: 1.1.0
+appVersion: "4.11"
+keywords:
+  - security
+  - compliance
+  - vulnerability-scanning
+  - zero-trust
+maintainers:
+  - name: Validated Patterns Team
+home: https://validatedpatterns.io/patterns/layered-zero-trust/
+sources:
+  - https://github.com/validatedpatterns/layered-zero-trust
+dependencies: []

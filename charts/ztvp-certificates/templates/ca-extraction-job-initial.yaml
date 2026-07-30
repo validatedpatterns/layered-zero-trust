@@ -6,7 +6,7 @@ metadata:
   name: {{ include "ztvp-certificates.fullname" . }}-ca-extractor-initial
   namespace: {{ .Values.global.namespace }}
   annotations:
-    argocd.argoproj.io/sync-wave: "-8"
+    argocd.argoproj.io/sync-wave: "23"
     # Run as regular sync resource (after RBAC at -9, before Policy at -5)
     # Using Prune=false prevents OutOfSync after TTL deletes the completed Job
     argocd.argoproj.io/sync-options: Prune=false

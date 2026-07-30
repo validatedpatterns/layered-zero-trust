@@ -1,0 +1,17 @@
+apiVersion: v2
+name: rh-keycloak
+description: ZTVP Keycloak deployment — wraps the generic rhbk chart with ZTVP realm configuration and ArgoCD hook lifecycle
+type: application
+version: 0.2.0
+dependencies:
+  - name: rhbk
+    version: ">=0.1.0"
+    repository: "oci://quay.io/validatedpatterns"
+maintainers:
+  - name: Zero Trust Validated Patterns Team
+    email: ztvp-arch-group@redhat.com
+keywords:
+  - keycloak
+  - rhbk
+  - zero-trust
+  - pattern

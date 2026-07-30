@@ -1,0 +1,18 @@
+# ACS Policies Configuration
+# Control which policies are enabled/disabled via the 'disabled' field
+# Note: Built-in ACS policies must be managed through the ACS UI or API,
+# not via SecurityPolicy CRDs. Only custom policies can be managed here.
+
+policies:
+  # Custom policy: Stop pods executing suspicious commands (runtime protection)
+  stopSuspiciousExec:
+    disabled: false
+  # Custom policy: Stop pods if privileges escalations tools or commands are detected (runtime protection)
+  preventRuntimePrivilegeEscalation:
+    disabled: false
+  # Custom policy: Show warning about missing egress Netwok Policy (deployment protection)
+  deploymentsShouldHaveAtLeastOneEgressNetworkPolicyAsCode:
+    disabled: false
+  # Custom policy: Show warning about missing ingress Netwok Policy (deployment protection)
+  deploymentsShouldHaveAtLeastOneIngressNetworkPolicyAsCode:
+    disabled: false

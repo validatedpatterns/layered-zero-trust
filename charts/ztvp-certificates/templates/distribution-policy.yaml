@@ -6,7 +6,7 @@ metadata:
   name: ztvp-certificates-distribution
   namespace: {{ .Values.global.namespace }}
   annotations:
-    argocd.argoproj.io/sync-wave: "-5"
+    argocd.argoproj.io/sync-wave: "26"
     policy.open-cluster-management.io/standards: NIST-CSF
     policy.open-cluster-management.io/categories: PR.DS Data Security
     policy.open-cluster-management.io/controls: PR.DS-2 Data-in-transit
@@ -50,7 +50,7 @@ metadata:
   name: ztvp-certificates-distribution-binding
   namespace: {{ .Values.global.namespace }}
   annotations:
-    argocd.argoproj.io/sync-wave: "-5"
+    argocd.argoproj.io/sync-wave: "26"
 bindingOverrides:
   remediationAction: enforce
 placementRef:
@@ -68,7 +68,7 @@ metadata:
   name: ztvp-certificates-distribution-placement
   namespace: {{ .Values.global.namespace }}
   annotations:
-    argocd.argoproj.io/sync-wave: "-5"
+    argocd.argoproj.io/sync-wave: "26"
 spec:
   predicates:
     - requiredClusterSelector:

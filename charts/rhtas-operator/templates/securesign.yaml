@@ -8,9 +8,13 @@ metadata:
   labels:
     {{- include "rhtas-operator.labels" . | nindent 4 }}
   annotations:
-    argocd.argoproj.io/sync-wave: "15"  # Deploy after namespace and operator
+    argocd.argoproj.io/sync-wave: "46"  # Deploy after namespace and operator
     {{- if .Values.rhtas.monitoring.enabled }}
     rhtas.redhat.com/metrics: "true"
+    {{- end }}
+    {{- if ne .Values.rhtas.logType "prod" }}
+    {{- include "log-type.validations" . }}
+    rhtas.redhat.com/log-type: {{ .Values.rhtas.logType | quote }}
     {{- end }}
 spec:
   # Fulcio - Certificate Authority

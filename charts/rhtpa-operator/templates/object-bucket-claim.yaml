@@ -6,7 +6,7 @@ metadata:
   name: {{ .Values.rhtpa.objectStorage.objectBucketClaim.name }}
   namespace: {{ .Values.rhtpa.namespace }}
   annotations:
-    argocd.argoproj.io/sync-wave: "5"  # Create OBC after NooBaa system is ready
+    argocd.argoproj.io/sync-wave: "36"  # Create OBC after NooBaa system is ready
 spec:
   generateBucketName: {{ .Values.rhtpa.objectStorage.objectBucketClaim.bucketName }}
   storageClassName: {{ .Values.rhtpa.objectStorage.objectBucketClaim.storageClass }}

@@ -1,0 +1,17 @@
+apiVersion: v2
+name: acs-policies
+description: Red Hat Advanced Cluster Security Custom Policies
+type: application
+version: 1.0.0
+appVersion: "4.9"
+keywords:
+  - security
+  - acs
+  - policies
+  - zero-trust
+maintainers:
+  - name: Validated Patterns Team
+home: https://validatedpatterns.io/patterns/layered-zero-trust/
+sources:
+  - https://github.com/validatedpatterns/layered-zero-trust
+dependencies: []

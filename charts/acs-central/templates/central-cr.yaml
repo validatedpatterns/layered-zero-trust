@@ -1,0 +1,127 @@
+{{- if .Values.central.enabled }}
+apiVersion: platform.stackrox.io/v1alpha1
+kind: Central
+metadata:
+  name: stackrox-central-services
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "acs-central.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "41"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  central:
+    # Admin password secret reference (enables htpasswd authentication)
+    adminPasswordSecret:
+      name: {{ .Values.central.adminPassword.secretName }}
+
+    exposure:
+      loadBalancer:
+        enabled: {{ .Values.central.exposure.loadBalancer.enabled }}
+        port: 443
+      route:
+        enabled: {{ .Values.central.exposure.route.enabled }}
+        {{- if .Values.central.exposure.route.host }}
+        host: {{ .Values.central.exposure.route.host }}
+        {{- end }}
+        {{- if .Values.central.exposure.route.reencrypt.enabled }}
+        reencrypt:
+          enabled: true
+          {{- if .Values.central.exposure.route.reencrypt.host }}
+          host: {{ .Values.central.exposure.route.reencrypt.host }}
+          {{- end }}
+        {{- end }}
+
+    {{- if .Values.central.persistence.enabled }}
+    persistence:
+      persistentVolumeClaim:
+        claimName: stackrox-db
+        {{- if .Values.central.persistence.storageClass }}
+        storageClassName: {{ .Values.central.persistence.storageClass }}
+        {{- end }}
+        size: {{ .Values.central.persistence.size }}
+    {{- end }}
+
+    resources:
+      {{- toYaml .Values.central.resources | nindent 6 }}
+
+    {{- if .Values.central.db }}
+    # Central database configuration
+    db:
+      {{- if .Values.central.db.resources }}
+      resources:
+        {{- toYaml .Values.central.db.resources | nindent 8 }}
+      {{- end }}
+    {{- end }}
+
+  egress:
+    connectivityPolicy: Online
+
+  {{- if .Values.scanner.scannerV4.enabled }}
+  scannerV4:
+    scannerComponent: Enabled
+
+    {{- if .Values.scanner.scannerV4.indexer }}
+    # Scanner V4 Indexer configuration
+    indexer:
+      {{- if .Values.scanner.scannerV4.indexer.resources }}
+      resources:
+        {{- toYaml .Values.scanner.scannerV4.indexer.resources | nindent 8 }}
+      {{- end }}
+      {{- if or .Values.scanner.scannerV4.indexer.replicas .Values.scanner.scannerV4.indexer.autoscaling }}
+      scaling:
+        {{- if .Values.scanner.scannerV4.indexer.autoscaling.enabled }}
+        autoScaling: Enabled
+        {{- end }}
+        {{- if .Values.scanner.scannerV4.indexer.replicas }}
+        replicas: {{ .Values.scanner.scannerV4.indexer.replicas }}
+        {{- end }}
+        {{- if .Values.scanner.scannerV4.indexer.autoscaling.minReplicas }}
+        minReplicas: {{ .Values.scanner.scannerV4.indexer.autoscaling.minReplicas }}
+        {{- end }}
+        {{- if .Values.scanner.scannerV4.indexer.autoscaling.maxReplicas }}
+        maxReplicas: {{ .Values.scanner.scannerV4.indexer.autoscaling.maxReplicas }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+
+    {{- if .Values.scanner.scannerV4.matcher }}
+    # Scanner V4 Matcher configuration
+    matcher:
+      {{- if .Values.scanner.scannerV4.matcher.resources }}
+      resources:
+        {{- toYaml .Values.scanner.scannerV4.matcher.resources | nindent 8 }}
+      {{- end }}
+      {{- if .Values.scanner.scannerV4.matcher.replicas }}
+      scaling:
+        replicas: {{ .Values.scanner.scannerV4.matcher.replicas }}
+      {{- end }}
+    {{- end }}
+
+    {{- if .Values.scanner.scannerV4.db }}
+    # Scanner V4 Database configuration
+    db:
+      {{- if .Values.scanner.scannerV4.db.resources }}
+      resources:
+        {{- toYaml .Values.scanner.scannerV4.db.resources | nindent 8 }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+
+  {{- if .Values.scanner.enabled }}
+  scanner:
+    analyzer:
+      scaling:
+        autoScaling: Enabled
+        replicas: {{ .Values.scanner.scannerV4.indexer.replicas }}
+        minReplicas: {{ .Values.scanner.scannerV4.indexer.autoscaling.minReplicas }}
+        maxReplicas: {{ .Values.scanner.scannerV4.indexer.autoscaling.maxReplicas }}
+    scannerComponent: Disabled # Explicitly disable V3 when using V4
+  {{- end }}
+
+  monitoring:
+    {{- if .Values.central.monitoring.openshift.enabled }}
+    openshift:
+      enabled: true
+    {{- end }}
+{{- end }}

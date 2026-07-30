@@ -1,0 +1,38 @@
+# Red Hat Trusted Artifact Signer (RHTAS) with SPIFFE + Email issuers
+# Depends on: Vault, SPIRE, Keycloak (all in base config)
+clusterGroup:
+  namespaces:
+    trusted-artifact-signer:
+      annotations:
+        argocd.argoproj.io/sync-wave: "32"
+      labels:
+        openshift.io/cluster-monitoring: "true"
+
+  subscriptions:
+    rhtas-operator:
+      name: rhtas-operator
+      namespace: openshift-operators
+      channel: stable-v1.3
+      annotations:
+        argocd.argoproj.io/sync-wave: "29"
+      catalogSource: redhat-operators
+
+  applications:
+    trusted-artifact-signer:
+      name: trusted-artifact-signer
+      namespace: trusted-artifact-signer
+      project: hub
+      path: charts/rhtas-operator
+      annotations:
+        argocd.argoproj.io/sync-wave: "46"
+      overrides:
+        - name: rhtas.zeroTrust.spire.enabled
+          value: "true"
+        - name: rhtas.zeroTrust.spire.trustDomain
+          value: "apps.{{ $.Values.global.clusterDomain }}"
+        - name: rhtas.zeroTrust.spire.issuer
+          value: "https://spire-spiffe-oidc-discovery-provider.apps.{{ $.Values.global.clusterDomain }}"
+        - name: rhtas.zeroTrust.email.enabled
+          value: "true"
+        - name: rhtas.zeroTrust.email.issuer
+          value: "https://keycloak.apps.{{ $.Values.global.clusterDomain }}/realms/ztvp"

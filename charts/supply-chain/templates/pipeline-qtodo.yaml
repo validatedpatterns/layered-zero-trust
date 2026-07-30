@@ -1,5 +1,5 @@
 ---
-apiVersion: tekton.dev/v1beta1
+apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
   name: qtodo-supply-chain
@@ -8,12 +8,20 @@ spec:
   params:
     - name: git-url
       type: string
-      description: The URL of the public Github qtodo repository
+      description: The URL of the qtodo repository (public or protected)
       default: {{ .Values.qtodo.repository | quote }}
     - name: git-revision
       type: string
-      description: The revision of the public Github qtodo repository
+      description: The revision of the qtodo repository
       default: {{ .Values.qtodo.revision }}
+    - name: rebuild
+      type: string
+      description: Force rebuild the image even if it already exists
+      default: "false"
+    - name: skip-checks
+      type: string
+      description: Skip pre-build checks against existing image
+      default: "false"
     - name: qtodo-build-cmd
       type: string
       description: The command to build the qtodo artifact
@@ -25,7 +33,7 @@ spec:
     - name: image-target
       type: string
       description: qtodo image push destination (e.g. quay.io/ztvp/qtodo:latest)
-      default: {{ .Values.registry.domain | default (printf "quay-registry-quay-quay-enterprise.%s" .Values.global.hubClusterDomain) }}/{{ .Values.registry.org }}/{{ .Values.registry.repo }}:{{ .Values.qtodo.tag }}
+      default: {{ template "qtodo.image" (dict "value" .Values.qtodo.image "context" $ "useRegistry" true) }}
     - name: image-tls-verify
       type: string
       description: Whether to verify TLS when pushing to the OCI registry
@@ -57,16 +65,22 @@ spec:
     - name: oidc-identity
       type: string
       description: The OIDC identity to use for verification
-      default: spiffe://{{ .Values.global.hubClusterDomain }}/ns/{{ .Values.global.namespace }}/sa/pipeline
+      default: {{ include "rhtas.oidc.identity" . }}
     - name: oidc-issuer
       type: string
       description: The OIDC issuer to use for verification
-      default: https://spire-spiffe-oidc-discovery-provider.{{ .Values.global.hubClusterDomain }}
+      default: {{ include "rhtas.oidc.issuer" . }}
+{{- if eq .Values.rhtas.oidc.enabled true }}
+    - name: rhtas-oidc-client-id
+      type: string
+      description: The RHTAS OIDC client ID to use for signing
+      default: {{ .Values.rhtas.oidc.clientId }}
+{{- end }}
 {{- if eq .Values.rhtpa.enabled true }}
     - name: rhtpa-url
       type: string
       description: The URL of the RHTPA service
-      default: https://servertrustify.{{ .Values.global.hubClusterDomain }}
+      default: {{ include "rhtpa.url" . }}
     - name: sbom-file
       type: string
       description: The SBOM file to upload to RHTPA
@@ -74,23 +88,68 @@ spec:
     - name: rhtpa-oidc-url
       type: string
       description: The URL of the RHTPA OIDC service
-      default: https://keycloak.{{ .Values.global.hubClusterDomain }}/realms/{{ .Values.rhtpa.oidcRealm }}
+      default: {{ include "rhtpa.oidc.url" . }}
     - name: rhtpa-oidc-client-id
       type: string
       description: The RHTPA OIDC client ID to use for authentication
-      default: {{ .Values.rhtpa.clientId }}
+      default: {{ .Values.rhtpa.oidc.clientId }}
     - name: rhtpa-oidc-client-secret
       type: string
       description: The RHTPA OIDC client Secret name to use for authentication
-      default: {{ .Values.rhtpa.clientSecretName }}
+      default: {{ .Values.rhtpa.oidc.clientSecretName }}
+{{- if ne .Values.rhtpa.oidc.apiId "" }}
+    - name: rhtpa-oidc-api-id
+      type: string
+      description: The Azure Entra ID API ID to use for authentication
+      default: {{ .Values.rhtpa.oidc.apiId }}
+{{- end }}
 {{- end }}
 
   workspaces:
     - name: qtodo-source
     - name: registry-auth-config
+    - name: git-auth
+      optional: true
+{{- if and .Values.git.sslCABundle.enabled (ne (default "https" .Values.git.credentials.authType) "ssh") }}
+    - name: ssl-ca-directory
+      optional: true
+{{- end }}
+
+  results:
+    - name: CHAINS-GIT_URL
+      description: The git URL used for the build (Tekton Chains provenance)
+      value: $(tasks.qtodo-clone-repository.results.URL)
+    - name: CHAINS-GIT_COMMIT
+      description: The git commit SHA used for the build (Tekton Chains provenance)
+      value: $(tasks.qtodo-clone-repository.results.COMMIT)
+    - name: IMAGE_URL
+      description: The image URL built by the pipeline (Tekton Chains provenance)
+      value: $(tasks.qtodo-build-image.results.IMAGE_URL)
+    - name: IMAGE_DIGEST
+      description: The image digest built by the pipeline (Tekton Chains provenance)
+      value: $(tasks.qtodo-build-image.results.IMAGE_DIGEST)
 
   tasks:
+    - name: init
+      taskRef:
+        name: init
+        kind: Task
+      params:
+        - name: image-url
+          value: $(params.image-target)
+        - name: rebuild
+          value: $(params.rebuild)
+        - name: skip-checks
+          value: $(params.skip-checks)
+
     - name: qtodo-clone-repository
+      runAfter:
+        - init
+      when:
+        - input: $(tasks.init.results.build)
+          operator: in
+          values:
+            - "true"
       taskRef:
         resolver: cluster
         params:
@@ -105,9 +164,26 @@ spec:
           value: $(params.git-url)
         - name: REVISION
           value: $(params.git-revision)
+{{- if and .Values.git.sslCABundle.enabled (ne (default "https" .Values.git.credentials.authType) "ssh") }}
+        - name: CRT_FILENAME
+          value: tls-ca-bundle.pem
+{{- end }}
       workspaces:
         - name: output
           workspace: qtodo-source
+{{- if .Values.git.credentials.enabled }}
+{{- if eq (default "https" .Values.git.credentials.authType) "ssh" }}
+        - name: ssh-directory
+          workspace: git-auth
+{{- else }}
+        - name: basic-auth
+          workspace: git-auth
+{{- end }}
+{{- end }}
+{{- if and .Values.git.sslCABundle.enabled (ne (default "https" .Values.git.credentials.authType) "ssh") }}
+        - name: ssl-ca-directory
+          workspace: ssl-ca-directory
+{{- end }}
 
     - name: qtodo-build-artifact
       runAfter:
@@ -132,16 +208,7 @@ spec:
         - name: source
           workspace: qtodo-source
       params:
-        - name: ca-file
-          value: $(params.ca-file)
-        - name: fulcio-url
-          value: $(params.fulcio-url)
-        - name: rekor-url
-          value: $(params.rekor-url)
-        - name: tuf-url
-          value: $(params.tuf-url)
-        - name: cli-server-url
-          value: $(params.cli-server-url)
+{{- include "rhtas.tasks.sigstoreParams" . | nindent 8 }}
         - name: qtodo-artifact-path
           value: $(params.qtodo-artifact-path)
 
@@ -155,20 +222,7 @@ spec:
         - name: source
           workspace: qtodo-source
       params:
-        - name: ca-file
-          value: $(params.ca-file)
-        - name: fulcio-url
-          value: $(params.fulcio-url)
-        - name: rekor-url
-          value: $(params.rekor-url)
-        - name: tuf-url
-          value: $(params.tuf-url)
-        - name: cli-server-url
-          value: $(params.cli-server-url)
-        - name: oidc-identity
-          value: $(params.oidc-identity)
-        - name: oidc-issuer
-          value: $(params.oidc-issuer)
+{{- include "rhtas.tasks.sigstoreParams" . | nindent 8 }}
         - name: qtodo-artifact-path
           value: $(params.qtodo-artifact-path)
 
@@ -209,18 +263,9 @@ spec:
         name: qtodo-sign-image
         kind: Task
       params:
+{{- include "rhtas.tasks.sigstoreParams" . | nindent 8 }}
         - name: image
           value: $(params.image-target)
-        - name: ca-file
-          value: $(params.ca-file)
-        - name: fulcio-url
-          value: $(params.fulcio-url)
-        - name: rekor-url
-          value: $(params.rekor-url)
-        - name: tuf-url
-          value: $(params.tuf-url)
-        - name: cli-server-url
-          value: $(params.cli-server-url)
 
     - name: qtodo-generate-sbom
       runAfter:
@@ -247,18 +292,9 @@ spec:
         - name: source
           workspace: qtodo-source
       params:
+{{- include "rhtas.tasks.sigstoreParams" . | nindent 8 }}
         - name: image
           value: $(params.image-target)
-        - name: ca-file
-          value: $(params.ca-file)
-        - name: fulcio-url
-          value: $(params.fulcio-url)
-        - name: rekor-url
-          value: $(params.rekor-url)
-        - name: tuf-url
-          value: $(params.tuf-url)
-        - name: cli-server-url
-          value: $(params.cli-server-url)
 
 {{- if eq .Values.rhtpa.enabled true }}
     - name: qtodo-upload-sbom
@@ -283,6 +319,10 @@ spec:
           value: $(params.rhtpa-oidc-client-id)
         - name: rhtpa-oidc-client-secret
           value: $(params.rhtpa-oidc-client-secret)
+{{- if ne .Values.rhtpa.oidc.apiId "" }}
+        - name: rhtpa-oidc-api-id
+          value: $(params.rhtpa-oidc-api-id)
+{{- end }}
 {{- end }}
 
     - name: qtodo-verify-image
@@ -293,19 +333,16 @@ spec:
         name: qtodo-verify-image
         kind: Task
       params:
+{{- include "rhtas.tasks.sigstoreParams" . | nindent 8 }}
         - name: image
           value: $(params.image-target)
-        - name: ca-file
-          value: $(params.ca-file)
-        - name: fulcio-url
-          value: $(params.fulcio-url)
-        - name: rekor-url
-          value: $(params.rekor-url)
-        - name: tuf-url
-          value: $(params.tuf-url)
-        - name: cli-server-url
-          value: $(params.cli-server-url)
-        - name: oidc-identity
-          value: $(params.oidc-identity)
-        - name: oidc-issuer
-          value: $(params.oidc-issuer)
+
+  finally:
+    - name: restart-qtodo
+      when:
+        - input: $(tasks.qtodo-verify-image.status)
+          operator: in
+          values: ["Succeeded"]
+      taskRef:
+        name: restart-qtodo
+        kind: Task

@@ -1,0 +1,8 @@
+# Azure platform-specific configuration
+
+# CoCo confidential computing configuration for Azure
+global:
+  coco:
+    azure:
+      defaultVMFlavour: "Standard_DC2eds_v5"
+      VMFlavours: "Standard_DC2eds_v5,Standard_DC4eds_v5,Standard_DC8eds_v5,Standard_DC16eds_v5"

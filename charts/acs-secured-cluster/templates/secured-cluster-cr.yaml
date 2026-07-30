@@ -1,0 +1,53 @@
+apiVersion: platform.stackrox.io/v1alpha1
+kind: SecuredCluster
+metadata:
+  name: stackrox-secured-cluster-services
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "acs-secured-cluster.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "46"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  clusterName: {{ .Values.clusterName | default .Values.global.clusterName | quote }}
+
+  centralEndpoint: central-stackrox.{{ .Values.global.localClusterDomain }}:443
+
+  {{- if .Values.admissionControl.enabled }}
+  admissionControl:
+    enforcement: {{ .Values.admissionControl.enforcement | default "Enabled" }}
+    listenOnCreates: {{ .Values.admissionControl.listenOnCreates }}
+    listenOnUpdates: {{ .Values.admissionControl.listenOnUpdates }}
+    listenOnEvents: {{ .Values.admissionControl.listenOnEvents }}
+    bypass: BreakGlassAnnotation
+    contactImageScanners: DoNotScanInline
+    timeoutSeconds: {{ .Values.admissionControl.timeoutSeconds }}
+  {{- end }}
+
+  {{- if .Values.sensor.enabled }}
+  sensor:
+    resources:
+      {{- toYaml .Values.sensor.resources | nindent 6 }}
+  {{- end }}
+
+  {{- if .Values.collector.enabled }}
+  perNode:
+    collector:
+      collection: {{ .Values.collector.collectionMethod }}
+      imageFlavor: {{ .Values.collector.imageFlavor }}
+    taintToleration: TolerateTaints
+  {{- end }}
+
+  auditLogs:
+    collection: Auto
+
+  {{- if .Values.monitoring.enabled }}
+  monitoring:
+    {{- if .Values.monitoring.openshift.enabled }}
+    openshift:
+      enabled: true
+    {{- end }}
+  {{- end }}
+
+  tls:
+    additionalCAs: []

@@ -6,7 +6,7 @@ metadata:
   name: spiffe-helper-config
   namespace: {{ .Values.rhtpa.namespace }}
   annotations:
-    argocd.argoproj.io/sync-wave: "18"
+    argocd.argoproj.io/sync-wave: "49"
 data:
   config.hcl: |
     agent_address = "/spiffe-workload-api/spire-agent.sock"

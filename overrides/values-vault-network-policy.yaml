@@ -1,0 +1,94 @@
+defaultDenyNetworkPolicy:
+  enabled: true
+
+vault:
+  server:
+    networkPolicy:
+      enabled: true
+      ingress:
+        # OCP router — vault Route (reencrypt TLS, UI and API)
+        # Router pods use hostNetwork:true — requires OVN-K policy-group label
+        - ports:
+          - protocol: TCP
+            port: 8200
+          from:
+          - namespaceSelector:
+              matchLabels:
+                policy-group.network.openshift.io/ingress: ""
+        # qtodo namespace — spiffe-vault-client sidecar authenticates via SPIFFE JWT
+        - ports:
+          - protocol: TCP
+            port: 8200
+          from:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: qtodo
+        # registry-token-refresher seed job — fetches Vault token for Quay registry
+        - ports:
+          - protocol: TCP
+            port: 8200
+          from:
+          - podSelector:
+              matchLabels:
+                job-name: registry-token-refresher-seed
+            namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: layered-zero-trust-hub
+        # registry-token-refresher CronJob — periodic token refresh to Vault
+        - ports:
+          - protocol: TCP
+            port: 8200
+          from:
+          - podSelector:
+              matchLabels:
+                app.kubernetes.io/name: registry-token-refresher
+            namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: layered-zero-trust-hub
+        # Vault cluster replication port — HA readiness
+        - ports:
+          - protocol: TCP
+            port: 8201
+          from:
+          - podSelector:
+              matchLabels:
+                app.kubernetes.io/name: vault
+                component: server
+      egress:
+        # DNS resolution via CoreDNS — OCP uses port 5353
+        - ports:
+          - protocol: UDP
+            port: 5353
+          - protocol: TCP
+            port: 5353
+          to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: openshift-dns
+        # SPIRE OIDC discovery provider — Vault JWT auth fetches JWKS
+        # Service port 443 -> pod port 8443, both included for OVN-K DNAT
+        - ports:
+          - protocol: TCP
+            port: 443
+          - protocol: TCP
+            port: 8443
+          to:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: zero-trust-workload-identity-manager
+        # Vault cluster replication — outbound to peer Vault pods (HA readiness)
+        - ports:
+          - protocol: TCP
+            port: 8201
+          to:
+          - podSelector:
+              matchLabels:
+                app.kubernetes.io/name: vault
+                component: server
+        # Kubernetes API server — TokenReview for ESO service account validation
+        # ClusterIP service is 172.x:443, DNAT to node IPs on 6443
+        - ports:
+          - protocol: TCP
+            port: 443
+          - protocol: TCP
+            port: 6443

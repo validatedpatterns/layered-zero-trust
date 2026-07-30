@@ -1,0 +1,19 @@
+{{- if and .Values.enabled .Values.proxyCA.enabled }}
+{{- /*
+  Set proxy/cluster trustedCA declaratively via Argo CD instead of
+  patching from the extraction Job SA.  The SA only needs proxies:[get]
+  to read the current trustedCA name; Argo CD applies this resource
+  with its own cluster-admin-scoped SA.
+*/ -}}
+---
+apiVersion: config.openshift.io/v1
+kind: Proxy
+metadata:
+  name: cluster
+  annotations:
+    argocd.argoproj.io/sync-wave: "24"
+    argocd.argoproj.io/sync-options: ServerSideApply=true,Validate=false
+spec:
+  trustedCA:
+    name: {{ .Values.proxyCA.configMapName }}
+{{- end }}

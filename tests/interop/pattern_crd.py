@@ -105,6 +105,15 @@ class SpireOIDCDiscoveryProvider(Resource):
     kind = "SpireOIDCDiscoveryProvider"
 
 
+class ZeroTrustWorkloadIdentityManager(Resource):
+    """
+    ZeroTrustWorkloadIdentityManager object
+    """
+
+    api_version = "operator.openshift.io/v1alpha1"
+    kind = "ZeroTrustWorkloadIdentityManager"
+
+
 class BucketClass(NamespacedResource):
     """
     BucketClass object
@@ -153,3 +162,32 @@ class QuayRegistry(NamespacedResource):
     api_group = "quay.redhat.com"
     api_version = Resource.ApiVersion.V1
     kind = "QuayRegistry"
+
+
+class Securesign(NamespacedResource):
+    """
+    Securesign object for RHTAS
+    """
+
+    api_group = "rhtas.redhat.com"
+    api_version = Resource.ApiVersion.V1ALPHA1
+    kind = "Securesign"
+
+
+class Ingress(NamespacedResource):
+    """
+    Ingress object
+    """
+
+    api_group = Resource.ApiGroup.NETWORKING_K8S_IO
+    kind = "Ingress"
+
+    @property
+    def host(self):
+        # Get the host from ingress rules
+        ingress_host = None
+        rules = self.instance.get("spec", {}).get("rules", [])
+        if rules and len(rules) > 0:
+            ingress_host = rules[0].get("host")
+
+        return ingress_host

@@ -1,0 +1,44 @@
+# Secure Supply Chain application + vault role
+# Depends on: pipelines, rhtas, rhtpa, storage (all resolved automatically)
+# Requires --registry-option to select the registry backend.
+#
+# Optional: add --features protected-repos to enable private Git repository
+# support (see scripts/features/protected-repos.yaml).
+clusterGroup:
+  applications:
+    supply-chain:
+      name: supply-chain
+      project: hub
+      path: charts/supply-chain
+      annotations:
+        argocd.argoproj.io/sync-wave: "48"
+      ignoreDifferences:
+        - kind: ServiceAccount
+          jqPathExpressions:
+            - ".imagePullSecrets[]|select(.name | contains(\"-dockercfg-\"))"
+        - group: tekton.dev
+          kind: Task
+          jsonPointers:
+            - /spec/steps
+        - group: tekton.dev
+          kind: Pipeline
+          jsonPointers:
+            - /spec/tasks
+
+  merge_into_applications:
+    ztvp-certificates:
+      overrides:
+        - name: "distribution.targetNamespaces[0]"
+          value: "qtodo"
+        - name: "distribution.targetNamespaces[1]"
+          value: "{{ $.Values.global.pattern }}-hub"
+    vault:
+      jwt:
+        roles:
+          - name: supply-chain
+            audience: supply-chain
+            subject: "spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/{{ $.Values.global.pattern }}-hub/sa/pipeline"
+            policies:
+              - hub-supply-chain-jwt-secret
+    supply-chain: {}
+    qtodo: {}

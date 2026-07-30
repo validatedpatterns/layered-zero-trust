@@ -1,6 +1,0 @@
-apiVersion: operator.openshift.io/v1alpha1
-kind: SpiffeCSIDriver
-metadata:
-  name: cluster
-spec:
-  agentSocketPath: {{ .Values.spiffe.csi.agentSocketPath }}

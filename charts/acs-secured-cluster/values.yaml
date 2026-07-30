@@ -1,0 +1,108 @@
+# Default values for ACS Secured Cluster Services
+
+global:
+  pattern: layered-zero-trust
+  clusterDomain: cluster.local
+
+clusterName: ""  # Will be overridden by values-hub.yaml
+
+# Central endpoint configuration
+centralEndpoint: ""  # e.g., central-stackrox.apps.cluster.example.com:443
+
+# Cluster registration is handled by the CRS job in acs-central chart.
+# The CRS (Cluster Registration Secret) replaces the deprecated init-bundle approach.
+# Legacy init-bundle values kept for reference:
+initBundle:
+  useExternalSecret: true
+  secretName: collector-tls
+  data: ""
+
+# Sensor configuration
+sensor:
+  enabled: true
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 500Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+# Admission controller configuration
+admissionControl:
+  enabled: true
+
+  # Policy enforcement setting
+  # Set to "Enabled" to enforce policies, "Disabled" to only alert (not recommended)
+  enforcement: Enabled
+
+  # Bypass configuration
+  bypass:
+    enabled: false
+
+  # Enforcement mode
+  listenOnCreates: true
+  listenOnUpdates: true
+  listenOnEvents: true
+
+  # Timeout configuration
+  timeoutSeconds: 20
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 100Mi
+    limits:
+      cpu: 500m
+      memory: 500Mi
+
+# Collector configuration
+collector:
+  enabled: true
+
+  # Collection method
+  #collectionMethod: CORE_BPF
+  collectionMethod: EBPF  # Use EBPF instead of KernelModule
+
+  # Image flavor
+  imageFlavor: Regular
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 320Mi
+    limits:
+      cpu: 750m
+      memory: 1Gi
+
+# Scanner configuration (lightweight)
+scanner:
+  enabled: false
+
+  replicas: 2
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 200Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+# Monitoring
+monitoring:
+  enabled: true
+  openshift:
+    enabled: true
+
+# Security context
+securityContext:
+  runAsNonRoot: true
+
+# Tolerations for collector DaemonSet
+tolerations:
+  - operator: Exists
+
+# Node selector
+nodeSelector: {}

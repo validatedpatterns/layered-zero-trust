@@ -1,0 +1,60 @@
+# Feature registry for gen-feature-variants.py
+# Each feature maps to a YAML fragment file in this directory.
+# Dependencies are resolved automatically (topological order).
+features:
+  storage:
+    description: "ODF object storage + NooBaa MCG (S3 backend)"
+    depends_on: []
+
+  quay:
+    description: "Red Hat Quay container registry"
+    depends_on: [storage]
+
+  rhtas:
+    description: "Red Hat Trusted Artifact Signer (SPIFFE + Email)"
+    depends_on: []
+
+  rhtpa:
+    description: "Red Hat Trusted Profile Analyzer"
+    depends_on: [storage]
+
+  pipelines:
+    description: "OpenShift Pipelines"
+    depends_on: []
+
+  tekton-chains:
+    description: "Tekton Chains with RHTAS keyless signing via SPIFFE"
+    depends_on: [pipelines, rhtas]
+
+  supply-chain:
+    description: "Full secure supply chain pipeline"
+    depends_on: [tekton-chains, rhtpa, storage]
+    registry_option_required: true
+    org: ztvp
+    image_name: qtodo
+
+  protected-repos:
+    description: "Protected (private) Git repository support for supply-chain"
+    depends_on: [supply-chain]
+    git_repo_required: true
+
+  entra-id:
+    description: "Azure Entra ID integration"
+    depends_on: [supply-chain]
+
+  entra-id-qtodo:
+    description: "Azure Entra ID for qtodo authentication (no supply-chain)"
+    depends_on: []
+
+# Registry options (only used with supply-chain feature)
+# Each maps to a file under registry/ subdirectory.
+registry_options:
+  1:
+    label: "built-in-quay-registry"
+    file: "registry/option-1-quay.yaml"
+  2:
+    label: "byo-external-registry"
+    file: "registry/option-2-byo.yaml"
+  3:
+    label: "embedded-openshift-registry"
+    file: "registry/option-3-embedded-openshift.yaml"

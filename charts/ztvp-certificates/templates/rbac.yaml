@@ -6,7 +6,7 @@ metadata:
   name: {{ include "ztvp-certificates.serviceAccountName" . }}
   namespace: {{ .Values.global.namespace }}
   annotations:
-    argocd.argoproj.io/sync-wave: "-9"
+    argocd.argoproj.io/sync-wave: "22"
   labels:
     {{- include "ztvp-certificates.labels" . | nindent 4 }}
 ---
@@ -16,7 +16,7 @@ metadata:
   name: {{ include "ztvp-certificates.serviceAccountName" . }}
   namespace: {{ .Values.global.namespace }}
   annotations:
-    argocd.argoproj.io/sync-wave: "-9"
+    argocd.argoproj.io/sync-wave: "22"
   labels:
     {{- include "ztvp-certificates.labels" . | nindent 4 }}
 rules:
@@ -30,7 +30,7 @@ metadata:
   name: {{ include "ztvp-certificates.serviceAccountName" . }}
   namespace: {{ .Values.global.namespace }}
   annotations:
-    argocd.argoproj.io/sync-wave: "-9"
+    argocd.argoproj.io/sync-wave: "22"
   labels:
     {{- include "ztvp-certificates.labels" . | nindent 4 }}
 roleRef:
@@ -41,35 +41,67 @@ subjects:
 - kind: ServiceAccount
   name: {{ include "ztvp-certificates.serviceAccountName" . }}
   namespace: {{ .Values.global.namespace }}
+{{- /* Namespace-scoped Roles for secrets/configmaps access (least-privilege: only the namespaces the Job reads from) */ -}}
+{{- range $ns := .Values.caReader.namespaces }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "ztvp-certificates.fullname" $ }}-ca-reader
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "22"
+  labels:
+    {{- include "ztvp-certificates.labels" $ | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: ["secrets", "configmaps"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "ztvp-certificates.fullname" $ }}-ca-reader
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "22"
+  labels:
+    {{- include "ztvp-certificates.labels" $ | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "ztvp-certificates.fullname" $ }}-ca-reader
+subjects:
+- kind: ServiceAccount
+  name: {{ include "ztvp-certificates.serviceAccountName" $ }}
+  namespace: {{ $.Values.global.namespace }}
+{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: {{ include "ztvp-certificates.fullname" . }}-ca-reader
   annotations:
-    argocd.argoproj.io/sync-wave: "-9"
+    argocd.argoproj.io/sync-wave: "22"
   labels:
     {{- include "ztvp-certificates.labels" . | nindent 4 }}
 rules:
-# Read ingress CA from router secrets (dynamically discovered from any IngressController)
-- apiGroups: [""]
-  resources: ["secrets"]
-  verbs: ["get", "list"]
-# Read OpenShift service CA and cluster-wide trusted-ca-bundle
-- apiGroups: [""]
-  resources: ["configmaps"]
-  verbs: ["get", "list"]
 # Read ingress controller configuration to detect custom certs
 - apiGroups: ["operator.openshift.io"]
   resources: ["ingresscontrollers"]
   verbs: ["get", "list"]
+# Read-only access to cluster proxy; trustedCA is managed declaratively by Argo CD
+- apiGroups: ["config.openshift.io"]
+  resources: ["proxies"]
+  resourceNames: ["cluster"]
+  verbs: ["get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: {{ include "ztvp-certificates.fullname" . }}-ca-reader
   annotations:
-    argocd.argoproj.io/sync-wave: "-9"
+    argocd.argoproj.io/sync-wave: "22"
   labels:
     {{- include "ztvp-certificates.labels" . | nindent 4 }}
 roleRef:
@@ -80,6 +112,39 @@ subjects:
 - kind: ServiceAccount
   name: {{ include "ztvp-certificates.serviceAccountName" . }}
   namespace: {{ .Values.global.namespace }}
+{{- if .Values.imagePullTrust.enabled }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "ztvp-certificates.fullname" . }}-image-config
+  annotations:
+    argocd.argoproj.io/sync-wave: "-9"
+  labels:
+    {{- include "ztvp-certificates.labels" . | nindent 4 }}
+rules:
+# Patch image.config.openshift.io/cluster to set additionalTrustedCA
+- apiGroups: ["config.openshift.io"]
+  resources: ["images"]
+  verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "ztvp-certificates.fullname" . }}-image-config
+  annotations:
+    argocd.argoproj.io/sync-wave: "-9"
+  labels:
+    {{- include "ztvp-certificates.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "ztvp-certificates.fullname" . }}-image-config
+subjects:
+- kind: ServiceAccount
+  name: {{ include "ztvp-certificates.serviceAccountName" . }}
+  namespace: {{ .Values.global.namespace }}
+{{- end }}
 {{- if .Values.rollout.enabled }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -87,7 +152,7 @@ kind: ClusterRole
 metadata:
   name: {{ include "ztvp-certificates.fullname" . }}-rollout
   annotations:
-    argocd.argoproj.io/sync-wave: "-9"
+    argocd.argoproj.io/sync-wave: "22"
   labels:
     {{- include "ztvp-certificates.labels" . | nindent 4 }}
 rules:
@@ -95,23 +160,27 @@ rules:
 - apiGroups: ["apps"]
   resources: ["deployments", "statefulsets", "daemonsets"]
   verbs: ["get", "list", "patch"]
+{{- /* Per-namespace RoleBindings restrict rollout restart to listed namespaces only */ -}}
+{{- range $ns := .Values.rollout.namespaces }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
-  name: {{ include "ztvp-certificates.fullname" . }}-rollout
+  name: {{ include "ztvp-certificates.fullname" $ }}-rollout
+  namespace: {{ $ns }}
   annotations:
-    argocd.argoproj.io/sync-wave: "-9"
+    argocd.argoproj.io/sync-wave: "22"
   labels:
-    {{- include "ztvp-certificates.labels" . | nindent 4 }}
+    {{- include "ztvp-certificates.labels" $ | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "ztvp-certificates.fullname" . }}-rollout
+  name: {{ include "ztvp-certificates.fullname" $ }}-rollout
 subjects:
 - kind: ServiceAccount
-  name: {{ include "ztvp-certificates.serviceAccountName" . }}
-  namespace: {{ .Values.global.namespace }}
+  name: {{ include "ztvp-certificates.serviceAccountName" $ }}
+  namespace: {{ $.Values.global.namespace }}
+{{- end }}
 {{- end }}
 {{- end }}
 

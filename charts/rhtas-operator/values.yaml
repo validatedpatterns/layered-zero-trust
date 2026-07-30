@@ -60,6 +60,10 @@ rhtas:
   database:
     create: true
   
+  # Log type configuration for Rekor, Fulcio and Timestamp Authority. Useful for debugging.
+  # Options: prod, dev
+  logType: "prod"
+
   # TUF configuration
   tuf:
     enabled: true

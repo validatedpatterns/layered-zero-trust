@@ -1,0 +1,18 @@
+- name: Retrieve Credentials for AAP on OpenShift
+  become: false
+  connection: local
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Ensure collection is installed # noqa: syntax-check[unknown-module]
+      community.general.ansible_galaxy_install:
+        type: collection
+        name: azure.azcollection
+    - name: Ensure community.crypto collection is installed # noqa: syntax-check[unknown-module]
+      community.general.ansible_galaxy_install:
+        type: collection
+        name: community.crypto
+    - name: Install Azure SDK
+      ansible.builtin.pip:
+        requirements: "~/.ansible/collections/ansible_collections/azure/azcollection/requirements.txt"
+        extra_args: --user

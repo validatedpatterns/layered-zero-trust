@@ -2,6 +2,7 @@
 # documentation and qe
 metadata_version: "1.0"
 name: layered-zero-trust 
+description: The Layered Zero Trust pattern shows how to implement zero trust in a Red Hat OpenShift environment.
 pattern_version: "1.0"
 display_name: Layered Zero Trust
 repo_url: https://github.com/validatedpatterns/layered-zero-trust

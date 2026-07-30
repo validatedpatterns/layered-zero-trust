@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: signer
+  namespace: rhtas-signing-test
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rhtas-signer
+  namespace: rhtas-signing-test
+  labels:
+    app: rhtas-signer
+spec:
+  serviceAccountName: signer
+  containers:
+  - name: signer
+    image: registry.access.redhat.com/ubi9/ubi:latest
+    command: ["sleep", "infinity"]
+    env:
+    - name: SPIFFE_ENDPOINT_SOCKET
+      value: /spiffe-workload-api/spire-agent.sock
+    - name: FULCIO_URL
+      value: {{ FULCIO_URL }}
+    - name: REKOR_URL
+      value: {{ REKOR_URL }}
+    - name: TUF_URL
+      value: {{ TUF_URL }}
+    - name: CLI_SERVER_URL
+      value: {{ CLI_SERVER_URL }}
+    - name: KEYCLOAK_URL
+      value: {{ KEYCLOAK_URL}}
+    - name: RHTAS_USER
+      value: "rhtas-user"
+    - name: RHTAS_USER_PASS
+      value: {{ RHTAS_USER_PASS }}
+    - name: QUAY_URL
+      value: {{ QUAY_URL }}
+    volumeMounts:
+    - name: spiffe-workload-api
+      mountPath: /spiffe-workload-api
+      readOnly: true
+      volumeMounts:
+    - name: kube-root-ca
+      mountPath: "/run/kube-root-ca"
+      readOnly: true
+  volumes:
+  - name: spiffe-workload-api
+    csi:
+      driver: csi.spiffe.io
+      readOnly: true
+  - name: kube-root-ca
+    configMap:
+      name: kube-root-ca.crt
+    items:
+      - key: ca.crt
+        path: ca.crt

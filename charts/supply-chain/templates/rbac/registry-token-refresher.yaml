@@ -1,0 +1,228 @@
+{{- if and (index .Values.registry "embeddedOpenShift") (index .Values.registry.embeddedOpenShift "tokenRefresher") (index .Values.registry.embeddedOpenShift.tokenRefresher "enabled") }}
+{{- $regVaultPath := .Values.registry.vaultPath | default .Values.global.registry.vaultPath }}
+{{- $regPasswordKey := .Values.registry.passwordVaultKey | default .Values.global.registry.passwordVaultKey }}
+# ============================================================
+# OpenShift Registry Token Refresher
+# Periodically creates a fresh pipeline SA token and writes it
+# to Vault so the ExternalSecret-based dockerconfigjson stays
+# valid for the embedded OpenShift image registry.
+# ============================================================
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: registry-token-refresher-script
+  namespace: {{ .Values.global.namespace }}
+data:
+  refresh_registry_token.sh: |
+{{- .Files.Get "files/refresh_registry_token.sh" | nindent 4 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: registry-token-refresher-spiffe-config
+  namespace: {{ .Values.global.namespace }}
+data:
+  helper.conf: |-
+    agent_address = "{{ .Values.spire.endpointSocketPath }}"
+    cmd = ""
+    cmd_args = ""
+    cert_dir = "/svids"
+    renew_signal = ""
+    svid_file_name = "svid.pem"
+    svid_key_file_name = "svid_key.pem"
+    svid_bundle_file_name = "svid_bundle.pem"
+    jwt_svids = [{jwt_audience="supply-chain", jwt_svid_file_name="jwt.token"}]
+    jwt_bundle_file_name  = "jwt_bundle.json"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: registry-token-refresher
+  namespace: {{ .Values.global.namespace }}
+rules:
+- apiGroups: [""]
+  resources: ["serviceaccounts/token"]
+  resourceNames: [{{ .Values.pipelineServiceAccount | quote }}]
+  verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: registry-token-refresher
+  namespace: {{ .Values.global.namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: registry-token-refresher
+subjects:
+- kind: ServiceAccount
+  name: {{ .Values.pipelineServiceAccount }}
+  namespace: {{ .Values.global.namespace }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: registry-token-refresher
+  namespace: {{ .Values.global.namespace }}
+spec:
+  schedule: {{ .Values.registry.embeddedOpenShift.tokenRefresher.schedule | quote }}
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: registry-token-refresher
+        spec:
+          serviceAccountName: {{ .Values.pipelineServiceAccount }}
+          restartPolicy: Never
+          initContainers:
+          - name: fetch-spiffe-jwt
+            image: {{ .Values.images.spiffeHelper }}
+            imagePullPolicy: IfNotPresent
+            args:
+              - '-config'
+              - /etc/helper.conf
+              - '-daemon-mode=false'
+            volumeMounts:
+              - name: spiffe-helper-config
+                readOnly: true
+                mountPath: /etc/helper.conf
+                subPath: helper.conf
+              - name: spiffe-workload-api
+                readOnly: true
+                mountPath: /spiffe-workload-api
+              - name: svids
+                mountPath: /svids
+          containers:
+          - name: refresh-token
+            image: {{ .Values.images.ubi }}
+            command: ["sh", "/app/refresh_registry_token.sh"]
+            env:
+              - name: VAULT_URL
+                value: https://vault.vault.svc.cluster.local:8200
+              - name: VAULT_ROLE
+                value: supply-chain
+              - name: VAULT_SECRET_PATH
+                value: {{ required "registry vaultPath is required" $regVaultPath }}
+              - name: VAULT_SECRET_KEY
+                value: {{ required "registry passwordVaultKey is required" $regPasswordKey }}
+              - name: SA_NAME
+                value: {{ .Values.pipelineServiceAccount }}
+              - name: SA_NAMESPACE
+                value: {{ .Values.global.namespace }}
+              - name: TOKEN_DURATION
+                value: {{ .Values.registry.embeddedOpenShift.tokenRefresher.tokenDuration | quote }}
+              - name: JWT_TOKEN_FILE
+                value: /svids/jwt.token
+              - name: CA_CERT
+                value: /run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+            volumeMounts:
+              - name: svids
+                readOnly: true
+                mountPath: /svids
+              - name: script-volume
+                readOnly: true
+                mountPath: /app
+          volumes:
+            - name: spiffe-workload-api
+              csi:
+                driver: csi.spiffe.io
+                readOnly: true
+            - name: spiffe-helper-config
+              configMap:
+                name: registry-token-refresher-spiffe-config
+                defaultMode: 420
+            - name: svids
+              emptyDir: {}
+            - name: script-volume
+              configMap:
+                name: registry-token-refresher-script
+                defaultMode: 0755
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: registry-token-refresher-seed
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    # Run after wave 0 (ConfigMaps, RBAC) and wave 1 (enable-registry-default-route hook),
+    # but before the qtodo-registry-auth ExternalSecret at wave 15.
+    argocd.argoproj.io/sync-wave: "10"
+    argocd.argoproj.io/hook: Sync
+    # HookSucceeded: remove completed Job so Argo does not sit on a stale object; BeforeHookCreation: clean retry/sync.
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
+spec:
+  backoffLimit: 3
+  # Avoid an indefinite sync if Vault/SPIFFE never become ready (Argo waits for hook completion).
+  activeDeadlineSeconds: 900
+  template:
+    spec:
+      serviceAccountName: {{ .Values.pipelineServiceAccount }}
+      restartPolicy: Never
+      initContainers:
+      - name: fetch-spiffe-jwt
+        image: {{ .Values.images.spiffeHelper }}
+        imagePullPolicy: IfNotPresent
+        args:
+          - '-config'
+          - /etc/helper.conf
+          - '-daemon-mode=false'
+        volumeMounts:
+          - name: spiffe-helper-config
+            readOnly: true
+            mountPath: /etc/helper.conf
+            subPath: helper.conf
+          - name: spiffe-workload-api
+            readOnly: true
+            mountPath: /spiffe-workload-api
+          - name: svids
+            mountPath: /svids
+      containers:
+      - name: refresh-token
+        image: {{ .Values.images.ubi }}
+        command: ["sh", "/app/refresh_registry_token.sh"]
+        env:
+          - name: VAULT_URL
+            value: https://vault.vault.svc.cluster.local:8200
+          - name: VAULT_ROLE
+            value: supply-chain
+          - name: VAULT_SECRET_PATH
+            value: {{ required "registry vaultPath is required" $regVaultPath }}
+          - name: VAULT_SECRET_KEY
+            value: {{ required "registry passwordVaultKey is required" $regPasswordKey }}
+          - name: SA_NAME
+            value: {{ .Values.pipelineServiceAccount }}
+          - name: SA_NAMESPACE
+            value: {{ .Values.global.namespace }}
+          - name: TOKEN_DURATION
+            value: {{ .Values.registry.embeddedOpenShift.tokenRefresher.tokenDuration | quote }}
+          - name: JWT_TOKEN_FILE
+            value: /svids/jwt.token
+          - name: CA_CERT
+            value: /run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+        volumeMounts:
+          - name: svids
+            readOnly: true
+            mountPath: /svids
+          - name: script-volume
+            readOnly: true
+            mountPath: /app
+      volumes:
+        - name: spiffe-workload-api
+          csi:
+            driver: csi.spiffe.io
+            readOnly: true
+        - name: spiffe-helper-config
+          configMap:
+            name: registry-token-refresher-spiffe-config
+            defaultMode: 420
+        - name: svids
+          emptyDir: {}
+        - name: script-volume
+          configMap:
+            name: registry-token-refresher-script
+            defaultMode: 0755
+{{- end }}

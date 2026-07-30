@@ -1,0 +1,18 @@
+apiVersion: v2
+name: hello-coco
+description: A Helm chart for SPIRE Agent CoCo test pod demonstrates x509pop attestation with KBS
+type: application
+version: 0.0.1
+maintainers:
+  - name: Beraldo Leal
+    email: bleal@redhat.com
+  - name: Chris Butler
+    email: chris.butler@redhat.com
+keywords:
+  - spire
+  - coco
+  - confidentialcontainers
+  - attestation
+  - x509pop
+annotations:
+  category: Test

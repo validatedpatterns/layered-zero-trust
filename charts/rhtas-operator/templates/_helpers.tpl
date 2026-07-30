@@ -51,3 +51,12 @@ app.kubernetes.io/name: {{ include "rhtas-operator.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+{{/*
+Validate logType variables
+*/}}
+{{- define "log-type.validations" }}
+{{- $logTypes := list "dev" "prod" }}
+{{- if not (has .Values.rhtas.logType $logTypes) }}
+{{- fail "Wrong value set in .Values.rhtas.logType" }}
+{{- end }}
+{{- end }}

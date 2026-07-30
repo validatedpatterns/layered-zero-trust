@@ -2,10 +2,10 @@
 
 One of the most common application design patterns makes use of a frontend application leveraging a database for persistent storage. Instead of traditional methods for accessing the database from the frontend application using static values stored within the application, this pattern will make use "just in time" methods for obtaining these database values from a credential store. A more detailed overview is located below:
 
-* qtodo - [Quarkus](https://quarkus.io) based frontend application. Access is protected via OIDC based authentication with users defined within an external identity store (Red Hat Build of Keycloak by default)
+* qtodo - [Quarkus](https://quarkus.io) based frontend application. Access is protected via OIDC based authentication with users defined within an external identity store ([Red Hat Build of Keycloak](https://access.redhat.com/products/red-hat-build-of-keycloak/) by default)
 * PostgreSQL - Relational database for use by the qtodo application. Credentials are generated dynamically and stored within Vault.
 * External Identity store - Users have been defined to enable access to the qtodo frontend. OIDC clients have also been created and configured within the todo application
-* HashiCorp Vault - Several features are being leveraged within this use case the external identity store
+* HashiCorp Vault - Several features are being leveraged within this use case for the external identity store
   * Secrets store - Storage of sensitive values for components including PostgreSQL and RHBK
   * JWT based authentication - Enables access using ZTWIM based identities
 * Zero Trust Workload Identity - Enables an identity to be assigned to the qtodo application to communicate with HashiCorp Vault and obtain the credentials to access the PostgreSQL database
@@ -45,3 +45,40 @@ Switch back to the qtodo application and enter the username and password on the 
 Once you have authenticated to RHBK, you will be instructed to change the temporary password and set a more permanent password. Once complete, you will be redirected to the qtodo application verifying the OIDC based authentication functions properly.
 
 Feel free to add new items to the list of todos. By being able to add and remove items from the page, the integration between the Quarkus application and the backend PostgreSQL database using credentials sourced from HashiCorp Vault was successful.
+
+## TLS Termination Options
+
+The qtodo application uses `reencrypt` TLS termination on the OpenShift Route by default, ensuring that traffic is encrypted end-to-end from the client to the pod. Ingress TLS communication is terminated at the OpenShift Router and reencrypted with a certificate generated using the [Service Serving Certificate feature](https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html/security_and_compliance/configuring-certificates#add-service-serving).
+
+### Configuration
+
+The qtodo Helm chart provides options to control how and where TLS communication is terminated:
+
+* **`app.route.termination`** — Specifies the TLS termination type for the OpenShift Route
+  * `reencrypt` (default) — TLS is terminated at the Router and reencrypted to the pod using the certificate specified in `app.tls.secret`
+  * `passthrough` — TLS traffic passes through the Router without decryption and is terminated at the pod
+  * `edge` — TLS is terminated at the Router; backend communication uses HTTP
+
+* **`app.securePort`** — The HTTPS port used by the application (default: `8443`)
+  * Used when `app.route.termination` is set to `reencrypt` or `passthrough`
+
+* **`app.insecurePort`** — The HTTP port used by the application (default: `8080`)
+  * Used when `app.route.termination` is set to `edge` or when TLS is disabled
+
+* **`app.tls.secret`** — Name of the Kubernetes Secret containing the TLS certificate and key (default: `qtodo-tls`)
+  * Used for pod-level TLS termination with `reencrypt` or `passthrough` routes
+
+* **`app.tls.serviceServing`** — Enable automatic certificate generation via Service Serving Certificates (default: `true`)
+  * When enabled, OpenShift automatically generates and rotates the certificate in `app.tls.secret`
+  * When using custom certificates (e.g., for `passthrough` mode), set this to `false` and provide your own certificate in the secret
+
+### Termination Types
+
+| Termination Type | TLS at Router | TLS to Pod | Certificate Source | Use Case |
+| --- | --- | --- | --- | --- |
+| `reencrypt` (default) | Yes | Yes | Service Serving Certificate | End-to-end encryption with automatic cert rotation |
+| `passthrough` | No | Yes | User-provided in `app.tls.secret` | Custom certificates or strict no-decrypt requirement |
+| `edge` | Yes | No | Route certificate | Legacy apps without TLS support |
+
+> [!NOTE]
+> When using `passthrough` termination with custom certificates, ensure the certificate's Subject Alternative Name (SAN) matches the Route hostname. The Service Serving Certificate feature cannot be used in this mode.

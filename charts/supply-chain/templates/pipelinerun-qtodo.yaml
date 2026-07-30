@@ -1,0 +1,117 @@
+{{- if .Values.pipelinerun.enabled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pipelinerun-launcher
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pipelinerun-launcher
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+rules:
+- apiGroups: ["tekton.dev"]
+  resources: ["pipelineruns"]
+  verbs: ["create"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get"]
+  resourceNames: [{{ .Values.registry.authSecretName | quote }}]
+- apiGroups: [""]
+  resources: ["persistentvolumeclaims"]
+  verbs: ["get"]
+  resourceNames: ["qtodo-workspace-source"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pipelinerun-launcher
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: pipelinerun-launcher
+subjects:
+- kind: ServiceAccount
+  name: pipelinerun-launcher
+  namespace: {{ .Values.global.namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: launch-qtodo-pipeline
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 600
+  template:
+    spec:
+      serviceAccountName: pipelinerun-launcher
+      restartPolicy: Never
+      containers:
+      - name: launcher
+        image: registry.redhat.io/openshift4/ose-tools-rhel9:latest
+        env:
+        - name: REGISTRY_DOMAIN
+          value: {{ tpl (default "" .Values.global.registry.domain) $ | quote }}
+        command:
+        - /bin/sh
+        - -ce
+        - |
+          if [ -n "${REGISTRY_DOMAIN}" ]; then
+            echo "Waiting for registry ${REGISTRY_DOMAIN} to become ready..."
+            MAX_WAIT=480
+            WAITED=0
+            while [ ${WAITED} -lt ${MAX_WAIT} ]; do
+              HTTP=$(curl -sk -o /dev/null -w "%{http_code}" "https://${REGISTRY_DOMAIN}/v2/" 2>/dev/null)
+              if [ "${HTTP}" = "200" ] || [ "${HTTP}" = "401" ] || [ "${HTTP}" = "301" ]; then
+                echo "Registry is ready (HTTP ${HTTP})."
+                break
+              fi
+              echo "Registry not ready (HTTP ${HTTP}), retrying in 15s... (${WAITED}/${MAX_WAIT}s)"
+              sleep 15
+              WAITED=$((WAITED + 15))
+            done
+            if [ ${WAITED} -ge ${MAX_WAIT} ]; then
+              echo "ERROR: Registry not ready after ${MAX_WAIT}s, launching pipeline anyway."
+            fi
+          fi
+
+          cat <<'MANIFEST' | oc create -f -
+          apiVersion: tekton.dev/v1
+          kind: PipelineRun
+          metadata:
+            generateName: qtodo-supply-chain-
+            namespace: {{ .Values.global.namespace }}
+          spec:
+            pipelineRef:
+              name: qtodo-supply-chain
+            workspaces:
+              - name: qtodo-source
+                persistentVolumeClaim:
+                  claimName: qtodo-workspace-source
+              - name: registry-auth-config
+                secret:
+                  secretName: {{ .Values.registry.authSecretName }}
+{{- if and .Values.git.sslCABundle.enabled (ne (default "https" .Values.git.credentials.authType) "ssh") }}
+              - name: ssl-ca-directory
+                configMap:
+                  name: {{ .Values.git.sslCABundle.configMapName }}
+{{- end }}
+          MANIFEST
+          echo "PipelineRun created successfully."
+{{- end }}

@@ -6,7 +6,7 @@ metadata:
   name: {{ include "ztvp-certificates.fullname" . }}-script
   namespace: {{ .Values.global.namespace }}
   annotations:
-    argocd.argoproj.io/sync-wave: "-9"
+    argocd.argoproj.io/sync-wave: "22"
   labels:
     {{- include "ztvp-certificates.labels" . | nindent 4 }}
     app.kubernetes.io/component: extraction-script
