@@ -11,14 +11,17 @@ spec:
   - Ingress
   - Egress
   ingress:
-  # PostgreSQL — only from qtodo app pods in the same namespace
+  # PostgreSQL — only from qtodo app pods in the qtodo namespace
   - ports:
     - protocol: TCP
-      port: 5432
+      port: {{ .Values.postgresql.port }}
     from:
-    - podSelector:
+    - namespaceSelector:
         matchLabels:
-          app: qtodo
+          kubernetes.io/metadata.name: {{ .Values.postgresql.allowedClientNamespace }}
+      podSelector:
+        matchLabels:
+          app: {{ .Values.postgresql.allowedClientApp }}
   egress:
   # DNS resolution via CoreDNS — OCP uses port 5353 (not 53)
   - ports:

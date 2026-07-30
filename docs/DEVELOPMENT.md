@@ -139,7 +139,7 @@ Secrets are organized by component under the `secret/` KV mount. The table below
 
 | Path | Contents |
 |---|---|
-| `secret/apps/qtodo/qtodo-db` | `admin-password`, `db-password` — PostgreSQL credentials for the qtodo app |
+| `secret/apps/qtodo/qtodo-db` | `admin-password`, `db-password` — PostgreSQL credentials for the qtodo-db deploy |
 | `secret/apps/qtodo/qtodo-truststore` | `truststore-password` — Keycloak TLS truststore password for qtodo |
 | `secret/hub/infra/keycloak/keycloak` | `admin-password`, `db-password` — Keycloak admin (username: `admin`) and database credentials |
 | `secret/hub/infra/users/keycloak-users` | `qtodo-admin-password`, `qtodo-user1-password`, `rhtpa-user-password`, `rhtas-user-password` — application user passwords provisioned in Keycloak |

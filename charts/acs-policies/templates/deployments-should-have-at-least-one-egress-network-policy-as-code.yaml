@@ -21,6 +21,8 @@ spec:
   scope:
     - label: {}
       namespace: "qtodo"
+    - label: {}
+      namespace: "qtodo-db"
 
   policySections:
     - sectionName: Alert on missing egress Network Policy

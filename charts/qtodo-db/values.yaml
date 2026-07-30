@@ -1,0 +1,24 @@
+global:
+  secretStore:
+    name: "vault-backend"
+    kind: "ClusterSecretStore"
+
+postgresql:
+  name: qtodo-db
+  port: 5432
+
+  image:
+    name: registry.redhat.io/rhel8/postgresql-16
+    version: latest
+    pullPolicy: IfNotPresent
+
+  auth:
+    secretName: qtodo-db-secret
+    database: tasks
+    username: qtodo_user
+    # qtodo DB password path (app-level isolation)
+    passwordVaultKey: secret/data/apps/qtodo/qtodo-db
+
+  # Namespace allowed to connect to PostgreSQL
+  allowedClientNamespace: qtodo
+  allowedClientApp: qtodo

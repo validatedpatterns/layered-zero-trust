@@ -1,19 +1,16 @@
 apiVersion: v2
-name: qtodo
-description: A Helm chart for QTodo - Persistent Todo Application
+name: qtodo-db
+description: PostgreSQL database for the qtodo application
 type: application
 version: 0.0.1
 appVersion: "1.0.0"
-sources:
-  - https://github.com/validatedpatterns-demos/qtodo
 maintainers:
   - name: Zero Trust Validated Patterns Team
     email: ztvp-arch-group@redhat.com
 keywords:
-  - web
-  - todo
-  - quarkus
   - postgresql
+  - database
+  - qtodo
   - pattern
 annotations:
-  category: Application
+  category: Database

@@ -4,7 +4,7 @@ apiVersion: v1
 metadata:
   name: spiffe-helper
   labels:
-    app: qtodo-db
+    app: qtodo
 data:
   helper.conf: |-
     agent_address = "/spiffe-workload-api/spire-agent.sock"
