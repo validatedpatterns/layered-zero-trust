@@ -69,7 +69,7 @@ clusterGroup:
       operatorGroup: true
       targetNamespace: cert-manager-operator
     # Layer 1: Storage and Registry
-    # Required for RHTPA and QUAY (provides NooBaa object storage backend)
+    # Required for RHTPA, QUAY, and Network Observability (provides NooBaa object storage backend)
     # openshift-storage:
     #   operatorGroup: true
     #   targetNamespace: openshift-storage
@@ -98,6 +98,29 @@ clusterGroup:
     #     argocd.argoproj.io/sync-wave: "32"  # Create before RHTPA components
     #   labels:
     #     openshift.io/cluster-monitoring: "true"
+    # Network Observability (LokiStack + FlowCollector)
+    # Depends on: storage / NooBaa (uncomment openshift-storage + odf + noobaa-mcg above/below)
+    # Prefer: python3 scripts/gen-feature-variants.py --features netobserv
+    # openshift-operators-redhat:
+    #   operatorGroup: true
+    #   targetNamespaces: []
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "26"
+    # openshift-netobserv-operator:
+    #   operatorGroup: true
+    #   targetNamespaces: []
+    #   labels:
+    #     openshift.io/cluster-monitoring: "true"
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "26"
+    # netobserv-loki:
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "26"
+    # netobserv:
+    #   labels:
+    #     openshift.io/cluster-monitoring: "true"
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "26"
     zero-trust-workload-identity-manager:
       operatorGroup: true
       targetNamespace: zero-trust-workload-identity-manager
@@ -162,7 +185,7 @@ clusterGroup:
       source: redhat-operators
     #
     # Storage and Registry operator subscriptions
-    # Required for RHTPA and QUAY (provides NooBaa object storage backend)
+    # Required for RHTPA, QUAY, and Network Observability (provides NooBaa object storage backend)
     # ODF provides object storage backend (NooBaa) for RHTPA and optionally Quay
     # odf:
     #   name: odf-operator
@@ -192,6 +215,21 @@ clusterGroup:
     #   catalogSource: redhat-operators
     #   annotations:
     #     argocd.argoproj.io/sync-wave: "27"  # Install after OperatorGroup (26), before applications
+    # Network Observability operator subscriptions (requires storage / NooBaa)
+    # loki-operator:
+    #   name: loki-operator
+    #   namespace: openshift-operators-redhat
+    #   channel: stable-6.6
+    #   source: redhat-operators
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "27"
+    # netobserv-operator:
+    #   name: netobserv-operator
+    #   namespace: openshift-netobserv-operator
+    #   channel: stable
+    #   source: redhat-operators
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "28"
   argoProjects:
     - hub
   # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
@@ -336,7 +374,7 @@ clusterGroup:
       annotations:
         argocd.argoproj.io/sync-wave: "25"
     # Shared Object Storage Backend
-    # Required for RHTPA and QUAY (provides S3-compatible storage via NooBaa MCG)
+    # Required for RHTPA, QUAY, and Network Observability (provides S3-compatible storage via NooBaa MCG)
     # NooBaa MCG provides S3-compatible object storage for multiple applications
     # noobaa-mcg:
     #   name: noobaa-mcg
@@ -345,6 +383,16 @@ clusterGroup:
     #   path: charts/noobaa-mcg
     #   annotations:
     #     argocd.argoproj.io/sync-wave: "36"  # Deploy after core services
+    # Network Observability (LokiStack + FlowCollector via NooBaa)
+    # Depends on: storage / NooBaa MCG above
+    # Prefer: python3 scripts/gen-feature-variants.py --features netobserv
+    # netobserv:
+    #   name: netobserv
+    #   namespace: netobserv
+    #   project: hub
+    #   path: charts/netobserv
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "42"  # Deploy after NooBaa storage backend
     # Quay Container Registry (uses NooBaa for storage)
     # quay-registry:
     #   name: quay-registry
