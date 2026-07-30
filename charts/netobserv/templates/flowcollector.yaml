@@ -25,3 +25,4 @@ spec:
   consolePlugin:
     enable: {{ .Values.flowcollector.consolePlugin.enable }}
 {{- end }}
+

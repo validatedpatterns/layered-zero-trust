@@ -5,7 +5,10 @@ loki:
   namespace: netobserv-loki
   name: loki
   size: 1x.extra-small
-  storageClassName: gp3-csi
+  # Required by LokiStack CRD. Leave empty to auto-detect the cluster default
+  # StorageClass via Helm lookup (helm install only). Under Argo CD, lookup is
+  # unsupported — set this explicitly (values or Application helm parameter).
+  storageClassName: ""
   storageSecretName: loki-s3
   objectBucketClaim:
     name: netobserv-loki-obc
