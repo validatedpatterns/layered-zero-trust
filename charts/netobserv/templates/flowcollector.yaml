@@ -24,5 +24,10 @@ spec:
       namespace: {{ .Values.loki.namespace }}
   consolePlugin:
     enable: {{ .Values.flowcollector.consolePlugin.enable }}
+  {{- if eq (.Values.networkPolicy.enabled | toString) "true" }}
+  # Operator-managed NPs for netobserv + netobserv-privileged (not LokiStack ns).
+  networkPolicy:
+    enable: true
+  {{- end }}
 {{- end }}
 

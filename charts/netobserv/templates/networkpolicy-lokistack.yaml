@@ -1,0 +1,114 @@
+{{- if and .Values.enabled .Values.loki.enabled (eq (.Values.networkPolicy.enabled | toString) "true") }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-in-namespace-{{ .Values.loki.namespace }}
+  namespace: {{ .Values.loki.namespace }}
+  labels:
+    {{- include "netobserv.labels" . | nindent 4 }}
+    app.kubernetes.io/component: network-policy
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+# LokiStack components. Operator-managed NPs cover netobserv / netobserv-privileged;
+# this fills the netobserv-loki gap (verified dry-run on OCP 4.21).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: lokistack
+  namespace: {{ .Values.loki.namespace }}
+  labels:
+    {{- include "netobserv.labels" . | nindent 4 }}
+    app.kubernetes.io/component: network-policy
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: lokistack
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector: {}
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ .Values.flowcollector.namespace }}
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-console
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-monitoring
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          policy-group.network.openshift.io/ingress: ""
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  - to:
+    - podSelector: {}
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-dns
+    ports:
+    - protocol: UDP
+      port: 5353
+    - protocol: TCP
+      port: 5353
+  - ports:
+    - protocol: TCP
+      port: 6443
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-storage
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+---
+# Credentials Job (Sync hook): API + DNS only
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: loki-s3-credentials-setup
+  namespace: {{ .Values.loki.namespace }}
+  labels:
+    {{- include "netobserv.labels" . | nindent 4 }}
+    app.kubernetes.io/component: network-policy
+  annotations:
+    argocd.argoproj.io/sync-wave: "38"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "netobserv.name" . }}
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-dns
+    ports:
+    - protocol: UDP
+      port: 5353
+    - protocol: TCP
+      port: 5353
+  - ports:
+    - protocol: TCP
+      port: 6443
+{{- end }}
