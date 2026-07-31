@@ -627,6 +627,12 @@ clusterGroup:
       overrides:
         - name: clusterName
           value: hub
+        # Central is local on the hub, so the sensor must reach it by the
+        # in-cluster service name. Central's serving cert only has
+        # DNS:central.stackrox and DNS:central.stackrox.svc, and the public route
+        # is passthrough -- so using the route hostname fails TLS verification.
+        - name: centralEndpoint
+          value: central.stackrox.svc:443
       extraValueFiles:
         - /values-global.yaml
         - /values-{{ .Values.global.pattern }}-hub.yaml
