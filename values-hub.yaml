@@ -327,6 +327,23 @@ clusterGroup:
         # ArgoCD 'Progressing' status on storage with WaitForFirstConsumer mode.
         - name: compliance.storage.enabled
           value: "false"
+        # Report findings, do not rewrite cluster config automatically.
+        #
+        # With this on, the operator wrote oauth/cluster directly and fought the
+        # ACM ConfigurationPolicy that enforces the 12h session (ARCH-486): both
+        # controllers were observed writing spec.tokenConfig in the same second,
+        # compliance pushing accessTokenMaxAgeSeconds=86400 against the policy's
+        # 43200, and re-adding accessTokenInactivityTimeout=10m0s each reconcile.
+        #
+        # Scope is small: of 125 checks (81 PASS / 22 MANUAL / 22 FAIL) only the
+        # two OAuth rules ever produced a remediation. The rest of the FAILs are
+        # not machine-remediable, so nothing else changes behaviour here.
+        #
+        # Turning this off does NOT unapply existing remediations -- those keep
+        # spec.apply=true and continue to be enforced. They must be set to
+        # apply=false separately.
+        - name: compliance.scanSetting.autoApplyRemediations
+          value: "false"
     vault:
       name: vault
       namespace: vault
