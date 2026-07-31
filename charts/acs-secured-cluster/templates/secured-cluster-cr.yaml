@@ -11,7 +11,22 @@ metadata:
 spec:
   clusterName: {{ .Values.clusterName | default .Values.global.clusterName | quote }}
 
-  centralEndpoint: central-stackrox.{{ .Values.global.localClusterDomain }}:443
+  {{- /*
+    Honour .Values.centralEndpoint when set, falling back to the public route.
+
+    The route is correct for a spoke, where Central lives on another cluster. It
+    is wrong when Central is local: Central's serving certificate carries only
+    DNS:central.stackrox and DNS:central.stackrox.svc, and the route is
+    passthrough, so the sensor is presented Central's own certificate under a
+    hostname that is not in its SANs and the handshake fails with
+
+      x509: certificate is valid for central.stackrox, central.stackrox.svc,
+      not central-stackrox.<domain>
+
+    Set centralEndpoint to central.stackrox.svc:443 on the hub, where that name
+    does match. The value already existed here but was never read.
+  */}}
+  centralEndpoint: {{ .Values.centralEndpoint | default (printf "central-stackrox.%s:443" .Values.global.localClusterDomain) }}
 
   {{- if .Values.admissionControl.enabled }}
   admissionControl:
