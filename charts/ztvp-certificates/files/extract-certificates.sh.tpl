@@ -10,6 +10,38 @@ set -x
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 error() { echo "[ERROR] $*" >&2; }
 
+# Emit the unique certificates from a concatenated PEM stream, in first-seen
+# order, normalised via `openssl x509`.
+#
+# Needed because PHASE 4 reads openshift-config-managed/trusted-ca-bundle, which
+# the cluster-network-operator builds from the system trust store *plus*
+# proxy/cluster.spec.trustedCA -- and that is this script's own proxyCA output.
+# So every run re-ingested what the previous run wrote. On us-east-1 that grew
+# the bundle to 459 concatenated certificates representing only 149 distinct
+# ones, and the ConfigMap write then failed against the 262144-byte limit on
+# metadata.annotations.
+#
+# A per-file check cannot fix this: the duplicates arrive inside a single
+# multi-certificate file, so they have to be split apart and compared
+# individually. Fingerprints are SHA-256 over the DER form, so cosmetically
+# different encodings of the same certificate still collapse.
+dedupe_certs() {
+  local d fp seen c
+  d=$(mktemp -d)
+  cat > "${d}/in.pem"
+  csplit -sz -f "${d}/c-" -b '%05d.pem' "${d}/in.pem" '/-----BEGIN CERTIFICATE-----/' '{*}' 2>/dev/null || true
+  seen=" "
+  for c in "${d}"/c-*.pem; do
+    [[ -f "$c" ]] || continue
+    fp=$(openssl x509 -in "$c" -noout -fingerprint -sha256 2>/dev/null | sed 's/.*=//') || continue
+    [[ -z "$fp" ]] && continue
+    case "$seen" in *" ${fp} "*) continue ;; esac
+    seen="${seen}${fp} "
+    openssl x509 -in "$c" 2>/dev/null
+  done
+  rm -rf "$d"
+}
+
 # Initialize variables
 INGRESS_CA_FOUND=false
 SERVICE_CA_FOUND=false
@@ -258,13 +290,26 @@ log "Validated $CERT_COUNT certificate(s)"
 
 log "Creating combined CA bundle"
 
-# Combine all certificates
-> "${TEMP_DIR}/tls-ca-bundle.pem"
+# Combine all certificates, then collapse duplicates. The concatenation is
+# staged separately so dedupe_certs sees the whole set at once -- duplicates
+# routinely span files (the same CA appears in the ingress cert chain and again
+# inside the cluster-wide trusted-ca-bundle).
+> "${TEMP_DIR}/tls-ca-bundle.raw"
 for cert_file in "${TEMP_DIR}"/*.crt; do
   [[ -f "$cert_file" ]] || continue
-  cat "$cert_file" >> "${TEMP_DIR}/tls-ca-bundle.pem"
-  echo "" >> "${TEMP_DIR}/tls-ca-bundle.pem"  # Add blank line between certs
+  cat "$cert_file" >> "${TEMP_DIR}/tls-ca-bundle.raw"
+  echo "" >> "${TEMP_DIR}/tls-ca-bundle.raw"  # Add blank line between certs
 done
+
+RAW_COUNT=$(grep -c 'BEGIN CERTIFICATE' "${TEMP_DIR}/tls-ca-bundle.raw" 2>/dev/null || echo 0)
+dedupe_certs < "${TEMP_DIR}/tls-ca-bundle.raw" > "${TEMP_DIR}/tls-ca-bundle.pem"
+DEDUPED_COUNT=$(grep -c 'BEGIN CERTIFICATE' "${TEMP_DIR}/tls-ca-bundle.pem" 2>/dev/null || echo 0)
+log "Deduplicated CA bundle: ${RAW_COUNT} certificates in, ${DEDUPED_COUNT} unique"
+
+if [[ "$DEDUPED_COUNT" -eq 0 && "$RAW_COUNT" -gt 0 ]]; then
+  error "Deduplication produced an empty bundle from ${RAW_COUNT} input certificates"
+  exit 1
+fi
 
 # Verify bundle is not empty
 BUNDLE_SIZE=$(wc -c < "${TEMP_DIR}/tls-ca-bundle.pem" 2>/dev/null || echo 0)
@@ -309,7 +354,13 @@ log "Combined CA bundle created: $BUNDLE_SIZE bytes"
 
 log "Creating ConfigMap: {{ .Values.global.namespace }}/{{ .Values.configMapName }}"
 
-cat <<EOF | oc apply -f -
+# Server-side apply, deliberately. A client-side `oc apply` stores the entire
+# object in the kubectl.kubernetes.io/last-applied-configuration annotation,
+# which doubles the etcd footprint of a CA bundle and is capped at 262144 bytes
+# for all annotations combined. A ~220KB bundle sits close enough to that ceiling
+# that the write fails outright, which is how this Job started failing. SSA
+# tracks ownership in metadata.managedFields instead and has no such limit.
+cat <<EOF | oc apply --server-side --force-conflicts -f -
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -376,17 +427,21 @@ log "Creating proxy CA ConfigMap for cluster trustedCA injection"
 > "${TEMP_DIR}/proxy-ca-bundle.pem"
 for cert_file in "${TEMP_DIR}"/ingress-ca-*.crt "${TEMP_DIR}/service-ca.crt" "${TEMP_DIR}/custom-ca.crt" "${TEMP_DIR}"/*.crt; do
   [[ -f "$cert_file" ]] || continue
-  # Deduplicate: skip if already appended (the *.crt glob may re-match earlier files)
-  if grep -qF "$(head -2 "$cert_file")" "${TEMP_DIR}/proxy-ca-bundle.pem" 2>/dev/null; then
-    continue
-  fi
   cat "$cert_file" >> "${TEMP_DIR}/proxy-ca-bundle.pem"
   echo "" >> "${TEMP_DIR}/proxy-ca-bundle.pem"
 done
 
+# Collapse duplicates. The previous check compared only the first two lines of
+# each *file*, which cannot deduplicate certificates that arrive concatenated
+# inside one file -- exactly what trusted-ca-bundle delivers.
+PROXY_RAW_COUNT=$(grep -c 'BEGIN CERTIFICATE' "${TEMP_DIR}/proxy-ca-bundle.pem" 2>/dev/null || echo 0)
+dedupe_certs < "${TEMP_DIR}/proxy-ca-bundle.pem" > "${TEMP_DIR}/proxy-ca-bundle.deduped"
+mv "${TEMP_DIR}/proxy-ca-bundle.deduped" "${TEMP_DIR}/proxy-ca-bundle.pem"
+log "Deduplicated proxy CA bundle: ${PROXY_RAW_COUNT} certificates in, $(grep -c 'BEGIN CERTIFICATE' "${TEMP_DIR}/proxy-ca-bundle.pem" 2>/dev/null || echo 0) unique"
+
 PROXY_BUNDLE_SIZE=$(wc -c < "${TEMP_DIR}/proxy-ca-bundle.pem" 2>/dev/null || echo 0)
 if [[ $PROXY_BUNDLE_SIZE -gt 100 ]]; then
-  cat <<PROXYEOF | oc apply -f -
+  cat <<PROXYEOF | oc apply --server-side --force-conflicts -f -
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -432,7 +487,7 @@ elif [[ -n "$CURRENT_TRUSTED_CA" && "$CURRENT_TRUSTED_CA" != "{{ .Values.proxyCA
     done < "${TEMP_DIR}/existing-proxy-ca.crt" >> "${TEMP_DIR}/proxy-ca-bundle.pem"
     PROXY_BUNDLE_SIZE=$(wc -c < "${TEMP_DIR}/proxy-ca-bundle.pem" 2>/dev/null || echo 0)
     log "Merged existing proxy CAs into {{ .Values.proxyCA.configMapName }}"
-    cat <<MERGEEOF | oc apply -f -
+    cat <<MERGEEOF | oc apply --server-side --force-conflicts -f -
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -507,7 +562,7 @@ metadata:
 data: {}
 CMEOF
 
-oc apply -f "${TEMP_DIR}/registry-cas-cm.yaml"
+oc apply --server-side --force-conflicts -f "${TEMP_DIR}/registry-cas-cm.yaml"
 
 # Patch each registry hostname as a key with the ingress CA PEM
 {{- range .Values.imagePullTrust.registries }}
@@ -515,7 +570,7 @@ log "Patching ConfigMap key: {{ tpl . $ }}"
 oc create configmap {{ $.Values.imagePullTrust.configMapName }} \
   -n {{ $.Values.global.namespace }} \
   --from-file="{{ tpl . $ }}=${COMBINED_INGRESS_CA}" \
-  --dry-run=client -o yaml | oc apply -f -
+  --dry-run=client -o yaml | oc apply --server-side --force-conflicts -f -
 {{- end }}
 
 # Patch image.config.openshift.io/cluster to reference the ConfigMap
