@@ -6,7 +6,7 @@ metadata:
   labels:
     app: qtodo-db
   name: qtodo-db
-  namespace: qtodo
+  namespace: {{ .Release.Namespace }}
 spec:
   persistentVolumeClaimRetentionPolicy:
     whenDeleted: Retain
@@ -25,8 +25,8 @@ spec:
     spec:
       containers:
       - name: postgres
-        image: {{ template "qtodo.image" (dict "value" .Values.app.images.postgresql "context" $) }}
-        imagePullPolicy: IfNotPresent
+        image: {{ template "qtodo-db.image" (dict "value" .Values.postgresql.image "context" $) }}
+        imagePullPolicy: {{ .Values.postgresql.image.pullPolicy }}
         env:
         - name: POSTGRESQL_DATABASE
           value: {{ .Values.postgresql.auth.database }}
@@ -41,7 +41,7 @@ spec:
               name: {{ .Values.postgresql.auth.secretName }}
               key: password
         ports:
-        - containerPort: 5432
+        - containerPort: {{ .Values.postgresql.port }}
           protocol: TCP
         securityContext:
           privileged: false

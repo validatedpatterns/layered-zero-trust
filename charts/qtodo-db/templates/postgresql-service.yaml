@@ -6,15 +6,14 @@ metadata:
   labels:
     app: qtodo-db
   name: qtodo-db
-  namespace: qtodo
+  namespace: {{ .Release.Namespace }}
 spec:
   ports:
-  - name: 5432-tcp
-    port: 5432
+  - name: {{ .Values.postgresql.port }}-tcp
+    port: {{ .Values.postgresql.port }}
     protocol: TCP
-    targetPort: 5432
+    targetPort: {{ .Values.postgresql.port }}
   selector:
     app: qtodo-db
   sessionAffinity: None
   type: ClusterIP
-

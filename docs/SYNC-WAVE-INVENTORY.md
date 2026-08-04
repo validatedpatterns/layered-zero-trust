@@ -48,8 +48,10 @@ Every sync-wave in the repository, in order. **App** = hub-level Argo CD Applica
 | 36 | └ quay-registry | chart | object-bucket-claim |
 | 36 | └ acs-central | chart | admin-password-secret, central-htpasswd-external-secret, keycloak-client-secret-external-secret |
 | 36 | └ qtodo | chart | truststore-secret-external-secret, registry-external-secret |
+| 36 | └ qtodo-db | chart | postgresql-external-secret |
 | 38+0 | └ qtodo | chart | registry-seed SA, ClusterRole, ClusterRoleBinding |
 | 38+5 | └ qtodo | chart (hook) | registry-seed-image (Sync hook Job -- mirrors upstream image to configured registry) |
+| 37 | qtodo-db | **App** | PostgreSQL for qtodo (before qtodo app) |
 | 37 | └ quay-registry | chart | quay-s3-setup-serviceaccount (5 resources) |
 | 37 | └ acs-central | chart | create-htpasswd-field (Job) |
 | 38 | qtodo | **App** | |
@@ -63,7 +65,8 @@ Every sync-wave in the repository, in order. **App** = hub-level Argo CD Applica
 | 41 | └ keycloak | chart | keycloak-realm-import |
 | 41 | └ quay-registry | chart | quay-registry (QuayRegistry CR) |
 | 41 | └ acs-central | chart | central-cr (Central CR) |
-| 41 | └ qtodo | chart | postgresql-statefulset, postgresql-service, qtodo-truststore-config |
+| 41 | └ qtodo | chart | qtodo-truststore-config |
+| 41 | └ qtodo-db | chart | postgresql-statefulset, postgresql-service |
 | 43 | └ acs-central | chart | create-cluster-init-bundle (Job) |
 | 44 | └ acs-central | chart | create-auth-provider (Job) |
 | 46 | acs-secured-cluster | **App** | |
@@ -110,7 +113,8 @@ Every sync-wave in the repository, in order. **App** = hub-level Argo CD Applica
 | trusted-profile-analyzer (namespace) | 1 | 32 | Before RHTPA components |
 | rh-keycloak | — | 35 | After ZTWIM for SPIFFE IdP (newly added) |
 | noobaa-mcg | 5 | 36 | Deploy after core services |
-| qtodo | — | 38 | After Keycloak, Vault (newly added) |
+| qtodo-db | — | 37 | PostgreSQL for qtodo; before qtodo app |
+| qtodo | — | 38 | After Keycloak, Vault, qtodo-db |
 | acs-central | 10 | 41 | — |
 | quay-registry | 10 | 41 | Deploy after NooBaa |
 | trusted-profile-analyzer | 10 | 41 | Chart resources (OBC, DB, etc.) |
@@ -239,6 +243,14 @@ Charts marked **(external)** have been externalized to standalone repositories m
 | operator-readiness-check.yaml (SA, Role, Job) | 40 | 71 |
 | trusted-profile-analyzer.yaml (Policy/CR) | 50 | 81 |
 
+### qtodo-db (`charts/qtodo-db/templates/`) — App wave: 37
+
+| Resource | Old | Current |
+| --- | ---: | ---: |
+| postgresql-external-secret.yaml | 5 | 36 |
+| postgresql-statefulset.yaml | 10 | 41 |
+| postgresql-service.yaml | 10 | 41 |
+
 ### qtodo (`charts/qtodo/templates/`) — App wave: 38
 
 | Resource | Old | Current |
@@ -247,8 +259,7 @@ Charts marked **(external)** have been externalized to standalone repositories m
 | registry-seed-job.yaml (Sync hook Job) | --- | 5 |
 | truststore-secret-external-secret.yaml | 5 | 36 |
 | registry-external-secret.yaml | --- | 36 |
-| postgresql-statefulset.yaml | 10 | 41 |
-| postgresql-service.yaml | 10 | 41 |
+| postgresql-external-secret.yaml (SPIFFE-off only) | 5 | 36 |
 | qtodo-truststore-config.yaml | 10 | 41 |
 | app-deployment.yaml | 20 | 51 |
 | app-service.yaml | 20 | 51 |

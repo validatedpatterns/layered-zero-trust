@@ -42,10 +42,6 @@ app:
       name: registry.redhat.io/ubi9/python-311
       version: latest
       pullPolicy: IfNotPresent
-    postgresql:
-      name: registry.redhat.io/rhel8/postgresql-16
-      version: latest
-      pullPolicy: IfNotPresent
 
   oidc:
     enabled: false  # Will be enabled when SPIFFE is enabled
@@ -121,6 +117,9 @@ app:
 # PostgreSQL database configuration
 postgresql:
   name: qtodo-db
+  host: qtodo-db.qtodo-db.svc.cluster.local
+  port: 5432
+  namespace: qtodo-db
 
   # Database configuration
   auth:

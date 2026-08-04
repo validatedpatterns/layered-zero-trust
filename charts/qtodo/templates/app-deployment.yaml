@@ -215,7 +215,7 @@ spec:
             type: RuntimeDefault
         env:
         - name: QUARKUS_DATASOURCE_JDBC_URL
-          value: 'jdbc:postgresql://qtodo-db:5432/{{ .Values.postgresql.auth.database }}'
+          value: 'jdbc:postgresql://{{ .Values.postgresql.host }}:{{ .Values.postgresql.port }}/{{ .Values.postgresql.auth.database }}'
         - name: QUARKUS_HTTP_HOST
           value: '0.0.0.0'
         - name: QUARKUS_HTTP_PORT
@@ -246,6 +246,7 @@ spec:
 {{- else }}
         - name: QUARKUS_CONFIG_LOCATIONS
           value: file:/run/secrets/db-credentials/credentials.properties
+{{- end }}
 {{- if .Values.app.oidc.clientSecret.enabled }}
         - name: QUARKUS_OIDC_CREDENTIALS_SECRET
           valueFrom:
@@ -264,9 +265,9 @@ spec:
         - name: JAVA_TOOL_OPTIONS
           value: "-Djavax.net.ssl.trustStore=/run/secrets/truststore/truststore.p12 -Djavax.net.ssl.trustStoreType=PKCS12 -Djavax.net.ssl.trustStorePassword=$(TRUSTSTORE_PASSWORD)"
 {{- end }}
-{{- end }}
-{{- if .Values.app.spire.enabled }}
+{{- if or .Values.app.spire.enabled (include "qtodo.isSecureTermination" .) .Values.app.truststore.enabled }}
         volumeMounts:
+{{- if .Values.app.spire.enabled }}
           - name: db-credentials
             mountPath: /run/secrets/db-credentials
 {{- if .Values.app.oidc.clientAssertion.enabled }}
@@ -274,25 +275,27 @@ spec:
             mountPath: /svids
             readOnly: true
 {{- end }}
-{{- if .Values.app.truststore.enabled }}
-          - name: truststore
-            mountPath: /run/secrets/truststore
-            readOnly: true
-{{- end }}
           # Mount ZTVP CA bundle for non-Java tools (curl, openssl, etc.)
           - name: ztvp-trusted-ca
             mountPath: /etc/pki/ca-trust/extracted/pem
             readOnly: true
 {{- end }}
+{{- if .Values.app.truststore.enabled }}
+          - name: truststore
+            mountPath: /run/secrets/truststore
+            readOnly: true
+{{- end }}
 {{- if include "qtodo.isSecureTermination" . }}
           - name: tls-certs
             mountPath: /certs
-            readOnly: true  
+            readOnly: true
+{{- end }}
 {{- end }}
         resources: {}
       serviceAccountName: qtodo
-{{- if .Values.app.spire.enabled }}
+{{- if or .Values.app.spire.enabled (include "qtodo.isSecureTermination" .) .Values.app.truststore.enabled }}
       volumes:
+{{- if .Values.app.spire.enabled }}
         - name: spiffe-helper-config
           configMap:
             name: spiffe-helper
@@ -312,6 +315,7 @@ spec:
           configMap:
             name: ztvp-trusted-ca
             defaultMode: 420
+{{- end }}
 {{- if .Values.app.truststore.enabled }}
         - name: truststore
           emptyDir: {}

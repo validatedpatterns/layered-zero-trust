@@ -3,7 +3,7 @@
 One of the most common application design patterns makes use of a frontend application leveraging a database for persistent storage. Instead of traditional methods for accessing the database from the frontend application using static values stored within the application, this pattern will make use "just in time" methods for obtaining these database values from a credential store. A more detailed overview is located below:
 
 * qtodo - [Quarkus](https://quarkus.io) based frontend application. Access is protected via OIDC based authentication with users defined within an external identity store ([Red Hat Build of Keycloak](https://access.redhat.com/products/red-hat-build-of-keycloak/) by default)
-* PostgreSQL - Relational database for use by the qtodo application. Credentials are generated dynamically and stored within Vault.
+* PostgreSQL - Relational database for use by the qtodo application, deployed in a separate `qtodo-db` namespace. Credentials are generated dynamically and stored within Vault. Isolating the database (and its Kubernetes Secret) from the application namespace strengthens data protection by ensuring the application does not share a namespace with the database credential Secret.
 * External Identity store - Users have been defined to enable access to the qtodo frontend. OIDC clients have also been created and configured within the todo application
 * HashiCorp Vault - Several features are being leveraged within this use case for the external identity store
   * Secrets store - Storage of sensitive values for components including PostgreSQL and RHBK
@@ -18,14 +18,21 @@ With an understanding of the goals and architecture of qtodo, launch the OpenShi
 1. Select **Home** -> **Projects** from the left hand navigation bar
 2. Locate and select the **qtodo** project
 
-The _qtodo_ Quarkus application and _qtodo-db_ PostgreSQL database are found within this namespace.
+The _qtodo_ Quarkus application runs in this namespace. The PostgreSQL database (`qtodo-db`) runs in the separate `qtodo-db` namespace so that the database credential Secret is not colocated with the application.
 
-View the running pods associated with these components
+View the running pods for the application
 
 1. Select **Workloads** -> **Pods** from the left hand navigation bar
-2. Explore both the _qtodo_ and _qtodo-db_ pods.
+2. Explore the _qtodo_ pod
 
-Take note that the _qtodo_ Pod makes use of a series of init containers and sidecar containers that are used to supply the application with credentials needed to support the application.
+Take note that the _qtodo_ Pod makes use of a series of init containers and sidecar containers that are used to supply the application with credentials needed to support the application. Database credentials are fetched from Vault using a SPIFFE JWT identity rather than from a Kubernetes Secret in this namespace.
+
+Optionally inspect the database namespace
+
+1. Select **Home** -> **Projects** from the left hand navigation bar
+2. Locate and select the **qtodo-db** project
+3. Select **Workloads** -> **Pods** and explore the _qtodo-db_ pod
+4. Select **Workloads** -> **Secrets** and note that `qtodo-db-secret` (sourced from Vault via External Secrets) lives only in this namespace
 
 Access the qtodo application in a browser. The URL can be located from the OpenShift Route in the `qtodo` Project
 

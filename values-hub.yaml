@@ -54,6 +54,7 @@ clusterGroup:
     open-cluster-management:
     vault:
     qtodo:
+    qtodo-db:
     external-secrets-operator:
       operatorGroup: true
       targetNamespaces: []
@@ -478,6 +479,13 @@ clusterGroup:
       overrides:
         - name: spire.clusterName
           value: hub
+    qtodo-db:
+      name: qtodo-db
+      namespace: qtodo-db
+      argoProject: hub
+      path: charts/qtodo-db
+      annotations:
+        argocd.argoproj.io/sync-wave: "37"
     qtodo:
       name: qtodo
       namespace: qtodo

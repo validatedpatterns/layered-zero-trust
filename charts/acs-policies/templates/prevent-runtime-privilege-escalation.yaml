@@ -36,6 +36,8 @@ spec:
   scope:
     - label: {}
       namespace: "qtodo"
+    - label: {}
+      namespace: "qtodo-db"
 
   policySections:
     - sectionName: "Privilege Escalation Binary Execution"

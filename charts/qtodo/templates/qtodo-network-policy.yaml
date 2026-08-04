@@ -33,12 +33,15 @@ spec:
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: openshift-dns
-  # PostgreSQL — qtodo-db pod in the same namespace
+  # PostgreSQL — qtodo-db pod in the qtodo-db namespace
   - ports:
     - protocol: TCP
-      port: 5432
+      port: {{ .Values.postgresql.port }}
     to:
-    - podSelector:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ .Values.postgresql.namespace }}
+      podSelector:
         matchLabels:
           app: qtodo-db
   # Vault API — SPIFFE JWT auth for DB credentials retrieval
