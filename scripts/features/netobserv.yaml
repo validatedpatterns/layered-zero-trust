@@ -27,7 +27,6 @@ clusterGroup:
     loki-operator:
       name: loki-operator
       namespace: openshift-operators-redhat
-      channel: stable-6.6
       source: redhat-operators
       annotations:
         argocd.argoproj.io/sync-wave: "27"
