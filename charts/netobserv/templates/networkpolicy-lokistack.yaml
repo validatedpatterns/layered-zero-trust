@@ -17,6 +17,9 @@ spec:
 ---
 # LokiStack components. Operator-managed NPs cover netobserv / netobserv-privileged;
 # this fills the netobserv-loki gap (verified dry-run on OCP 4.21).
+# Client ingress ports pinned from live Service/containerPort inventory:
+#   8080 gateway public, 3100 component metrics, 8081/8083 gateway/OPA metrics.
+# Intra-ns left open for memberlist (7946), gRPC (9095), healthchecks (3101), OPA (8082).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -35,20 +38,39 @@ spec:
   - Ingress
   - Egress
   ingress:
+  # Intra-namespace: gossip/gRPC/HTTP between LokiStack components
   - from:
     - podSelector: {}
+  # flowlogs-pipeline write + netobserv-plugin query → loki-gateway-http:8080
   - from:
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: {{ .Values.flowcollector.namespace }}
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Console UI reaches Loki via netobserv-plugin; keep gateway public only
   - from:
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: openshift-console
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Prometheus ServiceMonitors (platform + user-workload share this policy-group):
+  # loki-*-http metrics :3100, gateway metrics :8081, OPA metrics :8083
   - from:
     - namespaceSelector:
         matchLabels:
-          kubernetes.io/metadata.name: openshift-monitoring
+          network.openshift.io/policy-group: monitoring
+    ports:
+    - protocol: TCP
+      port: 3100
+    - protocol: TCP
+      port: 8081
+    - protocol: TCP
+      port: 8083
+  # OpenShift ingress / router → loki Route (gateway public)
   - from:
     - namespaceSelector:
         matchLabels:
