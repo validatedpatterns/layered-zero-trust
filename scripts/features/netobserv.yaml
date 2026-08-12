@@ -51,3 +51,34 @@ clusterGroup:
       overrides:
         - name: loki.storageClassName
           value: "<YOUR-STORAGE-CLASS>"
+      ignoreDifferences:
+        - group: flows.netobserv.io
+          kind: FlowCollector
+          jsonPointers:
+            - /spec/agent/ebpf/cacheActiveTimeout
+            - /spec/agent/ebpf/cacheMaxFlows
+            - /spec/agent/ebpf/excludeInterfaces
+            - /spec/agent/ebpf/imagePullPolicy
+            - /spec/agent/ebpf/kafkaBatchSize
+            - /spec/agent/ebpf/logLevel
+            - /spec/agent/ebpf/metrics
+            - /spec/agent/ebpf/resources
+            - /spec/agent/ipfix
+            - /spec/consolePlugin/autoscaler
+            - /spec/consolePlugin/imagePullPolicy
+            - /spec/consolePlugin/logLevel
+            - /spec/consolePlugin/portNaming
+            - /spec/consolePlugin/quickFilters
+            - /spec/consolePlugin/replicas
+            - /spec/consolePlugin/resources
+            - /spec/execution
+            - /spec/kafka
+            - /spec/loki/manual
+            - /spec/loki/microservices
+            - /spec/loki/monolithic
+            - /spec/loki/readTimeout
+            - /spec/loki/writeBatchSize
+            - /spec/loki/writeBatchWait
+            - /spec/loki/writeTimeout
+            - /spec/processor
+            - /spec/prometheus
