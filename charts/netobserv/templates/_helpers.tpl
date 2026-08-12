@@ -11,28 +11,16 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Resolve LokiStack storageClassName (required by the LokiStack CRD).
 
-1. Use .Values.loki.storageClassName when set.
-2. Else try Helm lookup for the cluster default StorageClass (works with
-   helm install / helm template --dry-run=server; Argo CD does NOT support lookup).
-3. Else fail and ask the user to set loki.storageClassName (required for Argo CD).
-
-Do not omit the field: LokiStack validation requires spec.storageClassName.
+Use .Values.loki.storageClassName when set; otherwise fail. No Helm lookup —
+Argo CD does not support it. Set explicitly via chart values, --set, or an
+Argo CD / clusterGroup helm parameter override (see values.yaml comments and
+scripts/features/netobserv.yaml). Discover classes with: oc get storageclass
 */}}
 {{- define "netobserv.lokiStorageClassName" -}}
 {{- $sc := .Values.loki.storageClassName | default "" -}}
 {{- if $sc -}}
 {{- $sc -}}
 {{- else -}}
-{{- $default := "" -}}
-{{- range (lookup "storage.k8s.io/v1" "StorageClass" "" "").items | default list -}}
-{{- $annotations := .metadata.annotations | default dict -}}
-{{- if eq (index $annotations "storageclass.kubernetes.io/is-default-class" | default "") "true" -}}
-{{- $default = .metadata.name -}}
-{{- end -}}
-{{- end -}}
-{{- if not $default -}}
-{{- fail "loki.storageClassName is required (LokiStack CRD). Set it in values or as an Argo CD helm parameter; Helm lookup cannot discover the default StorageClass under Argo CD." -}}
-{{- end -}}
-{{- $default -}}
+{{- fail "loki.storageClassName is required (LokiStack CRD). Set it in chart values (loki.storageClassName), via --set, or as an Argo CD / clusterGroup helm parameter override. See charts/netobserv/values.yaml. Discover classes: oc get storageclass" -}}
 {{- end -}}
 {{- end }}

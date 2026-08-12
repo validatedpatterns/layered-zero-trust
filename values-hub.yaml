@@ -392,9 +392,11 @@ clusterGroup:
     #   path: charts/netobserv
     #   annotations:
     #     argocd.argoproj.io/sync-wave: "42"  # Deploy after NooBaa storage backend
+    #   # Required: set loki.storageClassName to a cluster StorageClass
+    #   # (oc get storageclass). Chart fails at template time if empty.
     #   overrides:
     #     - name: loki.storageClassName
-    #       value: ""  # Add your own storageClassName here
+    #       value: "<YOUR-STORAGE-CLASS>"
     # Quay Container Registry (uses NooBaa for storage)
     # quay-registry:
     #   name: quay-registry

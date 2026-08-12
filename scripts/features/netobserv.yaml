@@ -46,6 +46,8 @@ clusterGroup:
       path: charts/netobserv
       annotations:
         argocd.argoproj.io/sync-wave: "42"
+      # Required: replace with a StorageClass on the cluster (oc get storageclass).
+      # Chart fails at template time if loki.storageClassName is empty.
       overrides:
         - name: loki.storageClassName
           value: "<YOUR-STORAGE-CLASS>"

@@ -5,9 +5,15 @@ loki:
   namespace: netobserv-loki
   name: loki
   size: 1x.extra-small
-  # Required by LokiStack CRD. Leave empty to auto-detect the cluster default
-  # StorageClass via Helm lookup (helm install only). Under Argo CD, lookup is
-  # unsupported — set this explicitly (values or Application helm parameter).
+  # Required by LokiStack CRD (spec.storageClassName). Must be set explicitly;
+  # empty fails at template time. Helm lookup is not used (unsupported under
+  # Argo CD). Set via one of:
+  #   - chart values: loki.storageClassName: gp3-csi
+  #   - helm: --set loki.storageClassName=gp3-csi
+  #   - Argo CD / clusterGroup overrides (see scripts/features/netobserv.yaml):
+  #       - name: loki.storageClassName
+  #         value: "<YOUR-STORAGE-CLASS>"
+  # Discover available classes: oc get storageclass
   storageClassName: ""
   storageSecretName: loki-s3
   objectBucketClaim:
