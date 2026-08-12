@@ -15,7 +15,9 @@ spec:
     type: {{ .Values.flowcollector.agent.type }}
     ebpf:
       sampling: {{ .Values.flowcollector.agent.sampling }}
-      privileged: {{ .Values.flowcollector.agent.privileged }}
+      {{- if eq (.Values.flowcollector.agent.privileged | toString) "true" }}
+      privileged: true
+      {{- end }}
   loki:
     enable: {{ .Values.flowcollector.loki.enable }}
     mode: {{ .Values.flowcollector.loki.mode }}
