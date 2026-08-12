@@ -70,7 +70,9 @@ Every sync-wave in the repository, in order. **App** = hub-level Argo CD Applica
 | 42 | netobserv | **App** | Network Observability (after NooBaa) |
 | 36 | └ netobserv | chart | object-bucket-claim |
 | 37 | └ netobserv | chart | loki-s3 credentials SA/Role/RoleBinding |
+| 38 | └ netobserv | chart | NetworkPolicy loki-s3-credentials-setup |
 | 39 | └ netobserv | chart | loki-s3-credentials Job (hook) |
+| 40 | └ netobserv | chart | NetworkPolicies default-deny + lokistack |
 | 41 | └ netobserv | chart | LokiStack |
 | 42 | └ netobserv | chart | FlowCollector |
 | 41 | └ rhtpa-operator | chart | postgresql-statefulset, postgresql-service |
@@ -194,7 +196,9 @@ Charts marked **(external)** have been externalized to standalone repositories m
 | --- | ---: | ---: |
 | object-bucket-claim.yaml | — | 36 |
 | loki-s3-credentials-job.yaml (SA, Role, RoleBinding) | — | 37 |
+| networkpolicy-lokistack.yaml (loki-s3-credentials-setup) | — | 38 |
 | loki-s3-credentials-job.yaml (Job hook) | — | 39 |
+| networkpolicy-lokistack.yaml (default-deny, lokistack) | — | 40 |
 | lokistack.yaml | — | 41 |
 | flowcollector.yaml | — | 42 |
 
