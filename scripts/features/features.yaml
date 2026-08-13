@@ -6,6 +6,10 @@ features:
     description: "ODF object storage + NooBaa MCG (S3 backend)"
     depends_on: []
 
+  netobserv:
+    description: "OpenShift Network Observability (LokiStack + FlowCollector via NooBaa)"
+    depends_on: [storage]
+
   quay:
     description: "Red Hat Quay container registry"
     depends_on: [storage]

@@ -24,10 +24,16 @@ Every sync-wave in the repository, in order. **App** = hub-level Argo CD Applica
 | 26 | └ openshift-storage | ns | Namespace + OperatorGroup |
 | 26 | └ rhtpa-operator | ns | Namespace + OperatorGroup |
 | 26 | └ external-secrets-operator | ns | Namespace + OperatorGroup |
+| 26 | └ openshift-operators-redhat | ns | Namespace + OperatorGroup (NetObserv / Loki) |
+| 26 | └ openshift-netobserv-operator | ns | Namespace + OperatorGroup |
+| 26 | └ netobserv-loki | ns | Namespace |
+| 26 | └ netobserv | ns | Namespace |
 | 27 | └ odf | sub | ODF operator install |
 | 27 | └ rhtpa-operator | sub | RHTPA operator install |
 | 27 | └ external-secrets | sub | External Secrets Operator install |
+| 27 | └ loki-operator | sub | Loki Operator install (NetObserv) |
 | 28 | └ quay-operator | sub | Quay operator install |
+| 28 | └ netobserv-operator | sub | Network Observability Operator |
 | 29 | └ rhtas-operator | sub | RHTAS operator install |
 | 30 | zero-trust-workload-identity-manager | **App** | |
 | 31 | └ rhtpa-operator | chart | ingress-ca-job (SA, Role, RoleBinding, ConfigMap, Job) |
@@ -61,6 +67,14 @@ Every sync-wave in the repository, in order. **App** = hub-level Argo CD Applica
 | 41 | acs-central | **App** | |
 | 41 | quay-registry | **App** | |
 | 41 | trusted-profile-analyzer | **App** | |
+| 42 | netobserv | **App** | Network Observability (after NooBaa) |
+| 36 | └ netobserv | chart | object-bucket-claim |
+| 37 | └ netobserv | chart | loki-s3 credentials SA/Role/RoleBinding |
+| 38 | └ netobserv | chart | NetworkPolicy loki-s3-credentials-setup |
+| 39 | └ netobserv | chart | loki-s3-credentials Job (hook) |
+| 40 | └ netobserv | chart | NetworkPolicies default-deny + lokistack |
+| 41 | └ netobserv | chart | LokiStack |
+| 42 | └ netobserv | chart | FlowCollector |
 | 41 | └ rhtpa-operator | chart | postgresql-statefulset, postgresql-service |
 | 41 | └ keycloak | chart | keycloak-realm-import |
 | 41 | └ quay-registry | chart | quay-registry (QuayRegistry CR) |
@@ -115,6 +129,7 @@ Every sync-wave in the repository, in order. **App** = hub-level Argo CD Applica
 | noobaa-mcg | 5 | 36 | Deploy after core services |
 | qtodo-db | — | 37 | PostgreSQL for qtodo; before qtodo app |
 | qtodo | — | 38 | After Keycloak, Vault, qtodo-db |
+| netobserv | — | 42 | After NooBaa |
 | acs-central | 10 | 41 | — |
 | quay-registry | 10 | 41 | Deploy after NooBaa |
 | trusted-profile-analyzer | 10 | 41 | Chart resources (OBC, DB, etc.) |
@@ -174,6 +189,18 @@ Charts marked **(external)** have been externalized to standalone repositories m
 | default-backingstore.yaml | 1 | 32 |
 | noobaa-system.yaml | 2 | 33 |
 | bucket-class.yaml | 3 | 34 |
+
+### netobserv (`charts/netobserv/templates/`) — App wave: 42
+
+| Resource | Old | Current |
+| --- | ---: | ---: |
+| object-bucket-claim.yaml | — | 36 |
+| loki-s3-credentials-job.yaml (SA, Role, RoleBinding) | — | 37 |
+| networkpolicy-lokistack.yaml (loki-s3-credentials-setup) | — | 38 |
+| loki-s3-credentials-job.yaml (Job hook) | — | 39 |
+| networkpolicy-lokistack.yaml (default-deny, lokistack) | — | 40 |
+| lokistack.yaml | — | 41 |
+| flowcollector.yaml | — | 42 |
 
 ### keycloak — **(external)** `rhbk-chart` v0.0.4 — App wave: 35
 

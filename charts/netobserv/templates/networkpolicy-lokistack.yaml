@@ -1,0 +1,136 @@
+{{- if and .Values.enabled .Values.loki.enabled (eq (.Values.networkPolicy.enabled | toString) "true") }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-in-namespace-{{ .Values.loki.namespace }}
+  namespace: {{ .Values.loki.namespace }}
+  labels:
+    {{- include "netobserv.labels" . | nindent 4 }}
+    app.kubernetes.io/component: network-policy
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+# LokiStack components. Operator-managed NPs cover netobserv / netobserv-privileged;
+# this fills the netobserv-loki gap (verified dry-run on OCP 4.21).
+# Client ingress ports pinned from live Service/containerPort inventory:
+#   8080 gateway public, 3100 component metrics, 8081/8083 gateway/OPA metrics.
+# Intra-ns left open for memberlist (7946), gRPC (9095), healthchecks (3101), OPA (8082).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: lokistack
+  namespace: {{ .Values.loki.namespace }}
+  labels:
+    {{- include "netobserv.labels" . | nindent 4 }}
+    app.kubernetes.io/component: network-policy
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: lokistack
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Intra-namespace: gossip/gRPC/HTTP between LokiStack components
+  - from:
+    - podSelector: {}
+  # flowlogs-pipeline write + netobserv-plugin query → loki-gateway-http:8080
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ .Values.flowcollector.namespace }}
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Console UI reaches Loki via netobserv-plugin; keep gateway public only
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-console
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Prometheus ServiceMonitors (platform + user-workload share this policy-group):
+  # loki-*-http metrics :3100, gateway metrics :8081, OPA metrics :8083
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          network.openshift.io/policy-group: monitoring
+    ports:
+    - protocol: TCP
+      port: 3100
+    - protocol: TCP
+      port: 8081
+    - protocol: TCP
+      port: 8083
+  # OpenShift ingress / router → loki Route (gateway public)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          policy-group.network.openshift.io/ingress: ""
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  - to:
+    - podSelector: {}
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-dns
+    ports:
+    - protocol: UDP
+      port: 5353
+    - protocol: TCP
+      port: 5353
+  - ports:
+    - protocol: TCP
+      port: 6443
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-storage
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+---
+# Credentials Job (Sync hook): API + DNS only
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: loki-s3-credentials-setup
+  namespace: {{ .Values.loki.namespace }}
+  labels:
+    {{- include "netobserv.labels" . | nindent 4 }}
+    app.kubernetes.io/component: network-policy
+  annotations:
+    argocd.argoproj.io/sync-wave: "38"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "netobserv.name" . }}
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-dns
+    ports:
+    - protocol: UDP
+      port: 5353
+    - protocol: TCP
+      port: 5353
+  - ports:
+    - protocol: TCP
+      port: 6443
+{{- end }}
