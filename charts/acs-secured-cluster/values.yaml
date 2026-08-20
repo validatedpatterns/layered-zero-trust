@@ -21,13 +21,19 @@ initBundle:
 sensor:
   enabled: true
 
+  # Sensor holds the cluster's object graph in memory, so this scales with
+  # object count, not node count. 1Gi wedges the process at the cgroup ceiling
+  # without ever tripping the OOM killer: it stops serving /ready, drops out of
+  # the sensor Service, and every collector then exits 1 on startup. See ARCH-592.
+  # Request stays low deliberately so sensor does not reserve headroom it only
+  # needs at peak; the limit is what has to clear the object graph.
   resources:
     requests:
       cpu: 500m
       memory: 500Mi
     limits:
       cpu: 1000m
-      memory: 1Gi
+      memory: 4Gi
 
 # Admission controller configuration
 admissionControl:
