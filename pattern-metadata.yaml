@@ -63,6 +63,12 @@ requirements:
 
 # Loosely defined extra features like hypershift support, non-openshift
 # kubernetes support, spoke support
+ocp_versions:
+  minimum: "4.20"
+  unsupported:
+    - version: "4.23"
+      reason: "Not yet validated — operator catalog and channel availability unconfirmed"
+
 extra_features:
   hypershift_support: true
   spoke_support: true
