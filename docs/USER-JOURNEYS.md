@@ -14,7 +14,7 @@ The ZTVP is organized into a layered architecture where each layer builds upon t
 
 The ZTVP follows a three-layer architecture model with a foundational platform layer:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Layer 2: Use Cases                            │
 │  Applications and workflows that demonstrate Zero Trust in      │
@@ -120,6 +120,7 @@ ArgoCD takes over and deploys all Layer 0 components in a carefully orchestrated
 - Default-deny NetworkPolicies isolating critical namespaces
 
 **Framework Alignment:**
+
 - NIST SP 800-207, Section 3.1: "ZTA using enhanced identity governance" — SPIRE provides cryptographic workload identity
 - NIST SP 800-53 IA-2: "Identification and Authentication" — Keycloak provides multi-factor, federated authentication
 - CISA ZTMM, Identity Pillar: "Agency uses phishing-resistant MFA and enterprise-managed identities"
@@ -137,6 +138,7 @@ The qtodo application pod demonstrates the sidecar pattern — security function
 The application developer never sees database credentials. The Platform Engineer never hardcodes secrets. Vault releases credentials only to pods with a valid SPIFFE identity that matches the configured role.
 
 **Framework Alignment:**
+
 - NIST SP 800-53 AC-4: "Information Flow Enforcement" — sidecars enforce data flow policies at the pod level
 - NIST SP 800-53 IA-8: "Identification and Authentication (Non-Organizational Users)" — SPIFFE provides machine identity
 - EO 14028, Section 3: "Modernizing Federal Government Cybersecurity" — zero trust architecture adoption
@@ -146,7 +148,7 @@ The application developer never sees database credentials. The Platform Engineer
 
 The Platform Engineer verifies that the cluster enforces network isolation:
 
-```
+```text
 qtodo namespace:
   default-deny-in-namespace-qtodo  → Blocks ALL ingress and egress
   qtodo-network-policy             → Allows: OCP router→8443, →DB:5432, →Vault:8200, →DNS:5353, →HTTPS:443
@@ -156,6 +158,7 @@ qtodo namespace:
 Without these explicit allow rules, no pod can communicate with any other pod — even within the same namespace. This is the "default-deny" posture that NIST SP 800-207 prescribes.
 
 **Framework Alignment:**
+
 - NIST SP 800-207, Section 2.1, Tenet 4: "Access to individual enterprise resources is granted on a per-session basis"
 - NIST SP 800-53 SC-7: "Boundary Protection" — NetworkPolicies act as micro-boundaries
 - NIST SP 800-53 AC-4: "Information Flow Enforcement" — explicit flow rules per pod
@@ -172,6 +175,7 @@ The Platform Engineer confirms that all inter-service communication uses TLS wit
 - A daily CronJob validates and rotates the CA bundle
 
 **Framework Alignment:**
+
 - NIST SP 800-53 SC-8: "Transmission Confidentiality and Integrity" — all data in transit encrypted
 - NIST SP 800-53 SC-12: "Cryptographic Key Establishment and Management" — automated certificate lifecycle
 - CISA ZTMM, Data Pillar: "Agency encrypts all data in transit"
@@ -186,6 +190,7 @@ The Compliance Operator continuously scans the cluster against security profiles
 ACS aggregates these findings alongside its own runtime observations, providing a single security dashboard.
 
 **Framework Alignment:**
+
 - NIST SP 800-53 CA-7: "Continuous Monitoring" — automated compliance scanning
 - NIST SP 800-53 CM-6: "Configuration Settings" — enforced baseline configurations
 - FedRAMP: Continuous monitoring requirement (ConMon)
@@ -249,12 +254,14 @@ The Tekton pipeline executes 10 tasks in sequence:
 | 10 | `verify-image` | Final verification of image signature and attestation |
 
 Every artifact produced by this pipeline has:
+
 - A **cryptographic signature** tied to the build pipeline's SPIFFE identity (not a static key)
 - A **transparency log entry** in Rekor (tamper-evident audit trail)
 - A **Software Bill of Materials** cross-referenced against known CVEs
 - A **signed attestation** binding the SBOM to the specific image digest
 
 **Framework Alignment:**
+
 - EO 14028, Section 4(e): "Guidelines for enhancing software supply chain security" — SBOM generation, artifact signing
 - OMB M-22-09, Action 7: "Agencies make use of strong encryption, code-signing"
 - NIST SP 800-53 SA-10: "Developer Configuration Management" — GitOps-managed pipeline definitions
@@ -274,6 +281,7 @@ The Security Architect opens the RHTPA web interface and reviews:
 This provides the evidence needed for compliance audits and risk assessments.
 
 **Framework Alignment:**
+
 - NIST SP 800-53 RA-5: "Vulnerability Monitoring and Scanning" — continuous CVE analysis
 - NIST SP 800-53 SI-2: "Flaw Remediation" — actionable fix information from RHTPA
 
@@ -289,6 +297,7 @@ ACS enforces runtime policies that complement the supply chain controls:
 | Network policy enforcement | Monitoring | Warn on workloads missing NetworkPolicies |
 
 **Framework Alignment:**
+
 - NIST SP 800-53 CM-7: "Least Functionality" — only signed, verified images deploy
 - NIST SP 800-53 SI-3: "Malicious Code Protection" — runtime behavioral monitoring
 - NIST SP 800-53 SI-4: "System Monitoring" — continuous workload observation
@@ -296,7 +305,7 @@ ACS enforces runtime policies that complement the supply chain controls:
 
 #### Journey 2 Summary: Supply Chain Trust Chain
 
-```
+```text
 Developer → Git commit → Pipeline (SPIFFE identity) → Build → Sign (RHTAS keyless)
     → Verify (Rekor transparency log) → SBOM (Syft) → CVE Analysis (RHTPA)
     → Attestation (Tekton Chains) → Deploy (ACS admission check) → Monitor (ACS runtime)
@@ -322,15 +331,18 @@ Organizations increasingly face mandates to demonstrate Zero Trust maturity. Thi
 #### Step 1: Compliance Operator Scan Results
 
 The Compliance Operator continuously scans the cluster against:
+
 - **CIS OpenShift Benchmark** — industry-standard hardening checks
 - **NIST 800-53 Moderate** — federal security control baseline
 
 Scan results are stored as Kubernetes custom resources (`ComplianceCheckResult`) and can be exported as OSCAP reports. The Compliance Officer can show auditors:
+
 - Which controls pass, fail, or are not applicable
 - Remediation status for failing controls
 - Historical trends via periodic re-scans
 
 **Framework Alignment:**
+
 - NIST SP 800-53 CA-2: "Control Assessments" — automated control verification
 - NIST SP 800-53 CA-7: "Continuous Monitoring" — ongoing compliance scanning
 - FedRAMP: Annual assessment + continuous monitoring (ConMon)
@@ -346,11 +358,13 @@ Because all ZTVP configuration is managed through Git and deployed via ArgoCD:
 - No ad-hoc `kubectl apply` or manual changes — everything is code-reviewed
 
 The Compliance Officer can provide auditors with:
+
 - Git history as the change management log
 - ArgoCD sync records as deployment evidence
 - PR reviews as change approval documentation
 
 **Framework Alignment:**
+
 - NIST SP 800-53 CM-3: "Configuration Change Control" — Git-based change management
 - NIST SP 800-53 AU-2: "Event Logging" — Git commits as audit events
 - NIST SP 800-53 AU-3: "Content of Audit Records" — commit metadata (who, what, when)
@@ -367,6 +381,7 @@ ACS Central provides a unified view across all managed clusters:
 - **Policy Violations:** Real-time alerts for security policy breaches
 
 **Framework Alignment:**
+
 - NIST SP 800-53 SI-4: "System Monitoring" — continuous security monitoring
 - NIST SP 800-53 RA-3: "Risk Assessment" — automated risk scoring
 - CISA ZTMM, Visibility & Analytics Pillar: "Agency uses automated tools for asset discovery and threat detection"
@@ -382,6 +397,7 @@ For organizations with multiple clusters, RHACM distributes and enforces securit
 - Compliance status is aggregated in the ACM hub console
 
 **Framework Alignment:**
+
 - NIST SP 800-53 PL-8: "Security and Privacy Architectures" — centralized security governance
 - NIST SP 800-53 CA-7: "Continuous Monitoring" — multi-cluster compliance aggregation
 - OMB M-22-09: "Government-wide zero trust goals" — consistent enforcement across the organization
@@ -389,12 +405,14 @@ For organizations with multiple clusters, RHACM distributes and enforces securit
 #### Step 5: Network Flow Visibility (with Network Observability)
 
 When Network Observability is enabled, the Compliance Officer gains:
+
 - Real-time flow data showing which pods communicate with which endpoints
 - Evidence that NetworkPolicies are enforced (blocked flows are visible)
 - Historical flow records for forensic analysis
 - Dashboard views in the OpenShift Console
 
 **Framework Alignment:**
+
 - NIST SP 800-53 AU-12: "Audit Record Generation" — network flow logging
 - NIST SP 800-53 SI-4: "System Monitoring" — network traffic analysis
 - CISA ZTMM, Network Pillar: "Agency monitors and analyzes network traffic"
