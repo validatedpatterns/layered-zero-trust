@@ -140,7 +140,7 @@ Default-deny policies, microsegmentation, namespace isolation.
 
 ---
 
-## 10. GitOps (ArgoCD)
+## 10. GitOps (Argo CD)
 
 Infrastructure as code, declarative configuration, audit trail, drift detection.
 

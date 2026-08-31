@@ -30,7 +30,7 @@ The ZTVP follows a three-layer architecture model with a foundational platform l
 │  compliance, certificate management, security posture           │
 ├─────────────────────────────────────────────────────────────────┤
 │              Validated Pattern Framework (Platform)              │
-│  OCP + OpenShift GitOps (ArgoCD) + VP Operator                  │
+│  OCP + OpenShift GitOps (Argo CD) + VP Operator                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -41,7 +41,7 @@ The base platform provides the deployment substrate and GitOps-driven lifecycle 
 | Component | Description | ZT Contribution |
 |---|---|---|
 | **OpenShift Container Platform (OCP)** | Kubernetes platform with enterprise security features | Platform-level enforcement points for workloads, networking, RBAC, and admission control |
-| **OpenShift GitOps (ArgoCD)** | GitOps continuous delivery | Single source of truth — every change is auditable, verifiable, and traceable to a Git commit |
+| **OpenShift GitOps (Argo CD)** | GitOps continuous delivery | Single source of truth — every change is auditable, verifiable, and traceable to a Git commit |
 | **Validated Patterns Operator** | Bootstraps the pattern, manages Hub/Spoke lifecycle | Automated, repeatable deployment with imperative job orchestration |
 
 ### Layer 0: Foundation (Always Deployed)
@@ -110,7 +110,7 @@ The Platform Engineer forks the ZTVP repository, configures their secrets file, 
 ./pattern.sh make install
 ```
 
-ArgoCD takes over and deploys all Layer 0 components in a carefully orchestrated sequence (sync waves). Within 30-45 minutes, the cluster has:
+Argo CD takes over and deploys all Layer 0 components in a carefully orchestrated sequence (sync waves). Within 30-45 minutes, the cluster has:
 
 - SPIRE server issuing workload identities
 - Vault storing all secrets with SPIFFE-based authentication
@@ -234,7 +234,7 @@ The Security Architect enables the supply chain feature set by uncommenting the 
 - Tekton Chains (attestation)
 - Supply Chain pipeline
 
-ArgoCD deploys all components. The pipeline is pre-configured to build, sign, verify, and analyze the qtodo application.
+Argo CD deploys all components. The pipeline is pre-configured to build, sign, verify, and analyze the qtodo application.
 
 #### Step 2: Run the Secure Build Pipeline
 
@@ -350,17 +350,17 @@ Scan results are stored as Kubernetes custom resources (`ComplianceCheckResult`)
 
 #### Step 2: GitOps Audit Trail
 
-Because all ZTVP configuration is managed through Git and deployed via ArgoCD:
+Because all ZTVP configuration is managed through Git and deployed via Argo CD:
 
 - Every configuration change has a Git commit with author, timestamp, and approval (PR review)
-- ArgoCD sync history shows when each change was applied to the cluster
+- Argo CD sync history shows when each change was applied to the cluster
 - Drift detection alerts when cluster state diverges from Git
 - No ad-hoc `kubectl apply` or manual changes — everything is code-reviewed
 
 The Compliance Officer can provide auditors with:
 
 - Git history as the change management log
-- ArgoCD sync records as deployment evidence
+- Argo CD sync records as deployment evidence
 - PR reviews as change approval documentation
 
 **Framework Alignment:**
@@ -368,7 +368,7 @@ The Compliance Officer can provide auditors with:
 - NIST SP 800-53 CM-3: "Configuration Change Control" — Git-based change management
 - NIST SP 800-53 AU-2: "Event Logging" — Git commits as audit events
 - NIST SP 800-53 AU-3: "Content of Audit Records" — commit metadata (who, what, when)
-- NIST SP 800-53 CM-6: "Configuration Settings" — ArgoCD enforces desired state
+- NIST SP 800-53 CM-6: "Configuration Settings" — Argo CD enforces desired state
 
 #### Step 3: ACS Security Dashboard
 
@@ -425,7 +425,7 @@ When Network Observability is enabled, the Compliance Officer gains:
 | "Are secrets properly managed?" | Vault audit log, ESO sync records | NIST 800-53 SC-12, SC-28 |
 | "Is the cluster hardened?" | Compliance Operator scan results | NIST 800-53 CM-6, CA-2 |
 | "Is network access controlled?" | NetworkPolicy definitions, ACS network graph, flow logs | NIST 800-53 AC-4, SC-7 |
-| "Are changes tracked?" | Git history, ArgoCD sync records | NIST 800-53 CM-3, AU-2 |
+| "Are changes tracked?" | Git history, Argo CD sync records | NIST 800-53 CM-3, AU-2 |
 | "Are images verified?" | RHTAS signatures, Rekor log, ACS admission checks | EO 14028 §4, NIST 800-53 SR-3/SR-4 |
 | "Are vulnerabilities managed?" | ACS vulnerability dashboard, RHTPA CVE analysis | NIST 800-53 RA-5, SI-2 |
 | "Is there continuous monitoring?" | ACS runtime monitoring, Compliance Operator re-scans | NIST 800-53 CA-7, SI-4, FedRAMP ConMon |
@@ -461,7 +461,7 @@ NIST SP 800-207 (Section 2.1) defines seven tenets that a Zero Trust Architectur
 | **Security Posture (ACS/StackRox)** | §2.1 Tenets 4, 5, 7; §3.3 (Trust Algorithm) | CA-7 (Continuous Monitoring), SI-4 (System Monitoring), SI-4(2) (Real-Time Analysis), RA-5 (Vuln Monitoring), CM-2 (Baseline Config), AC-4 (Info Flow Enforcement) | Apps & Workloads: Advanced/Optimal (Threat Protection); V&A: Advanced/Optimal | §3, §7 (detection) | D (app testing), B (EDR) | Pillar 3: 3.5 Continuous Monitoring; Pillar 7: 7.1 Log All Traffic |
 | **Compliance Scanning (Compliance Operator)** | §2.1 Tenet 5 | CA-2 (Control Assessments), CA-2(2) (Specialized Assessments), CA-7 (Continuous Monitoring), CM-2 (Baseline Config), CM-6(1) (Automated Verification), RA-5 (Vuln Monitoring), SI-2(2) (Automated Remediation) | Devices: Advanced/Optimal (Compliance Monitoring); Governance: Advanced/Optimal | §3, §3(a) (best practices) | B (device compliance) | Pillar 2: 2.2 Device Detection/Compliance; Pillar 6: 6.2 Critical Process Automation |
 | **Network Segmentation (NetworkPolicies)** | §3.1.2 (Micro-Segmentation); §3.1.3 (SDP) | SC-7 (Boundary Protection), SC-7(5) (Deny by Default), SC-7(20) (Dynamic Isolation), SC-7(22) (Separate Subnets), AC-4 (Info Flow Enforcement) | Networks: Advanced/Optimal (Segmentation, Traffic Mgmt) | §3(a)(b) — ZTA adoption | C (microsegment networks) | Pillar 5: 5.1 Data Flow Mapping, 5.3 Macro Segmentation, 5.4 Micro Segmentation |
-| **GitOps (ArgoCD)** | §2.1 Tenet 7; §7 (ZTA Migration) | CM-2 (Baseline Config), CM-3 (Change Control), CM-5 (Change Restrictions), AU-2 (Event Logging), AU-3 (Audit Content), AU-12 (Audit Generation), SA-10 (Developer Config Mgmt) | A&O: Advanced/Optimal; Governance: Advanced/Optimal | §3 (modernize) | D (app testing/config) | Pillar 6: 6.1 Policy Decision Point, 6.2 Critical Process Automation |
+| **GitOps (Argo CD)** | §2.1 Tenet 7; §7 (ZTA Migration) | CM-2 (Baseline Config), CM-3 (Change Control), CM-5 (Change Restrictions), AU-2 (Event Logging), AU-3 (Audit Content), AU-12 (Audit Generation), SA-10 (Developer Config Mgmt) | A&O: Advanced/Optimal; Governance: Advanced/Optimal | §3 (modernize) | D (app testing/config) | Pillar 6: 6.1 Policy Decision Point, 6.2 Critical Process Automation |
 | **Multi-cluster Mgmt (RHACM)** | §4.2 (Multi-cloud Enterprise); §3.1 (Combined ZTA) | PL-8 (Security Architecture), AC-4 (Info Flow Enforcement), CM-2 (Baseline Config), CA-7 (Continuous Monitoring), PM-9 (Risk Mgmt Strategy), SI-4(16) (Correlate Monitoring) | Governance: Advanced/Optimal; A&O: Advanced/Optimal; V&A: Advanced | §3 (enterprise-wide) | C (segmentation), A.1 (centralized identity) | Pillar 6: 6.1 PDP, 6.2 Automation; Pillar 7: 7.1 Log All Traffic, 7.2 SIEM |
 | **CI/CD Security (Tekton + Chains)** | §2.1 Tenet 5 (asset integrity) | SA-10(1) (SW/FW Integrity), SA-11 (Developer Testing), SA-15 (Dev Process/Standards), SI-7(1) (Integrity Checks), SR-4(3)(4) (Validate/Pedigree), CM-14 (Signed Components) | Apps & Workloads: Advanced/Optimal; A&O: Advanced | §4(e) supply chain, §4(e)(vi) build integrity, §4(r) dev attestation | D (rigorous testing) | Pillar 3: 3.2 Secure SW Dev, 3.3 SW Risk Mgmt, 3.4 Resource Auth |
 | **Network Observability** | §2.1 Tenet 7 | AU-12 (Audit Record Generation), SI-4 (System Monitoring), IR-4 (Incident Handling), AU-6 (Audit Review/Analysis) | Networks: Advanced (Traffic Analysis); V&A: Advanced/Optimal | — | — | Pillar 5: 5.1 Data Flow Mapping; Pillar 7: 7.1 Log All Traffic |
