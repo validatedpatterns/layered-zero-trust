@@ -5,8 +5,8 @@ from a private Git repository.
 
 The Validated Patterns framework supports deploying from both SSH-secured and
 HTTPS-secured (PAT) private repositories.  The mechanism works by creating an
-ArgoCD repository secret **before** the pattern is deployed, so that the VP
-operator can propagate credentials to all ArgoCD instances managed by the
+Argo CD repository secret **before** the pattern is deployed, so that the VP
+operator can propagate credentials to all Argo CD instances managed by the
 pattern.
 
 > [!NOTE]
@@ -75,11 +75,11 @@ bootstrap_secrets:
 ```
 
 > [!NOTE]
-> **About `insecureIgnoreHostKey`:** ArgoCD ships with pre-populated SSH
+> **About `insecureIgnoreHostKey`:** Argo CD ships with pre-populated SSH
 > fingerprints for github.com, gitlab.com, bitbucket.org, and
 > ssh.dev.azure.com in its `argocd-ssh-known-hosts-cm` ConfigMap.  If your
 > repository is hosted on one of these providers you may omit
-> `insecureIgnoreHostKey` and ArgoCD will verify the host key automatically.
+> `insecureIgnoreHostKey` and Argo CD will verify the host key automatically.
 >
 > For self-hosted Git servers (e.g. internal GitLab), the VP framework's
 > `bootstrap_secrets` mechanism does not currently support injecting entries
@@ -185,13 +185,13 @@ the private remote.  Pass `DISABLE_VALIDATE_ORIGIN=true` to skip it:
    Secret in the `openshift-operators` namespace **before** deploying the
    pattern.
 
-2. The `argocd.argoproj.io/secret-type: repository` label tells ArgoCD to
+2. The `argocd.argoproj.io/secret-type: repository` label tells Argo CD to
    pick up the secret as a repository credential.
 
 3. The `TOKEN_SECRET` and `TOKEN_NAMESPACE` Make variables set the
    `tokenSecret` and `tokenSecretNamespace` fields on the Pattern Custom
    Resource.  The VP operator copies the secret as
-   `vp-private-repo-credentials` into `vp-gitops` (its managed ArgoCD
+   `vp-private-repo-credentials` into `vp-gitops` (its managed Argo CD
    namespace).
 
 4. The ACM chart (0.2.x+) `vp-private-hub-policy` copies credentials from
@@ -219,7 +219,7 @@ oc get secret vp-private-repo-credentials -n vp-gitops \
 
 Expected output: `repository`
 
-Check the Cluster ArgoCD can see the repository:
+Check the Cluster Argo CD can see the repository:
 
 ```shell
 oc get application layered-zero-trust-hub -n vp-gitops \
@@ -237,12 +237,12 @@ Expected output: `Synced` (or `OutOfSync` if you have uncommitted changes).
   (`chartVersion: 0.2.*`), which reads `global.vpArgoNamespace` -- a value
   the VP operator sets automatically.
 
-* **ArgoCD shows "repository not accessible"** -- Verify the SSH key or PAT
+* **Argo CD shows "repository not accessible"** -- Verify the SSH key or PAT
   has read access.  For SSH, confirm the key has no passphrase (`ssh-keygen
   -y -f ~/.ssh/ztvp-deploy-key` should not prompt).
 
 * **SSH: "knownhosts: key is unknown"** -- The `insecureIgnoreHostKey: "true"`
-  field is missing from the bootstrap secret.  The ArgoCD repo-server runs
+  field is missing from the bootstrap secret.  The Argo CD repo-server runs
   in a container without your Git host's fingerprint in known_hosts.
 
 * **HTTPS: "x509: certificate signed by unknown authority"** -- This
@@ -266,7 +266,7 @@ oc patch proxy/cluster --type=merge \
 
   If the custom CA is added **after** the pattern is already deployed, the
   `trusted-ca-bundle` ConfigMap will be updated by the cluster CA injector,
-  but the ArgoCD repo-server will **not** pick it up automatically.  The
+  but the Argo CD repo-server will **not** pick it up automatically.  The
   repo-server uses an init container (`fetch-ca`) that copies the CA bundle
   into an `emptyDir` volume at pod startup; this only runs once.  Restart
   the repo-server to load the updated bundle:

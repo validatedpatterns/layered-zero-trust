@@ -302,7 +302,7 @@ Resources without an explicit sync-wave default to wave 0. These include: pipeli
 | registry-token-refresher-seed (Sync hook Job) | — | 10 | Writes initial SA token to Vault |
 | qtodo-registry-auth ExternalSecret | — | 15 | Reads registry token from Vault; must run after seed Job |
 | workspaces.yaml | 20 | 51 | Pipeline PVCs |
-| pipelinerun-qtodo.yaml (PostSync hook Job + RBAC) | — | — | Job wraps `oc create` of PipelineRun (PipelineRun is excluded from ArgoCD tracking) |
+| pipelinerun-qtodo.yaml (PostSync hook Job + RBAC) | — | — | Job wraps `oc create` of PipelineRun (PipelineRun is excluded from Argo CD tracking) |
 | pipeline-qtodo.yaml `finally` section | — | — | restart-qtodo Task runs after successful verify-image |
 
 ### docs/DEVELOPMENT.md (example snippet, not deployed)

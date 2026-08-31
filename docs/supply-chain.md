@@ -218,11 +218,11 @@ Set `<registry-hostname>` to match your registry option:
 
 > **Note**: Option 2 (BYO/External Registry) does not require `imagePullTrust` because external registries like quay.io and ghcr.io use publicly trusted certificates.
 
-### ArgoCD PVC Health Check
+### Argo CD PVC Health Check
 
-The supply-chain chart creates a `PersistentVolumeClaim` (`qtodo-workspace-source`) for the pipeline workspace. Depending on the storage class, this PVC may remain in `Pending` state until a pod is scheduled -- which is expected behavior, but ArgoCD reports it as `Progressing`, preventing the application from reaching `Healthy` status.
+The supply-chain chart creates a `PersistentVolumeClaim` (`qtodo-workspace-source`) for the pipeline workspace. Depending on the storage class, this PVC may remain in `Pending` state until a pod is scheduled -- which is expected behavior, but Argo CD reports it as `Progressing`, preventing the application from reaching `Healthy` status.
 
-A custom `resourceHealthChecks` entry in `values-hub.yaml` teaches ArgoCD to treat `Pending` PVCs as `Healthy`:
+A custom `resourceHealthChecks` entry in `values-hub.yaml` teaches Argo CD to treat `Pending` PVCs as `Healthy`:
 
 ```yaml
 resourceHealthChecks:
@@ -255,7 +255,7 @@ ZTVP creates a `Pipeline` in our cluster called **qtodo-supply-chain** that orch
 
 ### How to run the pipeline
 
-Once the supply-chain application has synced in ArgoCD, start the pipeline using one of the methods below.
+Once the supply-chain application has synced in Argo CD, start the pipeline using one of the methods below.
 
 #### Using OpenShift Web Console
 
