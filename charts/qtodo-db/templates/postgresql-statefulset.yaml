@@ -20,6 +20,10 @@ spec:
   serviceName: qtodo-db
   template:
     metadata:
+{{- if .Values.app.udn.enabled }}
+      annotations:
+        k8s.v1.cni.cncf.io/networks: {{ .Release.Namespace }}/{{ .Values.app.udn.nadName }}
+{{- end }}
       labels:
         app: qtodo-db
     spec:

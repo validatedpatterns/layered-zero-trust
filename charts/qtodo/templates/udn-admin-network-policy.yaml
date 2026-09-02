@@ -1,0 +1,118 @@
+{{- if and .Values.app.udn.enabled .Values.app.udn.networkPolicy.enabled }}
+# AdminNetworkPolicy for qtodo UDN
+# Controls traffic on the secondary (UDN) interface with explicit allow-lists
+# Primary network policies (cluster network) are in qtodo-network-policy.yaml
+apiVersion: policy.networking.k8s.io/v1alpha1
+kind: AdminNetworkPolicy
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: '37'
+  name: qtodo-udn-policy
+spec:
+  priority: 50
+  subject:
+    namespaces:
+      matchLabels:
+        kubernetes.io/metadata.name: {{ .Release.Namespace }}
+  ingress:
+  {{- if .Values.app.udn.networkPolicy.ingress.router.enabled }}
+  # Allow ingress from OpenShift router on primary network (not UDN)
+  # Router traffic comes through the cluster network interface
+  - name: allow-router-ingress
+    action: Allow
+    from:
+    - namespaces:
+        matchLabels:
+          policy-group.network.openshift.io/ingress: ""
+    ports:
+    - portNumber:
+        protocol: TCP
+        port: {{ .Values.app.udn.networkPolicy.ingress.router.port }}
+  {{- end }}
+  {{- if .Values.app.udn.networkPolicy.egress.postgresql.enabled }}
+  # Allow ingress to PostgreSQL from qtodo pods within same namespace on UDN
+  - name: allow-postgresql-ingress
+    action: Allow
+    from:
+    - pods:
+        namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: {{ .Release.Namespace }}
+        podSelector:
+          matchLabels:
+            app: qtodo
+    ports:
+    - portNumber:
+        protocol: TCP
+        port: {{ .Values.app.udn.networkPolicy.egress.postgresql.port }}
+  {{- end }}
+  # Deny all other ingress by default on UDN
+  - name: deny-all-ingress
+    action: Deny
+    from:
+    - namespaces: {}
+  egress:
+  {{- if .Values.app.udn.networkPolicy.egress.dns.enabled }}
+  # Allow DNS resolution via CoreDNS
+  - name: allow-dns
+    action: Allow
+    to:
+    - namespaces:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ .Values.app.udn.networkPolicy.egress.dns.namespace }}
+    ports:
+    - portNumber:
+        protocol: UDP
+        port: {{ .Values.app.udn.networkPolicy.egress.dns.port }}
+    - portNumber:
+        protocol: TCP
+        port: {{ .Values.app.udn.networkPolicy.egress.dns.port }}
+  {{- end }}
+  {{- if .Values.app.udn.networkPolicy.egress.postgresql.enabled }}
+  # Allow PostgreSQL access within same namespace on UDN
+  - name: allow-postgresql
+    action: Allow
+    to:
+    - pods:
+        namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: {{ .Release.Namespace }}
+        podSelector:
+          matchLabels:
+            app: qtodo-db
+    ports:
+    - portNumber:
+        protocol: TCP
+        port: {{ .Values.app.udn.networkPolicy.egress.postgresql.port }}
+  {{- end }}
+  {{- if .Values.app.udn.networkPolicy.egress.vault.enabled }}
+  # Allow Vault API access (SPIFFE JWT auth) via cluster network
+  - name: allow-vault
+    action: Allow
+    to:
+    - namespaces:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ .Values.app.udn.networkPolicy.egress.vault.namespace }}
+    ports:
+    - portNumber:
+        protocol: TCP
+        port: {{ .Values.app.udn.networkPolicy.egress.vault.port }}
+  {{- end }}
+  {{- if .Values.app.udn.networkPolicy.egress.https.enabled }}
+  # Allow OIDCs (HTTPS connections) via cluster network (external route)
+  - name: allow-https
+    action: Allow
+    to:
+    - networks:
+      - 0.0.0.0/0  # External route, cannot match by namespace
+    ports:
+    - portNumber:
+        protocol: TCP
+        port: {{ .Values.app.udn.networkPolicy.egress.https.port }}
+  {{- end }}
+  # Deny all other egress by default on UDN
+  - name: deny-all-egress
+    action: Deny
+    to:
+    - namespaces: {}
+{{- end }}

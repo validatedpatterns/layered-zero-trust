@@ -1,0 +1,32 @@
+{{- if .Values.app.udn.enabled }}
+apiVersion: k8s.ovn.org/v1
+kind: UserDefinedNetwork
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: '35'
+  name: {{ .Values.app.udn.name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  topology: {{ .Values.app.udn.topology }}
+  {{- if eq .Values.app.udn.topology "Layer2" }}
+  layer2:
+    role: Primary
+    subnets:
+    - {{ .Values.app.udn.subnet }}
+    {{- if .Values.app.udn.mtu }}
+    mtu: {{ .Values.app.udn.mtu }}
+    {{- end }}
+  {{- else if eq .Values.app.udn.topology "Layer3" }}
+  layer3:
+    role: Primary
+    subnets:
+    - {{ .Values.app.udn.subnet }}
+    {{- if .Values.app.udn.joinSubnet }}
+    joinSubnets:
+    - {{ .Values.app.udn.joinSubnet }}
+    {{- end }}
+    {{- if .Values.app.udn.mtu }}
+    mtu: {{ .Values.app.udn.mtu }}
+    {{- end }}
+  {{- end }}
+{{- end }}
