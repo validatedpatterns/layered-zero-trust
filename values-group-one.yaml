@@ -3,6 +3,7 @@ global:
     useCSV: False
     syncPolicy: Automatic
     installPlanApproval: Automatic
+
 clusterGroup:
   name: group-one
   isHubCluster: false
@@ -10,15 +11,20 @@ clusterGroup:
     external-secrets-operator:
       operatorGroup: true
       targetNamespaces: []
+      annotations:
+        argocd.argoproj.io/sync-wave: "26"  # Create before operator subscription
     external-secrets:
-  # The only subscription on spokes is gitops which gets managed by ACM
   subscriptions:
     eso:
       name: openshift-external-secrets-operator
       namespace: external-secrets-operator
       channel: stable-v1
+      annotations:
+        argocd.argoproj.io/sync-wave: "27"  # Install after OperatorGroup (26)
   argoProjects:
     - eso
+  sharedValueFiles:
+    - '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
   applications:
     openshift-external-secrets:
       name: openshift-external-secrets
@@ -26,28 +32,21 @@ clusterGroup:
       argoProject: eso
       chart: openshift-external-secrets
       chartVersion: 0.0.*
+      annotations:
+        argocd.argoproj.io/sync-wave: "30"
   imperative:
     # NOTE: We *must* use lists and not hashes. As hashes lose ordering once parsed by helm
     # The default schedule is every 10 minutes: imperative.schedule
     # Total timeout of all jobs is 1h: imperative.activeDeadlineSeconds
     # imagePullPolicy is set to always: imperative.imagePullPolicy
     jobs: []
-  # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
-  # We can use self-referential variables because the chart calls the tpl function with these variables defined
-  sharedValueFiles:
-    - '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
-    # To mirror the "Classic" magic include structure, the clusterGroup would need all of these:
-    # sharedValueFiles:
-    #   - '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
-    #   - '/overrides/values-{{ $.Values.global.clusterPlatform }}-{{ $.Values.global.clusterVersion }}.yaml'
-    #   - '/overrides/values-{{ $.Values.global.clusterPlatform }}-{{ $.Values.clusterGroup.name }}.yaml'
-    #   - '/overrides/values-{{ $.Values.global.clusterVersion }}-{{ $.Values.clusterGroup.name }}.yaml"
+  managedClusterGroups: {}
 #  To have apps in multiple flavors, use namespaces and use helm overrides as appropriate
 #
 #    pipelines:
 #      name: pipelines
 #      namespace: production
-#      project: datacenter
+#      argoProject: datacenter
 #      path: applications/pipeline
 #      repoURL: https://github.com/you/applications.git
 #      targetRevision: stable
@@ -58,7 +57,7 @@ clusterGroup:
 #    pipelines_staging:
 #    - name: pipelines
 #      namespace: staging
-#      project: datacenter
+#      argoProject: datacenter
 #      path: applications/pipeline
 #      repoURL: https://github.com/you/applications.git
 #      targetRevision: main
@@ -71,7 +70,7 @@ clusterGroup:
 #    vendor-app:
 #      name: vendor-app
 #      namespace: default
-#      project: vendor
+#      argoProject: vendor
 #      path: path/to/myapp
 #      repoURL: https://github.com/vendor/applications.git
 #      targetRevision: main

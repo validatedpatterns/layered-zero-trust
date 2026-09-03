@@ -37,55 +37,66 @@ clusterGroup:
   name: coco-dev
   isHubCluster: true
   namespaces:
-    - open-cluster-management
-    - vault
-    # - qtodo  # COMMENTED OUT for coco-dev
-    - golang-external-secrets
+    open-cluster-management:
+    vault:
+    # qtodo:  # COMMENTED OUT for coco-dev
+    external-secrets-operator:
+      operatorGroup: true
+      targetNamespaces: []
+      annotations:
+        argocd.argoproj.io/sync-wave: "26"  # Create before operator subscription
+    external-secrets:
     # COMMENTED OUT for coco-dev: Keycloak not needed
-    # - keycloak-system:
-    #     operatorGroup: true
-    #     targetNamespace: keycloak-system
-    - cert-manager
-    - cert-manager-operator:
-        operatorGroup: true
-        targetNamespace: cert-manager-operator
+    # keycloak-system:
+    #   operatorGroup: true
+    #   targetNamespace: keycloak-system
+    cert-manager:
+    cert-manager-operator:
+      operatorGroup: true
+      targetNamespace: cert-manager-operator
     # Layer 1: Quay Registry (for container image storage and signing)
     # COMMENTED OUT: Uncomment to enable integrated Quay registry
-    # - openshift-storage:
-    #     operatorGroup: true
-    #     targetNamespace: openshift-storage
-    #     annotations:
-    #       openshift.io/cluster-monitoring: "true"
-    #       argocd.argoproj.io/sync-wave: "26"  # Propagated to OperatorGroup by framework
-    # - quay-enterprise:
-    #     annotations:
-    #       argocd.argoproj.io/sync-wave: "32"  # Create before NooBaa and all Quay components
-    #     labels:
-    #       openshift.io/cluster-monitoring: "true"
+    # openshift-storage:
+    #   operatorGroup: true
+    #   targetNamespace: openshift-storage
+    #   annotations:
+    #     openshift.io/cluster-monitoring: "true"
+    #     argocd.argoproj.io/sync-wave: "26"  # Propagated to OperatorGroup by framework
+    # quay-enterprise:
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "32"  # Create before NooBaa and all Quay components
+    #   labels:
+    #     openshift.io/cluster-monitoring: "true"
     # RHTAS namespace (required when RHTAS application is enabled)
     # COMMENTED OUT: Uncomment to enable RHTAS with SPIFFE signing
-    # - trusted-artifact-signer:
-    #     annotations:
-    #       argocd.argoproj.io/sync-wave: "32"  # Auto-created by RHTAS operator
-    #     labels:
-    #       openshift.io/cluster-monitoring: "true"
-    - zero-trust-workload-identity-manager:
-        operatorGroup: true
-        targetNamespace: zero-trust-workload-identity-manager
-    - openshift-compliance:
-        operatorGroup: true
-        targetNamespace: openshift-compliance
-        annotations:
-          openshift.io/cluster-monitoring: "true"
+    # trusted-artifact-signer:
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "32"  # Auto-created by RHTAS operator
+    #   labels:
+    #     openshift.io/cluster-monitoring: "true"
+    zero-trust-workload-identity-manager:
+      operatorGroup: true
+      targetNamespace: zero-trust-workload-identity-manager
+    openshift-compliance:
+      operatorGroup: true
+      targetNamespace: openshift-compliance
+      annotations:
+        openshift.io/cluster-monitoring: "true"
     # CoCo namespaces
-    - openshift-sandboxed-containers-operator
-    - trustee-operator-system
+    openshift-sandboxed-containers-operator:
+    trustee-operator-system:
   subscriptions:
     acm:
       name: advanced-cluster-management
       namespace: open-cluster-management
       channel: release-2.14
       catalogSource: redhat-operators
+    eso:
+      name: openshift-external-secrets-operator
+      namespace: external-secrets-operator
+      channel: stable-v1
+      annotations:
+        argocd.argoproj.io/sync-wave: "27"  # Install after OperatorGroup (26)
     cert-manager:
       name: openshift-cert-manager-operator
       namespace: cert-manager-operator
@@ -166,7 +177,7 @@ clusterGroup:
     #   annotations:
     #     argocd.argoproj.io/sync-wave: "29"  # Install after Quay operator, before applications
     #   catalogSource: redhat-operators
-  projects:
+  argoProjects:
     - hub
   # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
   # We can use self-referential variables because the chart calls the tpl function with these variables defined
@@ -192,7 +203,7 @@ clusterGroup:
     acm:
       name: acm
       namespace: open-cluster-management
-      project: hub
+      argoProject: hub
       chart: acm
       chartVersion: 0.1.*
       ignoreDifferences:
@@ -206,7 +217,7 @@ clusterGroup:
           value: none
     acm-managed-clusters:
       name: acm-managed-clusters
-      project: hub
+      argoProject: hub
       path: charts/acm-managed-clusters
       ignoreDifferences:
         - group: cluster.open-cluster-management.io
@@ -219,13 +230,13 @@ clusterGroup:
       namespace: openshift-compliance
       annotations:
         argocd.argoproj.io/sync-wave: '1'
-      project: hub
+      argoProject: hub
       chart: ocp-compliance-scanning
       chartVersion: 0.0.*
     vault:
       name: vault
       namespace: vault
-      project: hub
+      argoProject: hub
       chart: hashicorp-vault
       chartVersion: 0.1.*
       policies: []
@@ -247,7 +258,7 @@ clusterGroup:
     # noobaa-mcg:
     #   name: noobaa-mcg
     #   namespace: openshift-storage
-    #   project: hub
+    #   argoProject: hub
     #   path: charts/noobaa-mcg
     #   annotations:
     #     argocd.argoproj.io/sync-wave: "36"  # Deploy after core services
@@ -255,7 +266,7 @@ clusterGroup:
     # quay-registry:
     #   name: quay-registry
     #   namespace: quay-enterprise
-    #   project: hub
+    #   argoProject: hub
     #   chart: quay
     #   chartVersion: 0.1.*
     #   annotations:
@@ -266,7 +277,7 @@ clusterGroup:
     # trusted-artifact-signer:
     #   name: trusted-artifact-signer
     #   namespace: trusted-artifact-signer
-    #   project: hub
+    #   argoProject: hub
     #   path: charts/rhtas-operator
     #   annotations:
     #     argocd.argoproj.io/sync-wave: "46"  # Deploy after dependencies
@@ -284,29 +295,31 @@ clusterGroup:
     #       value: "true"
     #     - name: rhtas.zeroTrust.email.issuer
     #       value: https://keycloak.apps.{{ $.Values.global.clusterDomain }}/realms/ztvp
-    golang-external-secrets:
-      name: golang-external-secrets
-      namespace: golang-external-secrets
-      project: hub
-      chart: golang-external-secrets
-      chartVersion: 0.1.*
+    openshift-external-secrets:
+      name: openshift-external-secrets
+      namespace: external-secrets
+      argoProject: hub
+      chart: openshift-external-secrets
+      chartVersion: 0.0.*
+      annotations:
+        argocd.argoproj.io/sync-wave: "30"
     # COMMENTED OUT for coco-dev: Keycloak is for user auth (not needed for CoCo testing)
     # rh-keycloak:
     #   name: rh-keycloak
     #   namespace: keycloak-system
-    #   project: hub
+    #   argoProject: hub
     #   chart: rhbk
     #   chartVersion: 0.0.*
     rh-cert-manager:
       name: rh-cert-manager
       namespace: cert-manager-operator
-      project: hub
+      argoProject: hub
       chart: ocp-certmanager
       chartVersion: 0.2.*
     zero-trust-workload-identity-manager:
       name: zero-trust-workload-identity-manager
       namespace: zero-trust-workload-identity-manager
-      project: hub
+      argoProject: hub
       chart: ztwim
       chartVersion: 0.1.*
       overrides:
@@ -316,7 +329,7 @@ clusterGroup:
     # qtodo:
     #   name: qtodo
     #   namespace: qtodo
-    #   project: hub
+    #   argoProject: hub
     #   path: charts/qtodo
     #   overrides:
     #     - name: app.oidc.enabled
@@ -332,7 +345,7 @@ clusterGroup:
     trustee:
       name: trustee
       namespace: trustee-operator-system
-      project: hub
+      argoProject: hub
       chart: trustee
       chartVersion: 0.2.*
       extraValueFiles:
@@ -340,7 +353,7 @@ clusterGroup:
     sandbox:
       name: sandbox
       namespace: openshift-sandboxed-containers-operator
-      project: hub
+      argoProject: hub
       chart: sandboxed-containers
       chartVersion: 0.2.*
       overrides:
@@ -358,7 +371,7 @@ clusterGroup:
     sandbox-policies:
       name: sandbox-policies
       namespace: openshift-sandboxed-containers-operator
-      project: hub
+      argoProject: hub
       chart: sandboxed-policies
       chartVersion: 0.1.*
       overrides:
@@ -373,7 +386,7 @@ clusterGroup:
     hello-coco:
       name: hello-coco
       namespace: zero-trust-workload-identity-manager
-      project: hub
+      argoProject: hub
       path: charts/hello-coco
       syncPolicy:
         automated: {}
