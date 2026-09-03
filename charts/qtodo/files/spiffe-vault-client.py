@@ -22,7 +22,7 @@ class VaultCredentialManager:
     def __init__(self):
         # Get configuration from environment variables
         self.vault_url = os.getenv("VAULT_URL")
-        self.vault_secret_path = os.getenv("VAULT_SECRET_PATH")
+        self.vault_secret_path = os.getenv("VAULT_CREDENTIAL_PATH")
         self.vault_role = os.getenv("VAULT_ROLE")
         self.db_username = os.getenv("DB_USERNAME", "postgres")
         self.credentials_file = os.getenv(
@@ -45,7 +45,7 @@ class VaultCredentialManager:
         # Validate required environment variables
         required_vars = {
             "VAULT_URL": self.vault_url,
-            "VAULT_SECRET_PATH": self.vault_secret_path,
+            "VAULT_CREDENTIAL_PATH": self.vault_secret_path,
             "VAULT_ROLE": self.vault_role,
         }
 
@@ -56,7 +56,7 @@ class VaultCredentialManager:
 
         logger.info("Initialized VaultCredentialManager with:")
         logger.info("  VAULT_URL: %s", self.vault_url)
-        logger.info("  VAULT_SECRET_PATH: %s", self.vault_secret_path)
+        logger.info("  VAULT_CREDENTIAL_PATH: %s", self.vault_secret_path)
         logger.info("  VAULT_ROLE: %s", self.vault_role)
         logger.info("  DB_USERNAME: %s", self.db_username)
         logger.info("  CREDENTIALS_FILE: %s", self.credentials_file)
