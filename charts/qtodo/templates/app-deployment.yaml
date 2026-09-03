@@ -118,7 +118,7 @@ spec:
             value: {{ .Values.app.vault.url }}
           - name: VAULT_ROLE
             value: {{ .Values.app.vault.role }}
-          - name: VAULT_SECRET_PATH
+          - name: VAULT_CREDENTIAL_PATH
             value: {{ .Values.app.vault.secretPath }}
           - name: DB_USERNAME
             value: {{ .Values.postgresql.auth.username }}
@@ -171,7 +171,7 @@ spec:
           value: {{ .Values.app.vault.url }}
         - name: VAULT_ROLE
           value: {{ .Values.app.vault.role }}
-        - name: VAULT_SECRET_PATH
+        - name: VAULT_CREDENTIAL_PATH
           value: {{ .Values.app.vault.secretPath }}
         - name: DB_USERNAME
           value: {{ .Values.postgresql.auth.username }}
