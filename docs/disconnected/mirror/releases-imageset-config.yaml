@@ -1,0 +1,25 @@
+# ImageSetConfiguration for the Layered Zero Trust Validated Pattern
+# Section: OpenShift releases
+#
+# Cluster environment: OCP 4.22.7
+#
+# Usage (run each config separately, or combine mirror steps as needed):
+#   oc mirror --v2 --config <this-file> \
+#     docker://registry.internal.example.com \
+#     --remove-signatures=false \
+#     --workspace file:///path/to/mirror/output
+#
+# After mirroring, apply the generated IDMS/ITMS resources to the cluster:
+#   oc apply -f oc-mirror-workspace/results-*/
+#
+apiVersion: mirror.openshift.io/v2alpha1
+kind: ImageSetConfiguration
+mirror:
+
+  platform:
+    channels:
+    - name: stable-4.22
+      type: ocp
+      minVersion: "4.22.7"
+      maxVersion: "4.22.7"
+

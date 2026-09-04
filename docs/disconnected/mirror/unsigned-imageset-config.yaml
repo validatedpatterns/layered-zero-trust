@@ -1,0 +1,18 @@
+# ImageSetConfiguration for the Layered Zero Trust Validated Pattern
+# Section: additionalImages
+#
+# Cluster environment: OCP 4.22.7
+#
+# Usage (run each config separately, or combine mirror steps as needed):
+#   oc mirror --v2 --config <this-file> \
+#     docker://registry.internal.example.com \
+#     --remove-signatures=true \
+#     --workspace file:///path/to/mirror/output
+#
+apiVersion: mirror.openshift.io/v2alpha1
+kind: ImageSetConfiguration
+mirror:
+
+  additionalImages:
+  # HashiCorp Vault (Helm chart: hashicorp-vault, namespace: vault) ---
+  - name: registry.connect.redhat.com/hashicorp/vault:1.21.4-ubi
