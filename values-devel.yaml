@@ -8,22 +8,29 @@ clusterGroup:
   name: devel
   isHubCluster: false
   namespaces:
-    - golang-external-secrets
-    - policies
-    - openshift-pipelines
+    external-secrets-operator:
+      operatorGroup: true
+      targetNamespaces: []
+    external-secrets:
+    policies:
+    openshift-pipelines:
   subscriptions:
+    eso:
+      name: openshift-external-secrets-operator
+      namespace: external-secrets-operator
+      channel: stable-v1
     openshift-pipelines:
       name: openshift-pipelines-operator-rh
       namespace: openshift-operators
-  projects:
+  argoProjects:
     - dev
     - eso
   applications:
-    golang-external-secrets:
-      name: golang-external-secrets
-      namespace: golang-external-secrets
-      project: eso
-      chart: golang-external-secrets
-      chartVersion: 0.1.*
+    openshift-external-secrets:
+      name: openshift-external-secrets
+      namespace: external-secrets
+      argoProject: eso
+      chart: openshift-external-secrets
+      chartVersion: 0.0.*
   sharedValueFiles:
     - '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
