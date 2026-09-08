@@ -1,0 +1,100 @@
+# ImageSetConfiguration for the Layered Zero Trust Validated Pattern
+# Section: operators
+#
+# Cluster environment: OCP 4.22.7
+#
+# Usage (run each config separately, or combine mirror steps as needed):
+#   oc mirror --v2 --config <this-file> \
+#     docker://registry.internal.example.com \
+#     --remove-signatures=false \
+#     --workspace file:///path/to/mirror/output
+#
+# After mirroring, apply the generated IDMS/ITMS resources to the cluster:
+#   oc apply -f oc-mirror-workspace/results-*/
+#
+apiVersion: mirror.openshift.io/v2alpha1
+kind: ImageSetConfiguration
+mirror:
+
+  operators:
+
+  - catalog: registry.redhat.io/redhat/community-operator-index:v4.22
+    packages:
+
+    - name: patterns-operator
+      channels:
+      - name: fast
+        minVersion: "0.0.80"
+
+  - catalog: registry.redhat.io/redhat/redhat-operator-index:v4.22
+    packages:
+
+    - name: advanced-cluster-management
+      defaultChannel: release-2.16
+      channels:
+      - name: release-2.16
+        minVersion: "2.16.3"
+    - name: compliance-operator
+      channels:
+      - name: stable
+        minVersion: "1.9.2"
+    - name: loki-operator
+      channels:
+      - name: stable-6.6
+        minVersion: "6.6.0"
+    - name: multicluster-engine
+      defaultChannel: stable-2.11
+      channels:
+      - name: stable-2.11
+        minVersion: "2.11.6"
+    - name: netobserv-operator
+      channels:
+      - name: stable
+        minVersion: "1.12.2"
+    - name: odf-operator
+      channels:
+      - name: stable-4.22
+        minVersion: "4.22.2-rhodf"
+    - name: openshift-cert-manager-operator
+      channels:
+      - name: stable-v1
+        minVersion: "1.20.0"
+    - name: openshift-external-secrets-operator
+      channels:
+      - name: stable-v1
+        minVersion: "1.2.0"
+    - name: openshift-gitops-operator
+      channels:
+      - name: gitops-1.21
+        minVersion: "1.21.3"
+    - name: openshift-pipelines-operator-rh
+      channels:
+      - name: latest
+        minVersion: "1.23.2"
+    - name: openshift-zero-trust-workload-identity-manager
+      channels:
+      - name: stable-v1
+        minVersion: "1.1.1"
+    - name: quay-operator
+      channels:
+      - name: stable-3.17
+        minVersion: "3.17.4"
+    - name: rhacs-operator
+      channels:
+      - name: stable
+        minVersion: "4.11.3"
+    - name: rhbk-operator
+      defaultChannel: stable-v26.4
+      channels:
+      - name: stable-v26.4
+        minVersion: "26.4.15-opr.1"
+    - name: rhtas-operator
+      channels:
+      - name: stable
+        minVersion: "1.4.3"
+    - name: rhtpa-operator
+      defaultChannel: stable-v1.1
+      channels:
+      - name: stable-v1.1
+        minVersion: "1.1.7"
+

@@ -1,0 +1,78 @@
+# ImageSetConfiguration for the Layered Zero Trust Validated Pattern
+# Section: individual images
+#
+# Cluster environment: OCP 4.22.7
+#
+# Usage (run each config separately, or combine mirror steps as needed):
+#   oc mirror --config <this-file> file:///path/to/mirror/output
+#   oc mirror --config <this-file> docker://registry.internal.example.com
+#
+# After mirroring, apply the generated IDMS/ITMS resources to the cluster:
+#   oc apply -f oc-mirror-workspace/results-*/
+#
+apiVersion: mirror.openshift.io/v2alpha1
+kind: ImageSetConfiguration
+mirror:
+
+  additionalImages:
+  # utility-container: runs pattern.sh make install on the deployment host (not a cluster pod)
+  - name: quay.io/validatedpatterns/utility-container:latest
+  # imperative-container: runs imperative jobs in the cluster (namespace: imperative)
+  - name: quay.io/validatedpatterns/imperative-container:v1
+  # pattern-ui-catalog: required by patterns-operator
+  - name: quay.io/validatedpatterns/pattern-ui-catalog:stable-v1
+  # qtodo demo application (Helm chart: qtodo, namespace: qtodo)
+  - name: quay.io/validatedpatterns/qtodo:latest
+  # UBI Images
+  # Used by init and management Jobs across ztvp-certificates, acs-central,
+  # rh-keycloak, netobserv, supply-chain, and noobaa-mcg charts.
+  - name: registry.access.redhat.com/ubi9/ubi:9.7-1764794285
+  - name: registry.access.redhat.com/ubi9@sha256:a7241cdcd984bccd84b0b5b18ef8643462ef8ca2a491ae5982dac11e1b497319
+  - name: registry.redhat.io/ubi9/ubi-minimal:latest
+  # OpenShift CLI tools
+  # Used in Jobs: CA extraction (ztvp-certificates), ACS auth config,
+  # Keycloak PreSync/PostSync hooks, NetObserv S3 credentials, and
+  # Tekton Chains SPIRE entry registration.
+  - name: registry.redhat.io/openshift4/ose-cli-rhel9:latest
+  - name: registry.redhat.io/openshift4/ose-tools-rhel9:latest
+  # PostgreSQL databases
+  # qtodo-db (RHEL 8 image, charts/qtodo-db)
+  - name: registry.redhat.io/rhel8/postgresql-16:latest
+  # Keycloak internal database (RHEL 9, as deployed on cluster)
+  - name: registry.redhat.io/rhel9/postgresql-15@sha256:23092ec0dd5ece095e79dd5ca74b5870479461c089a9330bb9182fb743374c02
+  # RHTPA database and ACM internal database (RHEL 9 variant)
+  - name: registry.redhat.io/rhel9/postgresql-16@sha256:cb66eb4b438ce3f9db194dd1948ce25dc4142e789025f214324b7baa3c915c05
+  # SPIFFE workload identity sidecars
+  # spiffe-helper-rhel9 is injected as a sidecar by the qtodo Helm chart
+  # for Vault JWT authentication (not deployed by the ZTWIM operator).
+  - name: registry.redhat.io/zero-trust-workload-identity-manager/spiffe-helper-rhel9:v0.10.0
+  # Upstream SPIFFE helper referenced in supply-chain sidecar templates.
+  # In a fully disconnected environment, mirror it separately or override
+  # charts/supply-chain templates to use spiffe-helper-rhel9 instead.
+  - name: ghcr.io/spiffe/spiffe-helper:0.10.1
+  # Python runtime
+  # Used as the Vault-client sidecar in qtodo pods (fetches DB credentials
+  # via SPIFFE JWT from HashiCorp Vault).
+  - name: registry.redhat.io/ubi9/python-311:latest
+  # Supply-chain pipeline task images
+  # Quarkus/Mandrel native compilation (build-app Tekton task)
+  - name: registry.redhat.io/quarkus/mandrel-for-jdk-21-rhel8:23.1-36
+  # Java runtime (pipeline build tasks)
+  - name: registry.redhat.io/ubi9/openjdk-17:latest
+  # Syft SBOM generation (generate-sbom Tekton task)
+  - name: registry.redhat.io/rh-syft-tech-preview/syft-rhel9:1.29.0
+  # Skopeo image copy (push-image Tekton task)
+  - name: registry.access.redhat.com/ubi9/skopeo:9.5-1745865345@sha256:d91eb0dac7308ddfb12193368a42009509925edba80da9ffd3b82d03427dc3ed
+  # UBI used by cosign signing and RHTPA upload tasks
+  - name: registry.access.redhat.com/ubi9/ubi:9.7-1764794285
+
+  # Validated Patterns Helm charts (stored as OCI images)
+  - name: quay.io/validatedpatterns/acm:0.2.11  # acm 0.2.*
+  - name: quay.io/validatedpatterns/clustergroup:0.9.58  # clustergroup 0.9.*
+  - name: quay.io/validatedpatterns/hashicorp-vault:0.1.8  # hashicorp-vault 0.1.*
+  - name: quay.io/validatedpatterns/ocp-certmanager:0.2.0  # ocp-certmanager 0.2.*
+  - name: quay.io/validatedpatterns/ocp-compliance-scanning:0.0.3  # ocp-compliance-scanning 0.0.*
+  - name: quay.io/validatedpatterns/openshift-external-secrets:0.0.4  # openshift-external-secrets 0.0.*
+  - name: quay.io/validatedpatterns/pattern-install:0.0.18  # pattern-install
+  - name: quay.io/validatedpatterns/rhbk:0.1.0  # rhbk
+  - name: quay.io/validatedpatterns/ztwim:0.1.1  # ztwim 0.1.*
