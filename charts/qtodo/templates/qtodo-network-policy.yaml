@@ -33,7 +33,11 @@ spec:
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: openshift-dns
-  # PostgreSQL — qtodo-db pod in the qtodo-db namespace
+# When UDN is enabled, PostgreSQL is reached on the secondary UDN (net1)
+# using the static IP in app.udn.dbIP. Cluster-network egress to 5432 is
+# intentionally omitted so the database path cannot bypass the UDN.
+{{- if eq (include "qtodo.udn.enabled" .) "" }}
+  # PostgreSQL — qtodo-db pod in the qtodo-db namespace (cluster network)
   - ports:
     - protocol: TCP
       port: {{ .Values.postgresql.port }}
@@ -44,6 +48,7 @@ spec:
       podSelector:
         matchLabels:
           app: qtodo-db
+{{- end }}
   # Vault API — SPIFFE JWT auth for DB credentials retrieval
   - ports:
     - protocol: TCP

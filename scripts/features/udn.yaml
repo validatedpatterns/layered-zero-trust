@@ -1,8 +1,12 @@
-# User-Defined Network isolation for qtodo application
-# Provides layer 2/3 network segmentation following Zero Trust principles
+# User-Defined Network isolation for qtodo / qtodo-db
+# Shared Layer2 secondary ClusterUserDefinedNetwork: PostgreSQL is only
+# reachable from qtodo over the CUDN.
 clusterGroup:
-  # Merge UDN configuration into existing qtodo application
   merge_into_applications:
+    qtodo-db:
+      overrides:
+        - name: udn.enabled
+          value: "true"
     qtodo:
       overrides:
         - name: app.udn.enabled

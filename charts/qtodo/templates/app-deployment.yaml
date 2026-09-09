@@ -22,8 +22,8 @@ spec:
         checksum/app-spiffe-helper-config: {{ include (print $.Template.BasePath "/spiffe-helper-config.yaml") . | sha256sum }}
         checksum/app-spiffe-vault-client-config: {{ include (print $.Template.BasePath "/spiffe-vault-client-config.yaml") . | sha256sum }}
 {{- end }}
-{{- if .Values.app.udn.enabled }}
-        k8s.v1.cni.cncf.io/networks: {{ .Release.Namespace }}/{{ .Values.app.udn.nadName }}
+{{- if include "qtodo.udn.enabled" . }}
+        k8s.v1.cni.cncf.io/networks: {{ .Release.Namespace }}/{{ .Values.app.udn.name }}
 {{- end }}
       labels:
         app: qtodo
@@ -218,7 +218,7 @@ spec:
             type: RuntimeDefault
         env:
         - name: QUARKUS_DATASOURCE_JDBC_URL
-          value: 'jdbc:postgresql://{{ .Values.postgresql.host }}:{{ .Values.postgresql.port }}/{{ .Values.postgresql.auth.database }}'
+          value: 'jdbc:postgresql://{{ include "qtodo.dbHost" . }}:{{ .Values.postgresql.port }}/{{ .Values.postgresql.auth.database }}'
         - name: QUARKUS_HTTP_HOST
           value: '0.0.0.0'
         - name: QUARKUS_HTTP_PORT

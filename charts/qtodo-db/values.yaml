@@ -19,6 +19,28 @@ postgresql:
     # qtodo DB password path (app-level isolation)
     passwordVaultKey: secret/data/apps/qtodo/qtodo-db
 
-  # Namespace allowed to connect to PostgreSQL
+  # Namespace allowed to connect to PostgreSQL on the cluster network.
+  # Ignored when udn.enabled is true — PostgreSQL is then reachable only
+  # on the shared secondary UDN (see udn.dbIP).
   allowedClientNamespace: qtodo
   allowedClientApp: qtodo
+
+# Shared secondary User-Defined Network (CUDN) spanning qtodo and qtodo-db.
+# Keep name, subnet, and dbIP in sync with charts/qtodo values (app.udn.*).
+# Kubernetes Services are not supported on secondary UDNs, so qtodo connects
+# to PostgreSQL by the static UDN IP set via network annotation (udn.dbIP).
+udn:
+  enabled: false
+  name: qtodo-isolated-network
+  topology: Layer2
+  role: Secondary
+  subnet: "10.100.0.0/16"
+  mtu: 1400
+  dbIP: "10.100.0.10"
+  namespaces:
+    - qtodo
+    - qtodo-db
+  networkPolicy:
+    # MultiNetworkPolicy on the UDN (requires CNO useMultiNetworkPolicy: true)
+    enabled: true
+    postgresqlPort: 5432

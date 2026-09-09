@@ -2,102 +2,121 @@
 
 ## Overview
 
-User-Defined Networks (UDN) provide layer 2/3 network isolation for workloads in OpenShift, separate from the default cluster network. This feature implements Zero Trust network segmentation principles by creating an isolated network for the qtodo application, restricting communication to only necessary services.
+User-Defined Networks (UDN) provide layer-2 network isolation for workloads in OpenShift, separate from the default cluster network. This feature implements Zero Trust network segmentation for the qtodo multi-tier application now that the frontend (`qtodo`) and PostgreSQL (`qtodo-db`) run in **different namespaces**.
+
+A cluster-scoped `ClusterUserDefinedNetwork` (CUDN) creates a **shared secondary** Layer2 network that both namespaces join. PostgreSQL is reachable from qtodo **only** on that UDN. qtodo keeps the cluster network as its primary interface for everything else (OpenShift router, Vault, OIDC, DNS). qtodo-db's only permitted cluster-network egress is CoreDNS (`5353/tcp` and `5353/udp`).
 
 ## Architecture
 
 ### Network Topology
 
-The UDN implementation creates a dedicated isolated network for qtodo workloads:
-
 ```text
-┌─────────────────────────────────────────────────────┐
-│                      Cluster Network                │
-│  ┌────────────┐    ┌─────────┐    ┌──────────┐      │
-│  │  Router    │───▶│ qtodo   │───▶│ Vault    │      │
-│  │  (Ingress) │    │ (eth0)  │    │ (8200)   │      │
-│  └────────────┘    └────┬────┘    └──────────┘      │
-│                         │                           │
-│                         │ UDN Attachment            │
-└─────────────────────────┼───────────────────────────┘
-                          │
-                    ┌─────▼──────┐
-                    │    UDN     │
-                    │ (net1/     │
-                    │  Layer2)   │
-                    └─────┬──────┘
-                          │
-                ┌─────────┴────────┐
-                │                  │
-          ┌─────▼──────┐      ┌────▼─────┐
-          │ qtodo pod  │      │ qtodo-db │
-          │ (isolated) │──────│  (5432)  │
-          └────────────┘      └──────────┘
-               │
-               └─────────▶ DNS (5353) via cluster network
+┌──────────────────────────────────────────────────────────────┐
+│                     Cluster Network (eth0)                   │
+│  ┌────────────┐     ┌─────────┐     ┌──────────┐             │
+│  │  Router    │────▶│ qtodo   │────▶│ Vault    │             │
+│  │  (Ingress) │     │ (eth0)  │     │ (8200)   │             │
+│  └────────────┘     └────┬────┘     └──────────┘             │
+│                          │                                   │
+│                     OIDC (443), DNS (5353)                   │
+│                                                              │
+│                     ┌───────────┐                            │
+│                     │ qtodo-db  │──── DNS (5353) only        │
+│                     │ (eth0)    │    PostgreSQL denied       │
+│                     └───────────┘                            │
+└──────────────────────────┬───────────────────────────────────┘
+                           │
+              Shared secondary CUDN (net1, Layer2)
+              ClusterUserDefinedNetwork
+              namespaces: qtodo, qtodo-db
+                            │
+              ┌─────────────┴─────────────┐
+              │                           │
+        ┌─────▼──────┐             ┌──────▼────────┐
+        │ qtodo pod  │             │ qtodo-db      │
+        │ (net1)     │─────────────│ (net1,        │
+        │            │    5432     │  10.100.0.10) │
+        └────────────┘             └───────────────┘
 ```
 
 ### Dual Network Interfaces
 
-When UDN is enabled, qtodo pods have two network interfaces:
+| Workload | eth0 (cluster network) | net1 (shared secondary UDN) |
+| --- | --- | --- |
+| **qtodo** | Ingress from OpenShift router. Egress to Vault (8200), OIDC (443), CoreDNS (5353) | JDBC to PostgreSQL at the static UDN IP (`10.100.0.10:5432`) |
+| **qtodo-db** | Egress to CoreDNS (`5353/tcp` and `5353/udp`) only; **no** PostgreSQL ingress | PostgreSQL (`5432/tcp`) from qtodo pods only |
 
-1. **eth0 (Primary - Cluster Network)**
-   - Ingress from OpenShift Router (port 8080)
-   - Egress to Vault (SPIFFE auth, port 8200)
-   - Egress to OIDCs (OIDC back-channel, port 443)
-   - DNS resolution (CoreDNS, port 5353)
+Kubernetes `NetworkPolicy` objects apply only to the cluster network. `MultiNetworkPolicy` objects apply to the CUDN.
 
-2. **net1 (Secondary - UDN)**
-   - PostgreSQL communication (qtodo ↔ qtodo-db, port 5432)
-   - Isolated from other cluster workloads
-   - Layer 2 topology (same subnet across nodes)
+Secondary UDNs do **not** support Kubernetes Services. qtodo therefore uses the PostgreSQL pod's static UDN IP as the JDBC host instead of `qtodo-db.qtodo-db.svc`.
 
 ## Security Benefits
 
-1. **Network Segmentation**: qtodo workloads are isolated from arbitrary cluster traffic
-2. **Explicit Allow-Lists**: AdminNetworkPolicy enforces allow-only-required communication
-3. **Defense in Depth**: Combines with existing NetworkPolicy for dual-layer protection
-4. **Blast Radius Reduction**: Compromise of qtodo cannot pivot to unrelated services
-5. **Compliance**: Supports Zero Trust architecture mandates (NIST 800-207, NIS2, ISO 27001:2022)
+1. **Cross-namespace segmentation**: the database namespace is not on a shared cluster-network path to the application
+2. **Explicit allow-lists**: cluster-network `NetworkPolicy` plus UDN `MultiNetworkPolicy`
+3. **Blast radius reduction**: qtodo-db is completely isolated. It is not accesible from pods other than qtodo pod.
+4. **Compliance**: supports Zero Trust architecture mandates (NIST SP 800-207, NIS2, ISO 27001:2022)
 
 ## Components
 
-UDN is integrated into the qtodo Helm chart (`charts/qtodo`). When enabled, the following resources are created:
+### ClusterUserDefinedNetwork CR
 
-### UserDefinedNetwork CR
+Template: `charts/qtodo-db/templates/udn-cluster-user-defined-network.yaml`
 
-Template: `charts/qtodo/templates/udn-user-defined-network.yaml`
+Created in the `qtodo-db` application (sync-wave 35, before the StatefulSet) so both namespaces receive a NAD before pods start:
 
-Creates the isolated network with Layer2 topology:
-
+- Name: `qtodo-isolated-network`
+- Topology: Layer2, role **Secondary** (qtodo's primary interface stays the cluster network)
 - Subnet: `10.100.0.0/16`
-- MTU: 1400 (avoids fragmentation)
-- IPAM: Persistent IP assignment
-- Sync-wave: 35 (before NAD)
+- Reserved subnet: `10.100.0.0/28` (static DB IP is taken from this range)
+- Namespace selector: `qtodo` and `qtodo-db` (`kubernetes.io/metadata.name`)
+- OVN-Kubernetes creates a `NetworkAttachmentDefinition` of the same name in each selected namespace, do not create NADs by hand
 
-### NetworkAttachmentDefinition
+### Pod attachment
 
-Template: `charts/qtodo/templates/udn-network-attachment-definition.yaml`
+- **qtodo-db** StatefulSet: Multus annotation with a **static** IP (`udn.dbIP`, default `10.100.0.10`)
+- **qtodo** Deployment: Multus annotation attaching to the CUDN-managed NAD (IP allocated from the non-reserved range)
 
-Defines how pods attach to the UDN:
+### Cluster-network NetworkPolicy
 
-- CNI type: `ovn-k8s-cni-overlay`
-- References the UserDefinedNetwork
-- Used via pod annotation `k8s.v1.cni.cncf.io/networks`
-- Sync-wave: 36 (before policies)
+When UDN is enabled:
 
-### AdminNetworkPolicy
+- `qtodo-db-network-policy.yaml` — **no** PostgreSQL ingress on eth0; egress is CoreDNS 5353 only
+- `qtodo-network-policy.yaml` — PostgreSQL egress to the `qtodo-db` namespace is **omitted**; router, Vault, OIDC, and DNS stay on eth0
 
-Template: `charts/qtodo/templates/udn-admin-network-policy.yaml`
+When UDN is disabled, the previous cluster-network PostgreSQL allow rules remain.
 
-Explicit allow-list for UDN traffic:
+### MultiNetworkPolicy (UDN)
 
-- **Ingress**:
-  - OpenShift router (port 8080)
-  - qtodo pods to qtodo-db (port 5432)
-- **Egress**: DNS, PostgreSQL, Vault, Keycloak (HTTPS connections)
-- Priority: 50 (higher = processed first)
-- Sync-wave: 37 (before qtodo app)
+Templates:
+
+- `charts/qtodo-db/templates/udn-multi-network-policy.yaml`
+- `charts/qtodo/templates/udn-multi-network-policy.yaml`
+
+- Default-deny on the UDN in both namespaces
+- Allow PostgreSQL (`5432/tcp`) from `app=qtodo` in `qtodo` to `app=qtodo-db` in `qtodo-db`
+- qtodo is not allowed to receive traffic on the UDN
+- qtodo-db is not allowed UDN egress (DNS stays on eth0)
+
+Requires `spec.useMultiNetworkPolicy: true` on `network.operator.openshift.io/cluster`. When `app.udn.networkPolicy.enabled` is `true` (the default), the `qtodo` chart runs a Job at sync-wave 36 that patches this setting if needed and waits for the Cluster Network Operator to expose the MultiNetworkPolicy API before wave 37 policies sync. If that Cluster Network Operator setting cannot be enabled, set `udn.networkPolicy.enabled` and `app.udn.networkPolicy.enabled` to `false`. UDN membership plus cluster-network `NetworkPolicy` still isolate PostgreSQL.
+
+### Cluster Network Operator patch Job
+
+Template: `charts/qtodo/templates/udn-enable-multi-network-policy-job.yaml`
+
+The job runs in the `default` namespace, which has no NetworkPolicies, so it can reach the Kubernetes API server without extra egress rules.
+
+- Runs when `app.udn.enabled` and `app.udn.networkPolicy.enabled` are both `true`
+- Checks `spec.useMultiNetworkPolicy` on `network.operator.openshift.io/cluster` and skips the patch when already `true`
+- Waits for the `multi-networkpolicies` API to become available (configurable via `app.udn.multiNetworkPolicyJob.waitForReconciliation`)
+- The `qtodo-db` MultiNetworkPolicies (deployed at app-wave 37, before `qtodo` at app-wave 38) carry `SkipDryRunOnMissingResource=true` and will be created successfully once the API is available after the job completes
+
+Manual patch (troubleshooting only):
+
+```bash
+oc patch network.operator.openshift.io cluster --type merge \
+  -p '{"spec":{"useMultiNetworkPolicy":true}}'
+```
 
 ## Enabling UDN
 
@@ -108,110 +127,120 @@ python3 scripts/gen-feature-variants.py \
   --features udn \
   --base values-hub.yaml
 
-# Apply the variant
 cp /tmp/values-hub-udn.yaml values-hub.yaml
 ./pattern.sh make install
 ```
 
+The fragment sets `udn.enabled` on `qtodo-db` and `app.udn.enabled` on `qtodo`.
+
 ### Option 2: Manual Configuration
 
-1. **Enable UDN in the qtodo application** in `values-hub.yaml`:
-
-   ```yaml
-   clusterGroup:
-     applications:
-       qtodo:
-         # ... existing config ...
-         overrides:
-           # ... existing overrides ...
-           - name: app.udn.enabled
-             value: "true"
-   ```
-
-2. **Deploy**:
-
-   ```bash
-   ./pattern.sh make install
-   ```
-
-## Verification
-
-### 1. Check UDN Resources
-
-```bash
-# UserDefinedNetwork
-oc get userdefinednetwork -n qtodo
-NAME                      AGE
-qtodo-isolated-network    5m
-
-# NetworkAttachmentDefinition
-oc get network-attachment-definitions -n qtodo
-NAME            AGE
-qtodo-udn-nad   5m
-```
-
-### 2. Verify Network Policies
-
-```bash
-# AdminNetworkPolicy
-oc get adminnetworkpolicy
-NAME              PRIORITY   AGE
-qtodo-udn-policy  50         5m
-```
-
-### 3. Test Connectivity
-
-```bash
-# DNS resolution (should work via eth0)
-oc exec -n qtodo deploy/qtodo -c qtodo -- getent hosts qtodo-db
-
-# PostgreSQL connectivity (should work via net1)
-oc exec -n qtodo deploy/qtodo -c qtodo -- timeout 5 bash -c '</dev/tcp/qtodo-db/5433 &>/dev/null' && echo "OK"
-
-# Vault API (should work via eth0)
-oc exec -n qtodo deploy/qtodo -c qtodo -- curl -sk https://vault.vault.svc:8200/v1/sys/health
-```
-
-### 4. Verify qtodo Application
-
-```bash
-# Get the route
-QTODO_URL=$(oc get route -n qtodo qtodo -o jsonpath='{.spec.host}')
-
-# Access the application
-curl https://$QTODO_URL
-```
-
-## Configuration Options
-
-UDN is configured via the `app.udn` section in `charts/qtodo/values.yaml`:
-
-| Parameter                        | Description                      | Default                  |
-| -------------------------------- | -------------------------------- | ------------------------ |
-| `app.udn.enabled`                | Enable UDN                       | `false`                  |
-| `app.udn.name`                   | UserDefinedNetwork name          | `qtodo-isolated-network` |
-| `app.udn.nadName`                | NetworkAttachmentDefinition name | `qtodo-udn-nad`          |
-| `app.udn.topology`               | Network topology (Layer2/Layer3) | `Layer2`                 |
-| `app.udn.subnet`                 | CIDR for UDN                     | `10.100.0.0/16`          |
-| `app.udn.mtu`                    | MTU for the network              | `1400`                   |
-| `app.udn.networkPolicy.enabled`  | Enable AdminNetworkPolicy        | `true`                   |
-
-### Layer3 Topology
-
-For larger deployments, Layer3 provides better scalability. Override in `values-hub.yaml`:
+Enable **both** applications in `values-hub.yaml`:
 
 ```yaml
 clusterGroup:
   applications:
+    qtodo-db:
+      overrides:
+        - name: udn.enabled
+          value: "true"
     qtodo:
       overrides:
         - name: app.udn.enabled
           value: "true"
-        - name: app.udn.topology
-          value: "Layer3"
-        - name: app.udn.joinSubnet
-          value: "100.64.0.0/16"
 ```
+
+Then deploy:
+
+```bash
+./pattern.sh make install
+```
+
+## Verification
+
+### 1. Check CUDN and NADs
+
+```bash
+oc get clusteruserdefinednetwork qtodo-isolated-network
+
+oc get network-attachment-definitions -n qtodo
+oc get network-attachment-definitions -n qtodo-db
+```
+
+Both namespaces should show `qtodo-isolated-network`.
+
+### 2. Confirm pod attachments
+
+```bash
+oc get pod -n qtodo -l app=qtodo -o jsonpath='{.items[0].metadata.annotations.k8s\.v1\.cni\.cncf\.io/networks}{"\n"}'
+oc get pod -n qtodo-db -l app=qtodo-db -o jsonpath='{.items[0].metadata.annotations.k8s\.v1\.cni\.cncf\.io/networks}{"\n"}'
+
+oc exec -n qtodo deploy/qtodo -c qtodo -- cat /proc/net/fib_trie | grep -B1 '/32 host LOCAL'
+oc exec -n qtodo-db qtodo-db-0 -c postgres -- cat /proc/net/fib_trie | grep -B1 '/32 host LOCAL'
+```
+
+qtodo-db's `net1` address must be `10.100.0.10`.
+
+### 3. Verify policies
+
+```bash
+oc get networkpolicy -n qtodo
+oc get networkpolicy -n qtodo-db
+oc get multi-networkpolicies.k8s.cni.cncf.io -A
+```
+
+### 4. Test connectivity
+
+```bash
+# DNS from qtodo via eth0
+oc exec -n qtodo deploy/qtodo -c qtodo -- getent hosts vault.vault.svc
+
+# PostgreSQL via UDN static IP (should succeed)
+oc exec -n qtodo deploy/qtodo -c qtodo -- timeout 5 bash -c '</dev/tcp/10.100.0.10/5432' && echo "UDN postgres OK"
+
+# PostgreSQL via cluster-network Service (should fail when UDN is enabled)
+oc exec -n qtodo deploy/qtodo -c qtodo -- timeout 5 bash -c '</dev/tcp/qtodo-db.qtodo-db.svc/5432' || echo "cluster-network postgres blocked"
+
+# DNS from qtodo-db via eth0 (should succeed)
+oc exec -n qtodo-db qtodo-db-0 -c postgres -- getent hosts kubernetes.default.svc
+
+# Vault from qtodo via eth0
+oc exec -n qtodo deploy/qtodo -c qtodo -- curl -sk https://vault.vault.svc:8200/v1/sys/health
+```
+
+### 5. Verify qtodo Application
+
+```bash
+QTODO_URL=$(oc get route -n qtodo qtodo -o jsonpath='{.spec.host}')
+curl -k "https://${QTODO_URL}"
+```
+
+## Configuration Options
+
+CUDN settings live in `charts/qtodo-db/values.yaml`. The qtodo chart only needs the CUDN name and the database UDN IP.
+
+| Parameter | Chart | Description | Default |
+| --- | --- | --- | --- |
+| `udn.enabled` / `app.udn.enabled` | both | Enable the shared UDN | `false` |
+| `udn.name` / `app.udn.name` | both | CUDN and NAD name (must match) | `qtodo-isolated-network` |
+| `udn.dbIP` / `app.udn.dbIP` | both | Static PostgreSQL IP on the UDN (JDBC target) | `10.100.0.10` |
+| `udn.topology` | qtodo-db | Must be `Layer2` | `Layer2` |
+| `udn.role` | qtodo-db | Must be `Secondary` | `Secondary` |
+| `udn.subnet` | qtodo-db | UDN CIDR | `10.100.0.0/16` |
+| `udn.reservedSubnet` | qtodo-db | Range reserved for static assignment | `10.100.0.0/28` |
+| `udn.mtu` | qtodo-db | MTU | `1400` |
+| `udn.namespaces` | qtodo-db | Namespaces that join the CUDN | `qtodo`, `qtodo-db` |
+| `udn.networkPolicy.enabled` / `app.udn.networkPolicy.enabled` | both | Create MultiNetworkPolicy objects | `true` |
+| `app.udn.multiNetworkPolicyJob.namespace` | qtodo | Namespace for the CNO patch Job | `default` |
+| `app.udn.multiNetworkPolicyJob.image.registry` | qtodo | OCI registry for the CNO patch Job | `registry.redhat.io` |
+| `app.udn.multiNetworkPolicyJob.image.repository` | qtodo | Container image path for the CNO patch Job | `openshift4/ose-cli-rhel9` |
+| `app.udn.multiNetworkPolicyJob.image.tag` | qtodo | Image tag for the CNO patch Job | `latest` |
+| `app.udn.multiNetworkPolicyJob.image.pullPolicy` | qtodo | Container image pull policy for the CNO patch Job | `IfNotPresent` |
+| `app.udn.multiNetworkPolicyJob.waitForReconciliation.enabled` | qtodo | Wait for MultiNetworkPolicy API after patch | `true` |
+| `app.udn.multiNetworkPolicyJob.waitForReconciliation.maxRetries` | qtodo | Reconciliation poll attempts | `60` |
+| `app.udn.multiNetworkPolicyJob.waitForReconciliation.intervalSeconds` | qtodo | Seconds between poll attempts | `10` |
+
+Keep `name` and `dbIP` identical in both charts.
 
 ## Security Considerations
 
@@ -219,18 +248,21 @@ clusterGroup:
 
 UDN complements, but does not replace, other security controls:
 
-- **NetworkPolicy**: Still applied on the cluster network (eth0)
-- **Service Mesh**: mTLS can layer on top of UDN
-- **ACS Policies**: Runtime enforcement still active
+- **NetworkPolicy** on the cluster network (eth0)
+- **MultiNetworkPolicy** on the UDN (net1)
+- **ACS policies** for runtime enforcement
+- **SPIFFE / Vault** for database credentials (unchanged)
 
 ### Attack Surface
 
-- UDN pods are still reachable via cluster network (eth0) for ingress/egress to external services
-- AdminNetworkPolicy must be correctly configured to avoid bypasses
-- Pods with `CAP_NET_ADMIN` could potentially manipulate interfaces
-- For integration with IDPs (_Keycloak_, _EntraID_), HTTPS connections to any destination are enabled. In a more secure environment, this rule should be more restrictive and only allow access to specific destinations.
+- qtodo remains reachable on the cluster network for ingress and for egress to Vault and OIDC
+- qtodo-db still has an eth0 address so kubelet probes and CoreDNS work. PostgreSQL on that interface is denied by NetworkPolicy
+- Pods with `CAP_NET_ADMIN` could potentially manipulate interfaces. qtodo and qtodo-db drop `ALL` capabilities
+- If MultiNetworkPolicy is disabled, any pod attached to the CUDN NAD can reach PostgreSQL on net1. Limit NAD use to these two workloads
 
 ## References
 
-- [OpenShift UDN Documentation](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/multiple_networks/understanding-multiple-networks)
+- [OpenShift: Understanding multiple networks](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/multiple_networks/understanding-multiple-networks)
+- [ClusterUserDefinedNetwork API](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/network_apis/clusteruserdefinednetwork-k8s-ovn-org-v1)
+- [Configuring multi-network policies](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/multiple_networks/secondary-networks)
 - [OVN-Kubernetes User-Defined Networks](https://github.com/ovn-kubernetes/ovn-kubernetes/blob/master/docs/features/user-defined-networks/user-defined-networks.md)

@@ -88,3 +88,24 @@ Returns the port the application should list on
 {{ .Values.app.insecurePort }}
 {{- end -}}
 {{- end -}}
+
+{{/*
+True when the shared secondary UDN is enabled (bool or string "true").
+*/}}
+{{- define "qtodo.udn.enabled" -}}
+{{- if eq (.Values.app.udn.enabled | default false | toString) "true" -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{/*
+PostgreSQL host: static UDN IP when UDN is enabled (secondary UDNs do not
+support Kubernetes Services), otherwise the cluster-network Service DNS name.
+*/}}
+{{- define "qtodo.dbHost" -}}
+{{- if include "qtodo.udn.enabled" . -}}
+{{- .Values.app.udn.dbIP -}}
+{{- else -}}
+{{- .Values.postgresql.host -}}
+{{- end -}}
+{{- end -}}

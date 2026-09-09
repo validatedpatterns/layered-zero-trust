@@ -81,7 +81,7 @@ Layer 2 contains the applications and workflows that demonstrate Zero Trust prin
 |---|---|---|
 | **Data Protection (UC-12)** | qtodo app, SPIFFE/SPIRE, Vault, Keycloak, NetworkPolicies | Multi-tier application (Quarkus + PostgreSQL) where database credentials are fetched just-in-time from Vault using SPIFFE workload identity. User access controlled via Keycloak OIDC. Network segmentation via default-deny policies. |
 | **Secure Supply Chain (UC-01/UC-02)** | Tekton, RHTAS, RHTPA, ACS, Quay | Automated pipeline that builds, signs (RHTAS/SPIFFE keyless), verifies, generates SBOM, uploads to RHTPA, and deploys with ACS policy checks at every stage. |
-| **Network Segmentation** | NetworkPolicies, ACS monitoring | Default-deny NetworkPolicies in qtodo, keycloak-system, vault, and ZTWIM namespaces. Per-pod allow rules with explicit justification. ACS monitors for policy violations. |
+| **Network Segmentation** | NetworkPolicies, optional UDN, ACS monitoring | Default-deny NetworkPolicies in qtodo, qtodo-db, keycloak-system, vault, and ZTWIM namespaces. Per-pod allow rules with explicit justification. Optional shared secondary UDN isolates PostgreSQL so qtodo-db is reachable from qtodo only on that network. ACS monitors for policy violations. |
 | **Runtime Threat Detection** | ACS policies | Custom security policies: suspicious exec detection, runtime privilege escalation prevention, network policy enforcement warnings. |
 | **Confidential Computing (CoCo)** | hello-coco, Sandboxed Containers, Trustee/KBS | *Status: Configuration exists but NOT functional.* TEE-based workload protection with sealed secrets via KBS. Requires specific hardware (AMD SEV-SNP). Planned for future enablement. |
 
