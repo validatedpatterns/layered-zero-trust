@@ -182,6 +182,23 @@ This feature configures OIDC for qtodo, RHTAS (Fulcio issuer), RHTPA
 > **Note:** The two features are mutually exclusive — use `entra-id-qtodo`
 > for qtodo-only setups and `entra-id` when the full supply chain is deployed.
 
+## User-Defined Network isolation (`udn`)
+
+Isolates PostgreSQL (`qtodo-db`) on a shared Layer2 secondary
+`ClusterUserDefinedNetwork`. The qtodo application keeps the cluster
+network as its primary interface (router, Vault, OIDC, DNS) and
+reaches the database only on the UDN. qtodo-db cluster-network egress
+is CoreDNS (`5353/tcp` and `5353/udp`) only.
+
+```bash
+python3 scripts/gen-feature-variants.py --features udn
+```
+
+This feature has no dependencies. It sets `udn.enabled` on `qtodo-db`
+and `app.udn.enabled` on `qtodo`. See
+[User-Defined Networks](../docs/user-defined-networks.md) for the
+MultiNetworkPolicy prerequisite and verification steps.
+
 ## How It Works
 
 1. The script reads the base `values-hub.yaml`.

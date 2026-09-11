@@ -569,6 +569,11 @@ clusterGroup:
       path: charts/qtodo-db
       annotations:
         argocd.argoproj.io/sync-wave: "37"
+      # Uncomment together with app.udn.enabled on qtodo to isolate
+      # PostgreSQL on a shared secondary UDN
+      # overrides:
+      #   - name: udn.enabled
+      #     value: "true"
     qtodo:
       name: qtodo
       namespace: qtodo
@@ -597,6 +602,9 @@ clusterGroup:
         # Uncomment to seed the registry with the upstream qtodo image
         # before the supply-chain pipeline runs (avoids ImagePullBackOff on first install)
         # - name: app.seedImage.enabled
+        #   value: "true"
+        # Use PostgreSQL on a shared secondary UDN (also set udn.enabled on qtodo-db)
+        # - name: app.udn.enabled
         #   value: "true"
     # Tekton Chains - Configures Tekton Chains for supply chain security
     # Requires: OpenShift Pipelines operator (openshift-pipelines subscription)

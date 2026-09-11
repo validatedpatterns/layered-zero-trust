@@ -42,3 +42,4 @@ This directory contains the engineering documentation for the Layered Zero Trust
 |---|---|
 | [Private Repositories](private-repos.md) | Deploying the pattern from a private Git repository |
 | [Confidential Containers](CONFIDENTIAL-CONTAINERS.md) | Confidential Containers integration for trusted execution environments |
+| [User-Defined Networks](user-defined-networks.md) | Shared secondary UDN isolating qtodo-db from the cluster network |

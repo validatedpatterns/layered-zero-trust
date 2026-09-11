@@ -20,6 +20,11 @@ spec:
   serviceName: qtodo-db
   template:
     metadata:
+{{- if include "qtodo-db.udn.enabled" . }}
+      annotations:
+        k8s.v1.cni.cncf.io/networks: {{ include "qtodo-db.udn.networksAnnotation" . | quote }}
+        k8s.ovn.org/pod-networks: {{ include "qtodo-db.udn.ovnPodNetworks" . | quote }}
+{{- end }}
       labels:
         app: qtodo-db
     spec:

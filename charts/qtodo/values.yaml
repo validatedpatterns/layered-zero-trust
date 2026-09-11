@@ -114,6 +114,33 @@ app:
     # QTodo truststore password path (app-level isolation)
     vaultPath: "secret/data/apps/qtodo/qtodo-truststore"
 
+  # Shared secondary User-Defined Network (CUDN) with qtodo-db.
+  # The ClusterUserDefinedNetwork CR lives in the qtodo-db chart; this
+  # chart only attaches the app pod and points JDBC at the static UDN IP.
+  # Keep name and dbIP in sync with charts/qtodo-db/values.yaml udn.*.
+  udn:
+    enabled: false
+    name: qtodo-isolated-network
+    # Static UDN IP of the PostgreSQL pod (JDBC target)
+    dbIP: "10.100.0.10"
+    networkPolicy:
+      # MultiNetworkPolicy on the UDN (requires CNO useMultiNetworkPolicy: true)
+      enabled: true
+      postgresqlPort: 5432
+    # Job that patches network.operator.openshift.io/cluster before MultiNetworkPolicy sync.
+    # Runs in the default namespace (no NetworkPolicies) because this is a cluster-wide change.
+    multiNetworkPolicyJob:
+      namespace: default
+      image:
+        registry: registry.redhat.io
+        repository: openshift4/ose-cli-rhel9
+        tag: latest
+        pullPolicy: IfNotPresent
+      waitForReconciliation:
+        enabled: true
+        maxRetries: 60
+        intervalSeconds: 10
+
 # PostgreSQL database configuration
 postgresql:
   name: qtodo-db

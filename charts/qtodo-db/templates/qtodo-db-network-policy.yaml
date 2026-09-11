@@ -10,8 +10,9 @@ spec:
   policyTypes:
   - Ingress
   - Egress
+{{- if eq (include "qtodo-db.udn.enabled" .) "" }}
   ingress:
-  # PostgreSQL — only from qtodo app pods in the qtodo namespace
+  # PostgreSQL — only from qtodo app pods in the qtodo namespace (cluster network)
   - ports:
     - protocol: TCP
       port: {{ .Values.postgresql.port }}
@@ -22,8 +23,13 @@ spec:
       podSelector:
         matchLabels:
           app: {{ .Values.postgresql.allowedClientApp }}
+{{- end }}
+  # When UDN is enabled there is no ingress allow-list: default-deny plus
+  # policyTypes: Ingress blocks PostgreSQL on the cluster network. Clients
+  # must use the shared secondary UDN (see udn-multi-network-policy.yaml).
   egress:
-  # DNS resolution via CoreDNS — OCP uses port 5353 (not 53)
+  # DNS resolution via CoreDNS — OCP uses port 5353 (not 53). This is the
+  # only egress qtodo-db is permitted on the cluster network.
   - ports:
     - protocol: UDP
       port: 5353

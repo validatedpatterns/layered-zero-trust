@@ -1,0 +1,48 @@
+{{- if and (include "qtodo-db.udn.enabled" .) .Values.udn.networkPolicy.enabled }}
+# Default deny on the secondary UDN, then allow PostgreSQL only from qtodo.
+# MultiNetworkPolicy applies to the CUDN-managed NAD, not the cluster network.
+# Requires spec.useMultiNetworkPolicy: true on network.operator.openshift.io/cluster.
+apiVersion: k8s.cni.cncf.io/v1beta1
+kind: MultiNetworkPolicy
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "37"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    k8s.v1.cni.cncf.io/policy-for: {{ .Release.Namespace }}/{{ .Values.udn.name }}
+  name: default-deny-udn
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress: []
+---
+apiVersion: k8s.cni.cncf.io/v1beta1
+kind: MultiNetworkPolicy
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "37"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+    k8s.v1.cni.cncf.io/policy-for: {{ .Release.Namespace }}/{{ .Values.udn.name }}
+  name: allow-qtodo-postgresql
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: qtodo-db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.postgresql.allowedClientNamespace }}
+          podSelector:
+            matchLabels:
+              app: {{ .Values.postgresql.allowedClientApp }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.udn.networkPolicy.postgresqlPort | default .Values.postgresql.port }}
+{{- end }}

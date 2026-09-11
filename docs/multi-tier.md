@@ -89,3 +89,9 @@ The qtodo Helm chart provides options to control how and where TLS communication
 
 > [!NOTE]
 > When using `passthrough` termination with custom certificates, ensure the certificate's Subject Alternative Name (SAN) matches the Route hostname. The Service Serving Certificate feature cannot be used in this mode.
+
+## Optional: User-Defined Network isolation
+
+By default, qtodo reaches PostgreSQL on the cluster network, limited by `NetworkPolicy` to the `qtodo` namespace. To place the database on an isolated Layer2 segment that only qtodo can join, enable the `udn` feature. qtodo continues to use the cluster network for the router, Vault, and OIDC; JDBC uses the PostgreSQL pod's static address on the shared secondary UDN.
+
+See [User-Defined Networks](user-defined-networks.md).

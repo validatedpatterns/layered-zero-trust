@@ -1,0 +1,65 @@
+{{- if and (include "qtodo.udn.enabled" .) .Values.app.udn.networkPolicy.enabled }}
+# Enables spec.useMultiNetworkPolicy on network.operator.openshift.io/cluster
+# before MultiNetworkPolicy objects sync at wave 37.
+# Runs in the default namespace (no NetworkPolicies) because this is a cluster-wide change.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: enable-multi-network-policy
+  namespace: {{ .Values.app.udn.multiNetworkPolicyJob.namespace }}
+  labels:
+    app: enable-multi-network-policy
+  annotations:
+    argocd.argoproj.io/sync-wave: "36"
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  template:
+    metadata:
+      name: enable-multi-network-policy
+      labels:
+        app: enable-multi-network-policy
+    spec:
+      serviceAccountName: enable-multi-network-policy
+      restartPolicy: OnFailure
+      containers:
+        - name: enable-multi-network-policy
+          image: {{ .Values.app.udn.multiNetworkPolicyJob.image.registry }}/{{ .Values.app.udn.multiNetworkPolicyJob.image.repository }}:{{ .Values.app.udn.multiNetworkPolicyJob.image.tag }}
+          imagePullPolicy: {{ .Values.app.udn.multiNetworkPolicyJob.image.pullPolicy }}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              #!/usr/bin/env bash
+              set -euo pipefail
+
+              CURRENT="$(oc get network.operator.openshift.io cluster \
+                -o jsonpath='{.spec.useMultiNetworkPolicy}' 2>/dev/null || true)"
+
+              if [[ "${CURRENT}" == "true" ]]; then
+                echo "spec.useMultiNetworkPolicy is already true — no patch needed"
+              else
+                echo "Enabling spec.useMultiNetworkPolicy on network.operator.openshift.io/cluster"
+                oc patch network.operator.openshift.io cluster --type merge \
+                  -p '{"spec":{"useMultiNetworkPolicy":true}}'
+                echo "Patch applied successfully"
+              fi
+
+              {{- if .Values.app.udn.multiNetworkPolicyJob.waitForReconciliation.enabled }}
+              MAX_RETRIES={{ .Values.app.udn.multiNetworkPolicyJob.waitForReconciliation.maxRetries }}
+              INTERVAL={{ .Values.app.udn.multiNetworkPolicyJob.waitForReconciliation.intervalSeconds }}
+              for i in $(seq 1 "${MAX_RETRIES}"); do
+                if oc api-resources --api-group=k8s.cni.cncf.io 2>/dev/null | grep -q multi-networkpolicies; then
+                  echo "MultiNetworkPolicy API is available (attempt ${i}/${MAX_RETRIES})"
+                  exit 0
+                fi
+                echo "Waiting for CNO to reconcile MultiNetworkPolicy API (${i}/${MAX_RETRIES})..."
+                sleep "${INTERVAL}"
+              done
+              echo "ERROR: timeout waiting for MultiNetworkPolicy API after patch"
+              exit 1
+              {{- else }}
+              exit 0
+              {{- end }}
+      terminationGracePeriodSeconds: 30
+{{- end }}

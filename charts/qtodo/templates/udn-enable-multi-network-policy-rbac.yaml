@@ -1,0 +1,43 @@
+{{- if and (include "qtodo.udn.enabled" .) .Values.app.udn.networkPolicy.enabled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: enable-multi-network-policy
+  namespace: {{ .Values.app.udn.multiNetworkPolicyJob.namespace }}
+  labels:
+    app: enable-multi-network-policy
+  annotations:
+    argocd.argoproj.io/sync-wave: "35"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: enable-multi-network-policy
+  labels:
+    app: enable-multi-network-policy
+  annotations:
+    argocd.argoproj.io/sync-wave: "35"
+rules:
+  - apiGroups: ["operator.openshift.io"]
+    resources: ["networks"]
+    resourceNames: ["cluster"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: enable-multi-network-policy
+  labels:
+    app: enable-multi-network-policy
+  annotations:
+    argocd.argoproj.io/sync-wave: "35"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: enable-multi-network-policy
+subjects:
+  - kind: ServiceAccount
+    name: enable-multi-network-policy
+    namespace: {{ .Values.app.udn.multiNetworkPolicyJob.namespace }}
+{{- end }}

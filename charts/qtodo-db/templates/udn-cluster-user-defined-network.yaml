@@ -1,0 +1,38 @@
+{{- if include "qtodo-db.udn.enabled" . }}
+{{- if ne .Values.udn.topology "Layer2" }}
+{{- fail "qtodo-db UDN supports Layer2 topology only (shared secondary ClusterUserDefinedNetwork)" }}
+{{- end }}
+{{- if ne .Values.udn.role "Secondary" }}
+{{- fail "qtodo-db UDN must use role Secondary so qtodo can keep the cluster network as its primary interface" }}
+{{- end }}
+# Cluster-scoped Layer2 secondary UDN shared by the qtodo and qtodo-db
+# namespaces. OVN-Kubernetes creates a NetworkAttachmentDefinition of the
+# same name in each selected namespace; pods opt in via the
+# k8s.v1.cni.cncf.io/networks annotation. reservedSubnets is not used here
+# because it is only valid for Primary networks.
+apiVersion: k8s.ovn.org/v1
+kind: ClusterUserDefinedNetwork
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "35"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  name: {{ .Values.udn.name }}
+spec:
+  namespaceSelector:
+    matchExpressions:
+      - key: kubernetes.io/metadata.name
+        operator: In
+        values:
+        {{- range .Values.udn.namespaces }}
+          - {{ . | quote }}
+        {{- end }}
+  network:
+    topology: {{ .Values.udn.topology }}
+    layer2:
+      role: {{ .Values.udn.role }}
+      subnets:
+        - {{ .Values.udn.subnet }}
+      {{- if .Values.udn.mtu }}
+      mtu: {{ .Values.udn.mtu }}
+      {{- end }}
+{{- end }}

@@ -50,6 +50,10 @@ features:
     description: "Azure Entra ID for qtodo authentication (no supply-chain)"
     depends_on: []
 
+  udn:
+    description: "User-Defined Network isolation for qtodo / qtodo-db"
+    depends_on: []
+
 # Registry options (only used with supply-chain feature)
 # Each maps to a file under registry/ subdirectory.
 registry_options:

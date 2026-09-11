@@ -1,0 +1,13 @@
+# User-Defined Network isolation for qtodo / qtodo-db
+# Shared Layer2 secondary ClusterUserDefinedNetwork: PostgreSQL is only
+# reachable from qtodo over the CUDN.
+clusterGroup:
+  merge_into_applications:
+    qtodo-db:
+      overrides:
+        - name: udn.enabled
+          value: "true"
+    qtodo:
+      overrides:
+        - name: app.udn.enabled
+          value: "true"
