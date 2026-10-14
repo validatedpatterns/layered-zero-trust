@@ -39,7 +39,7 @@ The ZTVP follows a three-layer architecture model with a foundational platform l
 The base platform provides the deployment substrate and GitOps-driven lifecycle management.
 
 | Component | Description | ZT Contribution |
-|---|---|---|
+| --- | --- | --- |
 | **OpenShift Container Platform (OCP)** | Kubernetes platform with enterprise security features | Platform-level enforcement points for workloads, networking, RBAC, and admission control |
 | **OpenShift GitOps (Argo CD)** | GitOps continuous delivery | Single source of truth — every change is auditable, verifiable, and traceable to a Git commit |
 | **Validated Patterns Operator** | Bootstraps the pattern, manages Hub/Spoke lifecycle | Automated, repeatable deployment with imperative job orchestration |
@@ -49,7 +49,7 @@ The base platform provides the deployment substrate and GitOps-driven lifecycle 
 Layer 0 establishes the core security baseline. These components are always deployed and provide the prerequisite capabilities for all use cases.
 
 | Component | Description | ZT Contribution |
-|---|---|---|
+| --- | --- | --- |
 | **Red Hat Build of Keycloak (RHBK)** | Identity and access management, OIDC provider | Centralized user authentication with SSO, federation (SPIFFE, Entra ID), fine-grained role-based access control. Manages the `ztvp` realm with per-application clients and roles. |
 | **Zero Trust Workload Identity Manager (ZTWIM)** | SPIFFE/SPIRE-based workload identity | Cryptographic, short-lived workload identities (SVIDs) that prove a pod's identity without shared secrets. Enables workload-to-workload mTLS and Vault authentication. |
 | **HashiCorp Vault** | Centralized secret management | Stores all sensitive credentials (DB passwords, OIDC secrets, API keys). Secrets are injected dynamically via SPIFFE identity, never stored as static Kubernetes secrets. |
@@ -65,7 +65,7 @@ Layer 0 establishes the core security baseline. These components are always depl
 Layer 1 components are optional and can be enabled based on the use cases an organization wants to implement. They are activated via the ZTVP feature variant system.
 
 | Component | Description | ZT Contribution | Required For |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **Red Hat Quay** | Private OCI container registry | Secure, trusted repository for container images within the environment. Prevents reliance on external, potentially compromised registries. | Supply chain use case (registry option 1) |
 | **Multicloud Object Gateway (NooBaa MCG)** | S3-compatible object storage | Provides storage backend for Quay, RHTPA, and Network Observability. | Quay, RHTPA, Network Observability |
 | **Red Hat Trusted Artifact Signer (RHTAS)** | Cryptographic signing via Sigstore (Fulcio, Rekor, TUF) | Keyless signing of artifacts and images using SPIFFE workload identity. Transparency log (Rekor) provides tamper-evident record of all signing events. | Supply chain use case |
@@ -78,7 +78,7 @@ Layer 1 components are optional and can be enabled based on the use cases an org
 Layer 2 contains the applications and workflows that demonstrate Zero Trust principles in practice.
 
 | Use Case | Components Used | Description |
-|---|---|---|
+| --- | --- | --- |
 | **Data Protection (UC-12)** | qtodo app, SPIFFE/SPIRE, Vault, Keycloak, NetworkPolicies | Multi-tier application (Quarkus + PostgreSQL) where database credentials are fetched just-in-time from Vault using SPIFFE workload identity. User access controlled via Keycloak OIDC. Network segmentation via default-deny policies. |
 | **Secure Supply Chain (UC-01/UC-02)** | Tekton, RHTAS, RHTPA, ACS, Quay | Automated pipeline that builds, signs (RHTAS/SPIFFE keyless), verifies, generates SBOM, uploads to RHTPA, and deploys with ACS policy checks at every stage. |
 | **Network Segmentation** | NetworkPolicies, optional UDN, ACS monitoring | Default-deny NetworkPolicies in qtodo, qtodo-db, keycloak-system, vault, and ZTWIM namespaces. Per-pod allow rules with explicit justification. Optional shared secondary UDN isolates PostgreSQL so qtodo-db is reachable from qtodo only on that network. ACS monitors for policy violations. |
@@ -130,7 +130,7 @@ Argo CD takes over and deploys all Layer 0 components in a carefully orchestrate
 The qtodo application pod demonstrates the sidecar pattern — security functions are injected alongside the application container without code changes:
 
 | Container | Role | ZT Function |
-|---|---|---|
+| --- | --- | --- |
 | `spiffe-helper` | Identity management | Obtains and rotates SPIFFE SVID (X.509 certificate) from the SPIRE Agent |
 | `spiffe-vault-client` | Secret retrieval | Uses the SPIFFE SVID to authenticate with Vault and retrieve database credentials |
 | `qtodo` | Application | Receives credentials from Vault sidecar; authenticates users via Keycloak OIDC |
@@ -198,7 +198,7 @@ ACS aggregates these findings alongside its own runtime observations, providing 
 #### Journey 1 Summary: Before vs. After
 
 | Aspect | Traditional Deployment | ZTVP Deployment |
-|---|---|---|
+| --- | --- | --- |
 | **Workload Identity** | Shared Kubernetes service accounts | Cryptographic SPIFFE SVIDs per workload |
 | **Database Credentials** | Static Kubernetes Secrets | Dynamic, just-in-time from Vault via SPIFFE |
 | **User Authentication** | Application-managed or none | Centralized Keycloak OIDC with SSO |
@@ -241,7 +241,7 @@ Argo CD deploys all components. The pipeline is pre-configured to build, sign, v
 The Tekton pipeline executes 10 tasks in sequence:
 
 | # | Task | ZT Function |
-|---|---|---|
+| --- | --- | --- |
 | 1 | `git-clone` | Clone source from verified Git repository |
 | 2 | `build-artifact` | Build Java application (Mandrel/Maven native image) |
 | 3 | `buildah-build` | Build container image |
@@ -290,7 +290,7 @@ This provides the evidence needed for compliance audits and risk assessments.
 ACS enforces runtime policies that complement the supply chain controls:
 
 | Policy | Type | Action |
-|---|---|---|
+| --- | --- | --- |
 | Image signature verification | Admission | Block unsigned images from deploying |
 | Privileged container prevention | Admission | Block containers requesting elevated privileges |
 | Suspicious exec detection | Runtime | Alert on unexpected process execution in containers |
@@ -420,7 +420,7 @@ When Network Observability is enabled, the Compliance Officer gains:
 #### Journey 3 Summary: Audit Evidence Map
 
 | Audit Question | ZTVP Evidence Source | Framework |
-|---|---|---|
+| --- | --- | --- |
 | "Are workloads authenticated?" | SPIRE SVID issuance logs, Keycloak authentication logs | NIST 800-207 §2.1, NIST 800-53 IA-2/IA-8 |
 | "Are secrets properly managed?" | Vault audit log, ESO sync records | NIST 800-53 SC-12, SC-28 |
 | "Is the cluster hardened?" | Compliance Operator scan results | NIST 800-53 CM-6, CA-2 |
@@ -439,7 +439,7 @@ When Network Observability is enabled, the Compliance Officer gains:
 NIST SP 800-207 (Section 2.1) defines seven tenets that a Zero Trust Architecture must adhere to. The ZTVP addresses all seven:
 
 | # | Tenet | ZTVP Implementation |
-|---|---|---|
+| --- | --- | --- |
 | 1 | All data sources and computing services are considered resources | Every component (databases, queues, identity providers) is protected independently with its own NetworkPolicies and access controls |
 | 2 | All communication is secured regardless of network location | cert-manager + ZTVP Certificates ensure TLS everywhere; SPIFFE mTLS for workload-to-workload; default-deny NetworkPolicies |
 | 3 | Access to individual enterprise resources is granted on a per-session basis | Vault issues short-lived, per-session credentials; SPIFFE SVIDs have a 1-hour TTL; Keycloak OIDC tokens are time-bounded |
@@ -451,7 +451,7 @@ NIST SP 800-207 (Section 2.1) defines seven tenets that a Zero Trust Architectur
 ### ZTVP Capability to Framework Control Mapping
 
 | ZTVP Capability | NIST SP 800-207 | NIST SP 800-53 Rev 5 | CISA ZTMM v2.0 | EO 14028 | OMB M-22-09 | DoD ZT RA |
-|---|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- | --- |
 | **Workload Identity (SPIFFE/SPIRE)** | §2.1 Tenets 2, 6; §3.1.1 (Enhanced Identity Governance); 800-207A §3 (SPIFFE ID) | IA-3 (Device ID/Auth), IA-3(1) (Crypto Bidirectional Auth), IA-4 (Identifier Mgmt), IA-9 (Service ID/Auth), SC-23 (Session Authenticity) | Identity: Advanced/Optimal; Apps & Workloads: Optimal | §3(a)(b) — ZTA adoption | A.1 (centralized identity), A.3 (device-level signals) | Pillar 1: 1.5 Identity Federation, 1.8 Continuous Auth, 1.9 Integrated ICAM |
 | **Secret Management (Vault + ESO)** | §2.1 Tenets 3, 5, 6; §3.3 (Trust Algorithm) | IA-5 (Authenticator Mgmt), IA-5(7) (No Embedded Static Auth), SC-12 (Crypto Key Mgmt), SC-28 (Info at Rest), SC-28(1) (Crypto Protection) | Identity: Advanced (Credential Mgmt); Data: Advanced (Encryption) | §3(d) — encrypt data | A.2 (MFA enterprise-wide) | Pillar 1: 1.3 MFA, 1.4 PAM |
 | **User Identity (Keycloak OIDC)** | §2.1 Tenets 1, 3, 6; §3.1.1; §6 | IA-2 (User Auth), IA-2(1)(2) (MFA), IA-4 (Identifier Mgmt), IA-8 (Non-Org Users), IA-12 (Identity Proofing), AC-2 (Account Mgmt) | Identity: Advanced/Optimal (Identity Mgmt, Auth, MFA) | §3(b)(d) — ZTA + MFA | A.1 (centralized identity), A.2 (phishing-resistant MFA), A.3 (device signals) | Pillar 1: 1.1 User Inventory, 1.2 Conditional Access, 1.3 MFA, 1.5 Federation, 1.7 Least Privilege |
@@ -469,7 +469,7 @@ NIST SP 800-207 (Section 2.1) defines seven tenets that a Zero Trust Architectur
 ### Coverage Summary by Framework
 
 | Framework | Controls Addressed | Coverage Level |
-|---|---|---|
+| --- | --- | --- |
 | **NIST SP 800-207** | 7 of 7 tenets; §3.1.1 (Enhanced Identity), §3.1.2 (Micro-Segmentation), §3.1.3 (SDP), §3.3 (Trust Algorithm), §4.2 (Multi-cloud); 800-207A §3 (SPIFFE) | **High** — all core ZTA tenets implemented with concrete enforcement across three deployment approaches |
 | **NIST SP 800-53 Rev 5** | 45+ controls with sub-controls across 12 families (IA, AC, SC, CM, AU, CA, SI, RA, SA, SR, PL, PM) | **High** — comprehensive coverage including sub-controls (e.g., SC-7(5) deny-by-default, IA-3(1) crypto auth, SI-7(15) code auth) |
 | **CISA ZTMM v2.0** | 5 of 5 pillars + 3 of 3 cross-cutting capabilities; majority at Advanced/Optimal | **Advanced-to-Optimal** across Identity, Network, Apps & Workloads; **Advanced** across Governance, A&O, V&A |
@@ -482,7 +482,7 @@ NIST SP 800-207 (Section 2.1) defines seven tenets that a Zero Trust Architectur
 ### Framework Gap Analysis
 
 | Framework Area | Current Gap | How to Address |
-|---|---|---|
+| --- | --- | --- |
 | **CISA ZTMM — Devices** | ZTVP does not manage device trust (laptop MDM, OS patching) | Out of scope for a Kubernetes pattern; addressed by enterprise endpoint management |
 | **OMB M-22-09 — Action 2** (Devices) | No device health check before granting access | Same as above; could partially address with OCP node attestation |
 | **OMB M-22-09 — Action 6** (DNS) | No encrypted DNS enforcement | Could add DNS-over-TLS configuration in future |
@@ -496,7 +496,7 @@ NIST SP 800-207 (Section 2.1) defines seven tenets that a Zero Trust Architectur
 ### Implemented Use Cases
 
 | ID | Use Case | Status | ZTVP Components | Layer |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | UC-12 | **Data Protection** | **Fully Implemented** | qtodo app, SPIFFE/SPIRE, Vault, Keycloak OIDC, NetworkPolicies, cert-manager | L0 + L2 |
 | UC-01 | **DevSecOps (Pipeline)** | **Implemented** (optional feature set) | Tekton, Tekton Chains, RHTAS, ACS admission/runtime policies | L1 + L2 |
 | UC-02 | **Supply Chain** | **Implemented** (optional feature set) | RHTAS signing, RHTPA SBOM analysis, Rekor transparency log, Quay | L1 + L2 |
@@ -505,7 +505,7 @@ NIST SP 800-207 (Section 2.1) defines seven tenets that a Zero Trust Architectur
 ### Planned / Future Use Cases
 
 | ID | Use Case | Status | Notes | Dependencies |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | UC-04 | **Privacy Protection** | Planned | CoCo integration exists but non-functional. Requires TEE hardware (AMD SEV-SNP) and updated configuration. | Hardware, CoCo operator maturity |
 | UC-05 | **AI in Org** | Not Started | Would require RHOAI integration, data segregation controls, model provenance tracking. | RHOAI, CoCo for model protection |
 | UC-03 | **Hybrid Cloud** | Not Started | Currently single-cluster. Would require SPIFFE federation across cloud providers, multi-cluster Vault. | Multi-cloud infrastructure |
@@ -524,7 +524,7 @@ NIST SP 800-207 (Section 2.1) defines seven tenets that a Zero Trust Architectur
 ### Key Personas and Use Case Alignment
 
 | Persona | Primary Use Cases | ZTVP Journey |
-|---|---|---|
+| --- | --- | --- |
 | **Platform Engineer** | UC-12 (Data Protection), UC-06 (Control Plane) | Journey 1: Deploy Zero Trust Application |
 | **Security Architect** | UC-01 (DevSecOps), UC-02 (Supply Chain) | Journey 2: Secure Supply Chain |
 | **CISO / Compliance Officer** | UC-06 (Control Plane), all use cases | Journey 3: Audit Zero Trust Posture |
@@ -538,7 +538,7 @@ NIST SP 800-207 (Section 2.1) defines seven tenets that a Zero Trust Architectur
 The ZTVP uses a feature variant system that allows organizations to compose their deployment by enabling specific feature sets. Features are declared in `scripts/features/` and composed into the final `values-hub.yaml`.
 
 | Feature Flag | Components Added | Dependencies |
-|---|---|---|
+| --- | --- | --- |
 | `storage` | ODF operator, NooBaa MCG | None |
 | `quay` | Quay operator + chart | `storage` |
 | `rhtas` | RHTAS operator + chart | None |
@@ -553,7 +553,7 @@ The ZTVP uses a feature variant system that allows organizations to compose thei
 ## Appendix B: ZTVP Deployment Variants
 
 | Variant | Description | Use Case |
-|---|---|---|
+| --- | --- | --- |
 | `values-hub.yaml` | Primary hub cluster | Full ZTVP deployment |
 | `values-devel.yaml` | Development spoke cluster | Minimal with ESO + Pipelines |
 | `values-group-one.yaml` | Generic spoke cluster | Minimal with ESO only |

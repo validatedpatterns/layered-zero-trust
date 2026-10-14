@@ -13,7 +13,7 @@ When the ZTVP pattern is deployed with SPIRE's default self-signed CA (no upstre
 The SPIRE server is configured with a self-signed CA with the following TTLs (from the `spire-server` ConfigMap in the `zero-trust-workload-identity-manager` namespace):
 
 | Parameter | Value | Description |
-|---|---|---|
+| --- | --- | --- |
 | `ca_ttl` | `24h` | Lifetime of the self-signed X509 CA certificate |
 | `default_x509_svid_ttl` | `1h` | Lifetime of X509 SVIDs issued to workloads |
 | `default_jwt_svid_ttl` | `5m` | Lifetime of JWT SVIDs issued to workloads |

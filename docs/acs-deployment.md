@@ -8,7 +8,7 @@
 
 | Name | Email | URL |
 | ---- | ------ | --- |
-| Validated Patterns Team | <validatedpatterns@googlegroups.com> |  |
+| Validated Patterns Team | <validatedpatterns@googlegroups.com> | |
 
 ## Overview
 
@@ -53,7 +53,7 @@ The ACS deployment in the Layered Zero Trust pattern is implemented using:
 ACS Central exposes two OpenShift routes with different TLS termination modes:
 
 | Route | TLS Mode | Purpose |
-|---|---|---|
+| --- | --- | --- |
 | `central` | Passthrough | Sensor/SecuredCluster gRPC communication (mTLS) |
 | `central-reencrypt` | Reencrypt | Browser UI access using cluster wildcard certificate |
 
