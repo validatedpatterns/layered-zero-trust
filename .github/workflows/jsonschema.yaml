@@ -30,7 +30,7 @@ jobs:
           pip install check-jsonschema
 
       - name: Install yq
-        uses: chrisdickinson/setup-yq@051a38e294d971e4d17d7a702d3e95a184593665 # v1.0.1
+        uses: chrisdickinson/setup-yq@3d931309f27270ebbafd53f2daee773a82ea1822 # v1.0.1
         with:
           yq-version: v4.30.7
 
