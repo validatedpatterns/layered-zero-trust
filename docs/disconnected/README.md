@@ -145,7 +145,7 @@ oc apply -f mirror/unsigned/working-dir/cluster-resources/
 
 Argo CD Applications in this pattern reference
 `https://github.com/validatedpatterns/layered-zero-trust.git` at branch `main`.
-Mirror the repository to an internal Git server (Gitlab, Gitea, etc.)
+Mirror the repository to an internal Git server (GitLab, Gitea, etc.)
 and keep it in sync.
 
 ### One-time mirror

@@ -76,11 +76,11 @@ The output directory is created automatically if it does not exist.
 
 ## Registry Options (supply-chain only)
 
-| Option | Description                 | Notes                                      |
-| ------ | --------------------------- | ------------------------------------------ |
-| 1      | Built-in Quay registry      | Deploys Quay inside the cluster            |
-| 2      | BYO / external registry     | Uses an external registry (e.g. quay.io)   |
-| 3      | Embedded OpenShift image registry | Uses the built-in OpenShift image registry |
+| Option | Description                       | Notes                                       |
+| ------ | --------------------------------- | ------------------------------------------- |
+| 1      | Built-in Quay registry            | Deploys Quay inside the cluster             |
+| 2      | BYO / external registry           | Uses an external registry (e.g. quay.io)    |
+| 3      | Embedded OpenShift image registry | Uses the built-in OpenShift image registry  |
 
 > **Note:** The registry option fragments use generic `org/image-name`
 > placeholders in the `repository` field. When a feature defines `org`

@@ -104,7 +104,7 @@ def test_quay_deployment(openshift_dyn_client):
     quay_obc = pattern_crd.ObjectBucketClaim(
         client=openshift_dyn_client, namespace=quay_namespace, name=quay_obc_name
     )
-    err_msg = f'FAIL: ObjectBucketClaim "{quay_obc_name}" not found in namesapce "{quay_namespace}"!'
+    err_msg = f'FAIL: ObjectBucketClaim "{quay_obc_name}" not found in namespace "{quay_namespace}"!'
     assert quay_obc.exists, err_msg
     err_msg = f'FAIL: ObjectBucketClaim "{quay_obc_name}" is not in "Bound" status!'
     assert quay_obc.status == "Bound", err_msg

@@ -143,11 +143,11 @@ These parameters are set in the `global.registry` block at the top of `values-hu
 
 Registry credentials are stored at different paths based on registry type:
 
-| Registry Type | Vault Path                                     | Password Key         |
-| ------------- | ---------------------------------------------- | -------------------- |
-| Built-in Quay | `secret/data/hub/infra/quay/quay-users`        | `quay-user-password` |
-| BYO Registry  | `secret/data/hub/infra/registry/registry-user` | `registry-password`  |
-| Embedded OpenShift | `secret/data/hub/infra/registry/registry-user` | `registry-password`  |
+| Registry Type        | Vault Path                                     | Password Key         |
+| -------------------- | ---------------------------------------------- | -------------------- |
+| Built-in Quay        | `secret/data/hub/infra/quay/quay-users`        | `quay-user-password` |
+| BYO Registry         | `secret/data/hub/infra/registry/registry-user` | `registry-password`  |
+| Embedded OpenShift   | `secret/data/hub/infra/registry/registry-user` | `registry-password`  |
 
 Set `global.registry.vaultPath` and `global.registry.passwordVaultKey` in the `global.registry` block to match your scenario. When `global.registry.enabled` is false or unset (default), no registry auth secret is created (fresh install state).
 
@@ -211,10 +211,10 @@ The `ztvp-certificates` application handles this by patching `image.config.opens
 
 Set `<registry-hostname>` to match your registry option:
 
-| Option                  | Registry Hostname                                             |
-| ----------------------- | ------------------------------------------------------------- |
-| Option 1: Built-in Quay | `quay-registry-quay-quay-enterprise.apps.<clusterDomain>`     |
-| Option 3: Embedded OpenShift  | `default-route-openshift-image-registry.apps.<clusterDomain>` |
+| Option                         | Registry Hostname                                             |
+| ------------------------------ | ------------------------------------------------------------- |
+| Option 1: Built-in Quay        | `quay-registry-quay-quay-enterprise.apps.<clusterDomain>`     |
+| Option 3: Embedded OpenShift   | `default-route-openshift-image-registry.apps.<clusterDomain>` |
 
 > **Note**: Option 2 (BYO/External Registry) does not require `imagePullTrust` because external registries like quay.io and ghcr.io use publicly trusted certificates.
 

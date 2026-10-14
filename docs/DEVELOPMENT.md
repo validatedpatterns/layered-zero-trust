@@ -7,8 +7,8 @@ This document describes recommended practices for developing and testing against
 This pattern is tested and supported on the following OpenShift Container Platform versions:
 
 | OCP Stream | Status | Notes |
-|---|---|---|
-| **< 4.20** | Usupported | |
+| --- | --- | --- |
+| **< 4.20** | Unsupported | |
 | **4.20** | Supported | Tested and verified |
 | **4.21** | Supported | Tested and verified |
 | **4.22** | Supported | Tested and verified |
@@ -138,7 +138,7 @@ oc exec -n vault vault-0 -- env VAULT_TOKEN="$VAULT_TOKEN" \
 Secrets are organized by component under the `secret/` KV mount. The table below lists the paths relevant to testing the default pattern deployment.
 
 | Path | Contents |
-|---|---|
+| --- | --- |
 | `secret/apps/qtodo/qtodo-db` | `admin-password`, `db-password` — PostgreSQL credentials for the qtodo-db deploy |
 | `secret/apps/qtodo/qtodo-truststore` | `truststore-password` — Keycloak TLS truststore password for qtodo |
 | `secret/hub/infra/keycloak/keycloak` | `admin-password`, `db-password` — Keycloak admin (username: `admin`) and database credentials |

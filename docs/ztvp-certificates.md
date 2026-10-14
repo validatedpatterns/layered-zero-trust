@@ -31,7 +31,7 @@ certificates are available before any workload that needs TLS verification.
 ### Kubernetes Resources
 
 | Resource | Purpose |
-|---|---|
+| --- | --- |
 | **ServiceAccount / RBAC** | Grants the extraction Job read access to secrets, configmaps, ingresscontrollers, and proxy across namespaces |
 | **ConfigMap (script)** | Holds the templated `extract-certificates.sh` script |
 | **Job (initial)** | Runs once at first sync to populate the CA bundle |
@@ -46,7 +46,7 @@ phase is independently gated by values, so the script adapts to the active
 configuration.
 
 | Phase | Gate | What It Does |
-|---|---|---|
+| --- | --- | --- |
 | 1 -- Custom CA | `customCA.secretRef.enabled` | Reads a user-supplied secret and writes `custom-ca.crt` |
 | 2 -- Ingress CA | `autoDetect` | Loops over every `IngressController`, extracts `tls.crt` from the referenced or default router secret |
 | 3 -- Service CA | `autoDetect` | Reads `openshift-service-ca.crt` ConfigMap |
@@ -260,7 +260,7 @@ When certificates are updated, consuming workloads need to pick up the new
 bundle. The chart supports three rollout strategies:
 
 | Strategy | Behavior |
-|---|---|
+| --- | --- |
 | `labeled` (default) | Restarts Deployments/StatefulSets matching `ztvp.io/uses-certificates: "true"` in distribution target namespaces |
 | `all` | Restarts all Deployments/StatefulSets in target namespaces |
 | `specific` | Restarts only the named resources listed in `rollout.targets` |
@@ -278,7 +278,7 @@ metadata:
 The chart's resources are ordered within the Argo CD sync:
 
 | Order | Resources |
-|---|---|
+| --- | --- |
 | 1st | ServiceAccount, RBAC (Role, RoleBinding, ClusterRole, ClusterRoleBinding) |
 | 2nd | Initial Job, CronJob, ConfigMap (script) |
 | 3rd | ManagedClusterSetBinding |
@@ -293,7 +293,7 @@ on the CA bundle.
 ### Top-Level Values
 
 | Value | Default | Description |
-|---|---|---|
+| --- | --- | --- |
 | `enabled` | `true` | Master toggle for all chart resources |
 | `autoDetect` | `true` | Auto-detect ingress, service, and cluster CAs from OpenShift |
 | `configMapName` | `ztvp-trusted-ca` | Name of the output ConfigMap |
@@ -310,7 +310,7 @@ on the CA bundle.
 ### Platform Override Files
 
 | File | When Applied | Effect |
-|---|---|---|
+| --- | --- | --- |
 | `overrides/values-ztvp-certificates.yaml` | Always | Additional CAs, rollout config |
 | `overrides/values-ztvp-certificates-BareMetal.yaml` | `clusterPlatform == BareMetal` | Confirms `proxyCA` (redundant; default is already `true`) |
 | `overrides/values-ztvp-certificates-VSphere.yaml` | `clusterPlatform == VSphere` | Confirms `proxyCA` (redundant; default is already `true`) |

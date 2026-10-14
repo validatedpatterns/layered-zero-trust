@@ -54,7 +54,7 @@ Secondary UDNs do **not** support Kubernetes Services. qtodo therefore uses the 
 
 1. **Cross-namespace segmentation**: the database namespace is not on a shared cluster-network path to the application
 2. **Explicit allow-lists**: cluster-network `NetworkPolicy` plus UDN `MultiNetworkPolicy`
-3. **Blast radius reduction**: qtodo-db is completely isolated. It is not accesible from pods other than qtodo pod.
+3. **Blast radius reduction**: qtodo-db is completely isolated. It is not accessible from pods other than qtodo pod.
 4. **Compliance**: supports Zero Trust architecture mandates (NIST SP 800-207, NIS2, ISO 27001:2022)
 
 ## Components
