@@ -18,6 +18,7 @@ jobs:
       packages: write # Allows writing to packages
       id-token: write # Allows creating OpenID Connect (OIDC) tokens
     secrets:
+      METADATA_SYNC_PRIVATE_KEY: ${{ secrets.METADATA_SYNC_PRIVATE_KEY }}
       DOCS_TOKEN: ${{ secrets.DOCS_TOKEN }}
     # For testing you can point to a different branch in the docs repository
     # with:
