@@ -214,15 +214,24 @@ Charts marked **(external)** have been externalized to standalone repositories m
 | keycloak.yaml | 5 | 36 |
 | keycloak-realm-import.yaml | 10 | 41 |
 
-### quay-registry — **(external)** `quay-chart` v0.1.3 — App wave: 41
+### quay-registry — **(external)** `quay-chart` v0.2.0 — App wave: 41
 
 | Resource | Old | Current |
 | --- | ---: | ---: |
+| mcg-backingstore.yaml (`objectStorage.mode=mcg`) | — | 32 |
+| mcg-noobaa.yaml | — | 33 |
+| mcg-bucketclass.yaml | — | 34 |
 | object-bucket-claim.yaml | 5 | 36 |
 | quay-s3-setup-serviceaccount.yaml (5 resources) | 6 | 37 |
 | quay-config-bundle-secret.yaml | 7 | 38 |
-| quay-s3-credentials-job.yaml | 8 | 39 |
+| quay-s3-credentials-job.yaml (ConfigMap + Job) | 8 | 38–39 |
+| quay-config-rbac.yaml (SA, Role, RoleBinding) | — | 40 |
+| quay-config-configmap.yaml | — | 40 |
+| quay-config-externalsecret.yaml | — | 40 |
 | quay-registry.yaml | 10 | 41 |
+| quay-config-job.yaml | — | 42 |
+| quay-config-cronjob.yaml | — | 43 |
+| console-link.yaml | — | 44 |
 
 ### acs-central (`charts/acs-central/templates/`) — App wave: 41
 

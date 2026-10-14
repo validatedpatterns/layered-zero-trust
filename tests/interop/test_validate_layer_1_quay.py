@@ -22,8 +22,8 @@ logger = logging.getLogger(__loggername__)
 
 quay_app_name = "quay-registry-quay"
 quay_namespace = "quay-enterprise"
-quay_admin_username = "quayadmin"
-quay_admin_email = "quayadmin@example.com"
+quay_admin_username = "quay-admin"
+quay_admin_email = "quay-admin@example.com"
 quay_admin_password = "securepassword"
 
 
@@ -313,7 +313,7 @@ def test_quay_validate_registry_operations(openshift_dyn_client):
 set -e
 QUAY_HOSTNAME="{quay_route.host}"
 SRC_IMAGE="quay.io/quay/busybox:latest"
-DST_IMAGE="$QUAY_HOSTNAME/quayadmin/test-busybox:latest"
+DST_IMAGE="$QUAY_HOSTNAME/quay-admin/test-busybox:latest"
 podman login --tls-verify=false --username "{quay_admin_username}" --password {quay_admin_password} $QUAY_HOSTNAME
 # pull a public image
 podman pull --tls-verify=false $SRC_IMAGE

@@ -1,0 +1,26 @@
+# Values for the external quay Helm chart (validatedpatterns/quay-chart) v0.2+
+# Referenced via extraValueFiles on clusterGroup.applications.quay-registry.
+#
+# objectStorage.mode odf consumes the NooBaa MCG from the storage feature
+# (applications.noobaa-mcg). Use mode mcg only when Quay is deployed without
+# charts/noobaa-mcg (standalone Quay + object storage).
+
+objectStorage:
+  mode: odf
+
+quayConfig:
+  enabled: true
+  credentials:
+    key: secret/data/hub/infra/quay/quay-users
+  users:
+    - name: quay-admin
+      email: quay-admin@example.com
+      passwordProperty: quay-admin-password
+      superuser: true
+      initialize: true
+  organizations:
+    - name: ztvp
+      email: ztvp@example.com
+  repositories:
+    - name: ztvp/qtodo
+      visibility: private

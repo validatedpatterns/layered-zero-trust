@@ -17,6 +17,7 @@ clusterGroup:
         argocd.argoproj.io/sync-wave: "27"
 
   applications:
+    # Shared MCG for Quay (objectStorage.mode=odf), RHTPA, netobserv, etc.
     noobaa-mcg:
       name: noobaa-mcg
       namespace: openshift-storage

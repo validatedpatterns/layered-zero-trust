@@ -67,24 +67,22 @@ The updated setting will become enabled upon next login.
 
 ### Reducing the storage required
 
-By default, NooBaa requires 100 Gi of disk space: 50 Gi for the database and 50 Gi for the default `BackingStore`. While this might make sense for production, in our development environment we will only be using a few images for testing, so it may be excessive.
+By default, NooBaa requires 100 Gi of disk space: 50 Gi for the database and 50 Gi for the default `BackingStore`. While this might make sense for production, in a development environment only a few images are used for testing, so it may be excessive.
 
-If we want to save some space, we can add these overrides to the `noobaa-mcg` component in the `values-hub.yaml` file:
+If we want to save some space, we can add these overrides for the Quay registry in `overrides/values-quay.yaml`:
 
 ```yaml
-    noobaa-mcg:
-      name: noobaa-mcg
-      namespace: openshift-storage
-      project: hub
-      path: charts/noobaa-mcg
-      annotations:
-        argocd.argoproj.io/sync-wave: "36"
-      overrides:
-        - name: noobaa.dbSize
-          value: 10Gi
-        - name: noobaa.pvPool.resources.requests.storage
-          value: 25Gi
+objectStorage:
+  mode: odf
+  mcg:
+    dbSize: 10Gi
+    pvPool:
+      resources:
+        requests:
+          storage: 25Gi
 ```
+
+This sets the NooBaa database to 10 Gi and the backing store pool to 25 Gi. To adjust these further, edit the `objectStorage.mcg` section in `overrides/values-quay.yaml`.
 
 ## Accessing Credentials for Testing
 

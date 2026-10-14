@@ -1,5 +1,6 @@
-# Red Hat Quay container registry
-# Depends on: storage (ODF + NooBaa MCG for backend)
+---
+# Red Hat Quay container registry (validatedpatterns/quay-chart v0.2+)
+# Depends on: storage (ODF + noobaa-mcg). overrides/values-quay.yaml uses objectStorage.mode=odf.
 clusterGroup:
   namespaces:
     quay-enterprise:
@@ -21,11 +22,8 @@ clusterGroup:
       namespace: quay-enterprise
       project: hub
       chart: quay
-      chartVersion: 0.1.*
+      chartVersion: 0.2.*
+      extraValueFiles:
+        - /overrides/values-quay.yaml
       annotations:
         argocd.argoproj.io/sync-wave: "41"
-      overrides:
-      - name: job.image
-        value: "registry.redhat.io/openshift4/ose-cli-rhel9:latest"
-      - name: job.resources.limits.memory
-        value: "512Mi"

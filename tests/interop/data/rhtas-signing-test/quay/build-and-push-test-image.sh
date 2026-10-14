@@ -32,12 +32,12 @@ podman build -t test-app:v1 .
 podman images | grep test-app
 
 # Tag the image for Quay registry
-# Namespace is either the username (e.g., quayadmin) or an organization (e.g., developer1)
+# Namespace is either the username (e.g., quay-admin) or an organization (e.g., developer1)
 
 # If using organization 'developer1':
 export QUAY_NAMESPACE="developer1"
-# If using your user 'quayadmin':
-# export QUAY_NAMESPACE="quayadmin"
+# If using your user 'quay-admin':
+# export QUAY_NAMESPACE="quay-admin"
 
 export QUAY_IMAGE="${QUAY_URL}/${QUAY_NAMESPACE}/test-app:v1"
 podman tag test-app:v1 ${QUAY_IMAGE}

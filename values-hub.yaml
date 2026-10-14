@@ -25,9 +25,9 @@ spire:
 #     enabled: true
 #     domain: quay-registry-quay-quay-enterprise.apps.{{ .Values.global.clusterDomain }}
 #     repository: ztvp/qtodo
-#     user: quay-user
+#     user: quay-admin
 #     vaultPath: "secret/data/hub/infra/quay/quay-users"
-#     passwordVaultKey: "quay-user-password"
+#     passwordVaultKey: "quay-admin-password"
 # OPTION 2: BYO/External Registry (quay.io, ghcr.io, etc.)
 # global:
 #   registry:
@@ -376,7 +376,7 @@ clusterGroup:
         argocd.argoproj.io/sync-wave: "25"
     # Shared Object Storage Backend
     # Required for RHTPA, QUAY, and Network Observability (provides S3-compatible storage via NooBaa MCG)
-    # NooBaa MCG provides S3-compatible object storage for multiple applications
+    # NooBaa MCG provides S3-compatible object storage for Quay, RHTPA, and others.
     # noobaa-mcg:
     #   name: noobaa-mcg
     #   namespace: openshift-storage
@@ -430,20 +430,17 @@ clusterGroup:
     #         - /spec/loki/writeTimeout
     #         - /spec/processor
     #         - /spec/prometheus
-    # Quay Container Registry (uses NooBaa for storage)
+    # Quay Container Registry (uses NooBaa from noobaa-mcg; see overrides/values-quay.yaml)
     # quay-registry:
     #   name: quay-registry
     #   namespace: quay-enterprise
     #   argoProject: hub
     #   chart: quay
-    #   chartVersion: 0.1.*
+    #   chartVersion: 0.2.*
+    #   extraValueFiles:
+    #     - /overrides/values-quay.yaml
     #   annotations:
-    #     argocd.argoproj.io/sync-wave: "41"  # Deploy after NooBaa storage backend
-    #   overrides:
-    #   - name: job.image
-    #     value: "registry.redhat.io/openshift4/ose-cli-rhel9:latest"
-    #   - name: job.resources.limits.memory
-    #     value: "512Mi"
+    #     argocd.argoproj.io/sync-wave: "41"
     # RHTAS with SPIFFE Integration
     # COMMENTED OUT: Uncomment to enable RHTAS with SPIFFE and Email issuers
     # Depends on: Vault, SPIRE, Keycloak (for Email OIDC issuer if used)
@@ -641,9 +638,6 @@ clusterGroup:
     #  overrides:
     #    # Registry credentials are inherited from global.registry.
     #    # Only set app-specific overrides below.
-    #    # Built-in Quay: uncomment to enable the Quay user provisioner CronJob
-    #    # - name: quay.enabled
-    #    #   value: "true"
     #    # Built-in Quay: self-signed certs require TLS verify off
     #    # - name: registry.tlsVerify
     #    #   value: "false"
