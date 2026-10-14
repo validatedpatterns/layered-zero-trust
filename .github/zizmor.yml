@@ -1,7 +1,0 @@
-# zizmor config: https://docs.zizmor.sh/configuration/
-rules:
-  secrets-inherit:
-    ignore:
-      # Reusable metadata-docs workflow needs org/repo secrets (e.g. METADATA_SYNC_PRIVATE_KEY)
-      # that are not declared in workflow_call; explicit forwarding is not practical here.
-      - update-metadata.yml
