@@ -96,9 +96,12 @@ OPERATORS: list = [
     OperatorSpec("netobserv-operator", "stable", "redhat-operators", optional=True),
     # Optional — secure supply chain
     OperatorSpec(
-        "openshift-pipelines-operator-rh", "latest", "redhat-operators", optional=True
+        "openshift-pipelines-operator-rh",
+        "pipelines-1.23",
+        "redhat-operators",
+        optional=True,
     ),
-    OperatorSpec("rhtas-operator", "stable", "redhat-operators", optional=True),
+    OperatorSpec("rhtas-operator", "stable-v1.4", "redhat-operators", optional=True),
     OperatorSpec("rhtpa-operator", "stable-v1.1", "redhat-operators", optional=True),
     # Optional — registry
     OperatorSpec("quay-operator", "stable-3.17", "redhat-operators", optional=True),
