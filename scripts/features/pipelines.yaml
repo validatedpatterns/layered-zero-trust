@@ -8,3 +8,4 @@ clusterGroup:
     openshift-pipelines:
       name: openshift-pipelines-operator-rh
       namespace: openshift-operators
+      channel: pipelines-1.23

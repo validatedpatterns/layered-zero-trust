@@ -69,8 +69,8 @@ mirror:
         minVersion: "1.21.3"
     - name: openshift-pipelines-operator-rh
       channels:
-      - name: latest
-        minVersion: "1.23.2"
+      - name: pipelines-1.23
+        minVersion: "1.23.0"
     - name: openshift-zero-trust-workload-identity-manager
       channels:
       - name: stable-v1
@@ -90,8 +90,8 @@ mirror:
         minVersion: "26.4.15-opr.1"
     - name: rhtas-operator
       channels:
-      - name: stable
-        minVersion: "1.4.3"
+      - name: stable-v1.4
+        minVersion: "1.4.2"
     - name: rhtpa-operator
       defaultChannel: stable-v1.1
       channels:

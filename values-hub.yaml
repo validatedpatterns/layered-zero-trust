@@ -158,6 +158,7 @@ clusterGroup:
     # openshift-pipelines:
     #   name: openshift-pipelines-operator-rh
     #   namespace: openshift-operators
+    #   channel: pipelines-1.23  # Pinned; see docs/support-matrix.md
     rhbk:
       name: rhbk-operator
       namespace: keycloak-system
@@ -202,6 +203,7 @@ clusterGroup:
     # rhtas-operator:
     #   name: rhtas-operator
     #   namespace: openshift-operators
+    #   channel: stable-v1.4  # Pinned; see docs/support-matrix.md
     #   annotations:
     #     argocd.argoproj.io/sync-wave: "29"  # Install after Quay operator, before applications
     #   catalogSource: redhat-operators
