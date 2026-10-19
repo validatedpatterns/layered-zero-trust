@@ -12,7 +12,7 @@ on:
 
 jobs:
   update-metadata:
-    uses: validatedpatterns/docs/.github/workflows/metadata-docs.yml@139b4ca43ae6665ac081e6e341f7d0c3e9bb090d # main
+    uses: validatedpatterns/docs/.github/workflows/metadata-docs.yml@main # zizmor: ignore[unpinned-uses]
     permissions: # Workflow-level permissions
       contents: read  # Required for "read-all"
       packages: write # Allows writing to packages
