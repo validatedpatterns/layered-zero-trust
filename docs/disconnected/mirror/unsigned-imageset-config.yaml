@@ -14,5 +14,5 @@ kind: ImageSetConfiguration
 mirror:
 
   additionalImages:
-  # HashiCorp Vault (Helm chart: hashicorp-vault, namespace: vault) ---
+  # HashiCorp Vault (Helm chart: hashicorp-vault 0.1.10, namespace: vault) ---
   - name: registry.connect.redhat.com/hashicorp/vault:1.21.4-ubi

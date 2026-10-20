@@ -69,7 +69,7 @@ mirror:
   # Validated Patterns Helm charts (stored as OCI images)
   - name: quay.io/validatedpatterns/acm:0.2.11  # acm 0.2.*
   - name: quay.io/validatedpatterns/clustergroup:0.9.58  # clustergroup 0.9.*
-  - name: quay.io/validatedpatterns/hashicorp-vault:0.1.8  # hashicorp-vault 0.1.*
+  - name: quay.io/validatedpatterns/hashicorp-vault:0.1.10  # hashicorp-vault 0.1.10
   - name: quay.io/validatedpatterns/ocp-certmanager:0.2.0  # ocp-certmanager 0.2.*
   - name: quay.io/validatedpatterns/ocp-compliance-scanning:0.0.3  # ocp-compliance-scanning 0.0.*
   - name: quay.io/validatedpatterns/openshift-external-secrets:0.0.4  # openshift-external-secrets 0.0.*
