@@ -197,10 +197,9 @@ The [pattern.sh](pattern.sh) script is used to deploy the Layered Zero Trust Val
 
 Once the pattern has been successfully deployed, you can review the deployed components. Each are deployed and managed using OpenShift GitOps.
 
-Two (2) instances of OpenShift GitOps has been deployed to your Hub Cluster. Each can be seen within the OpenShift Console by selecting the Application Selector at the top navigation bar (box with 9 smaller squares).
+One instance of OpenShift GitOps is deployed to your Hub Cluster. It can be seen within the OpenShift Console by selecting the Application Selector at the top navigation bar (box with 9 smaller squares).
 
-1. Cluster Argo CD - Deploys an Argo CD App of Apps Application called _layered-zero-trust-hub_ which deploys the components associated with the pattern. These _Applications_ are managed by the Hub Argo CD instance (see below)
-2. Hub Argo CD - Manages the individual components associated with the pattern on the Hub OpenShift instance.
+The consolidated Argo CD instance (namespace `vp-gitops`) manages all pattern applications.
 
 If all of the Argo CD applications are reporting healthy, the pattern has been deployed successfully.
 

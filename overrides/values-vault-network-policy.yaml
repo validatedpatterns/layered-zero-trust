@@ -33,7 +33,7 @@ vault:
                 job-name: registry-token-refresher-seed
             namespaceSelector:
               matchLabels:
-                kubernetes.io/metadata.name: layered-zero-trust-hub
+                kubernetes.io/metadata.name: vp-gitops
         # registry-token-refresher CronJob — periodic token refresh to Vault
         - ports:
           - protocol: TCP
@@ -44,7 +44,7 @@ vault:
                 app.kubernetes.io/name: registry-token-refresher
             namespaceSelector:
               matchLabels:
-                kubernetes.io/metadata.name: layered-zero-trust-hub
+                kubernetes.io/metadata.name: vp-gitops
         # Vault cluster replication port — HA readiness
         - ports:
           - protocol: TCP
