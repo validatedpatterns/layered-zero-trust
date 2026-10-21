@@ -269,9 +269,11 @@ clusterGroup:
     #   namespace: quay-enterprise
     #   argoProject: hub
     #   chart: quay
-    #   chartVersion: 0.1.*
+    #   chartVersion: 0.2.*
+    #   extraValueFiles:
+    #     - /overrides/values-quay.yaml
     #   annotations:
-    #     argocd.argoproj.io/sync-wave: "41"  # Deploy after NooBaa storage backend
+    #     argocd.argoproj.io/sync-wave: "41"
     # RHTAS with SPIFFE Integration
     # COMMENTED OUT: Uncomment to enable RHTAS with SPIFFE and Email issuers
     # Depends on: Vault, SPIRE, Keycloak (for Email OIDC issuer if used)

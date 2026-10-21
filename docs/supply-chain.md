@@ -14,7 +14,7 @@ In this project, we used the [qtodo](https://github.com/validatedpatterns-demos/
 > * `subscriptions.rhtas-operator` and its namespace entry
 > * `applications.trusted-profile-analyzer` — RHTPA for SBOM management
 > * `subscriptions.rhtpa-operator` and its namespace entry
-> * `applications.quay-registry` — Quay image registry (or configure an external registry)
+> * `applications.quay-registry` — Quay image registry (see `overrides/values-quay.yaml`) or configure an external registry
 > * `applications.noobaa-mcg` — NooBaa MCG object storage (required by Quay and RHTPA)
 > * `subscriptions.odf` and `subscriptions.quay-operator` and their namespace entries
 >
@@ -69,7 +69,7 @@ By default, ZTVP deploys a built-in Red Hat Quay registry. However, you can use 
 
 ### Configuration Steps
 
-1. **Disable built-in Quay registry** (optional - if not using Quay): Comment out the Quay-related applications in `values-hub.yaml`: `quay-enterprise` namespace, `quay-operator` subscription, and `quay-registry` application. Remove the `applications.supply-chain.overrides.quay.enabled` and `applications.supply-chain.overrides.registry.tlsVerify` settings.
+1. **Disable built-in Quay registry** (optional - if not using Quay): Comment out the Quay-related applications in `values-hub.yaml`: `quay-enterprise` namespace, `quay-operator` subscription, and `quay-registry` application. Remove the `applications.supply-chain.overrides.registry.tlsVerify` setting when it no longer applies.
 
 2. **Configure registry credentials in Vault** (**BYO registry only**): Per VP rule, add your registry credentials to `~/values-secrets.yaml` (or `~/values-secret.yaml` / `~/values-secret-layered-zero-trust.yaml` per VP lookup order):
 
@@ -97,7 +97,7 @@ By default, ZTVP deploys a built-in Red Hat Quay registry. However, you can use 
          onMissingValue: error
    ```
 
-   > **Note**: This secret is only required for **BYO/external registries** (Option 2). **Built-in Quay** (Option 1) uses the auto-generated `quay-users` secret. **Embedded OpenShift registry** (Option 3) does not need a manual secret when the automatic token refresher is enabled (see [Embedded OpenShift Registry](#embedded-openshift-registry)) -- the refresher creates and rotates the Vault credential automatically.
+   > **Note**: This secret is only required for **BYO/external registries** (Option 2). **Built-in Quay** (Option 1) uses Vault path `secret/data/hub/infra/quay/quay-users` (see `overrides/values-quay.yaml` and [DEVELOPMENT.md](DEVELOPMENT.md)). **Embedded OpenShift registry** (Option 3) does not need a manual secret when the automatic token refresher is enabled (see [Embedded OpenShift Registry](#embedded-openshift-registry)) -- the refresher creates and rotates the Vault credential automatically.
    >
    > **Note**: Never commit `~/values-secrets.yaml` (or your local values-secret file) to git. This file contains sensitive credentials and should remain local.
 
@@ -118,7 +118,7 @@ By default, ZTVP deploys a built-in Red Hat Quay registry. However, you can use 
    See the **Registry Options** section at the top of `values-hub.yaml` for the full set of option blocks (built-in Quay, BYO, embedded OpenShift).
 
 4. **Enable supply-chain-specific overrides** (if needed): The `supply-chain` application may need additional overrides depending on the registry type. These are set in the `supply-chain` overrides section of `values-hub.yaml`:
-   * **Built-in Quay**: Enable `quay.enabled` (Quay user provisioner CronJob) and `registry.tlsVerify: "false"` (self-signed certs).
+   * **Built-in Quay**: Set `registry.tlsVerify: "false"` (self-signed certs). Users, organizations, and repositories are provisioned by the external `quay` chart (`quayConfig` in `overrides/values-quay.yaml`), not the supply-chain chart.
    * **Embedded OpenShift**: Enable `registry.embeddedOpenShift.ensureImageNamespaceRBAC` (creates image namespace and push RBAC) and optionally `registry.embeddedOpenShift.tokenRefresher.enabled` (see [Embedded OpenShift Registry](#embedded-openshift-registry)).
    * **BYO/External**: No extra overrides needed.
 
@@ -145,7 +145,7 @@ Registry credentials are stored at different paths based on registry type:
 
 | Registry Type        | Vault Path                                     | Password Key         |
 | -------------------- | ---------------------------------------------- | -------------------- |
-| Built-in Quay        | `secret/data/hub/infra/quay/quay-users`        | `quay-user-password` |
+| Built-in Quay        | `secret/data/hub/infra/quay/quay-users`        | `quay-admin-password`|
 | BYO Registry         | `secret/data/hub/infra/registry/registry-user` | `registry-password`  |
 | Embedded OpenShift   | `secret/data/hub/infra/registry/registry-user` | `registry-password`  |
 
@@ -645,7 +645,7 @@ The credentials to access the Quay web interface can be obtained as follows:
       -o jsonpath='{.items[0].spec.host}')"
   ```
 
-* Quay username: The same one you specified in `values-hub.yaml` or **quay-user**.
+* Quay username: The same one you specified in `values-hub.yaml` or **quay-admin**.
 * Quay password:
 
   ```shell
