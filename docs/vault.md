@@ -8,6 +8,7 @@ External Secrets Operator (ESO) for Kubernetes-native secret sync, or through
 direct SPIFFE JWT authentication for workloads that need dynamic credentials.
 
 **Chart:** `hashicorp-vault` (external, from Validated Patterns Helm repository)  
+**Chart version:** `0.1.10` (pinned in `values-hub.yaml`, `values-standalone.yaml`, `values-coco-dev.yaml`)  
 **Namespace:** `vault`  
 **Sync wave:** 25  
 **Service endpoint:** `https://vault.vault.svc.cluster.local:8200`

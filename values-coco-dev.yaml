@@ -239,7 +239,7 @@ clusterGroup:
       namespace: vault
       argoProject: hub
       chart: hashicorp-vault
-      chartVersion: 0.1.*
+      chartVersion: 0.1.10
       policies: []
       jwt:
         enabled: true
