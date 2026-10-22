@@ -6,9 +6,9 @@ global:
     enabled: true
     domain: quay-registry-quay-quay-enterprise.apps.{{ .Values.global.clusterDomain }}
     repository: ztvp/qtodo
-    user: quay-user
+    user: quay-admin
     vaultPath: "secret/data/hub/infra/quay/quay-users"
-    passwordVaultKey: "quay-user-password"
+    passwordVaultKey: "quay-admin-password"
 
 clusterGroup:
   namespaces:
@@ -43,6 +43,7 @@ clusterGroup:
     openshift-pipelines:
       name: openshift-pipelines-operator-rh
       namespace: openshift-operators
+      channel: pipelines-1.23
     odf:
       name: odf-operator
       namespace: openshift-storage
@@ -79,14 +80,11 @@ clusterGroup:
       namespace: quay-enterprise
       argoProject: hub
       chart: quay
-      chartVersion: 0.1.*
+      chartVersion: 0.2.*
       annotations:
         argocd.argoproj.io/sync-wave: "41"  # Deploy after NooBaa storage backend
-      overrides:
-      - name: job.image
-        value: "registry.redhat.io/openshift4/ose-cli-rhel9:latest"
-      - name: job.resources.limits.memory
-        value: "512Mi"
+      extraValueFiles:
+      - /overrides/values-quay.yaml
     trusted-artifact-signer:
       name: trusted-artifact-signer
       namespace: trusted-artifact-signer
@@ -156,8 +154,6 @@ clusterGroup:
           jsonPointers:
             - /spec/tasks
       overrides:
-        - name: quay.enabled
-          value: "true"
         - name: registry.tlsVerify
           value: "false"
         - name: rhtas.enabled
