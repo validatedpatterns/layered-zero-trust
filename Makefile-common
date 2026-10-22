@@ -19,7 +19,7 @@ operator-deploy operator-upgrade: ## Installs/updates the pattern on a cluster (
 
 .PHONY: install
 #install: pattern-install ## Installs the pattern onto a cluster (Loads secrets as well if configured)
-install: operator-deploy load-secrets
+install: operator-deploy load-secrets argo-healthcheck
 
 .PHONY: uninstall ## Prints a notice that patterns cannot currently be uninstalled
 uninstall:
