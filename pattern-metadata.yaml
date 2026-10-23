@@ -25,7 +25,7 @@ requirements:
           type: Standard_D8s_v3
         aws:
           replicas: 3
-          type: m5.2xlarge
+          type: m5.4xlarge
     controlPlane:
       platform:
         gcp:
@@ -36,7 +36,7 @@ requirements:
           type: Standard_D4s_v3
         aws:
           replicas: 3
-          type: m5.xlarge
+          type: m5.2xlarge
   spoke: # optional - represents the clusters imported into ACM
     compute:
       platform:
