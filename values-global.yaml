@@ -1,6 +1,7 @@
 ---
 global:
   pattern: layered-zero-trust
+  singleArgoCD: true
   options:
     useCSV: false
     syncPolicy: Automatic

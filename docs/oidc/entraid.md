@@ -489,7 +489,7 @@ When the pipeline reaches any of these tasks, we will need to follow these steps
 ##### Using the OpenShift Web UI
 
 1. Select **Pipelines -> Pipelines** from the left hand navigation bar.
-2. Locate the **qtodo-supply-chain** pipeline. It's within the **layered-zero-trust-hub** project.
+2. Locate the **qtodo-supply-chain** pipeline. It's within the **vp-gitops** project.
 3. Select the last `PipelineRun` or start a new one.
 4. On the logs tab, select the signing task: `qtodo-sign-artifact`, `qtodo-sign-image` or `qtodo-sbom-attestation`
 5. In the log box, on the last lines, you can get the verification code.
@@ -499,24 +499,24 @@ When the pipeline reaches any of these tasks, we will need to follow these steps
 
 ##### Using the OpenShift CLI
 
-1. List the `TaskRuns` in the namespace **layered-zero-trust-hub**.
+1. List the `TaskRuns` in the namespace **vp-gitops**.
 
     ```shell
-    oc get taskrun -n layered-zero-trust-hub
+    oc get taskrun -n vp-gitops
     ```
 
 2. Continue monitoring the status of the tasks until one of the signing tasks (`qtodo-sign-artifact`, `qtodo-sign-image` or `qtodo-sbom-attestation`) starts.
 3. For each signing task, obtain the verification code and verify it using a Web browser:
 
     ```shell
-    export SIGN_ARTIFACT_POD=$(oc get taskrun -n layered-zero-trust-hub -l tekton.dev/pipelineTask=qtodo-sign-artifact -o jsonpath='{ .items[0].status.podName }')
-    oc logs -n layered-zero-trust-hub ${SIGN_ARTIFACT_POD} | grep 'verification code'
+    export SIGN_ARTIFACT_POD=$(oc get taskrun -n vp-gitops -l tekton.dev/pipelineTask=qtodo-sign-artifact -o jsonpath='{ .items[0].status.podName }')
+    oc logs -n vp-gitops ${SIGN_ARTIFACT_POD} | grep 'verification code'
 
-    export SIGN_IMAGE_POD=$(oc get taskrun -n layered-zero-trust-hub -l tekton.dev/pipelineTask=qtodo-sign-image -o jsonpath='{ .items[0].status.podName }')
-    oc logs -n layered-zero-trust-hub ${SIGN_IMAGE_POD} | grep 'verification code'
+    export SIGN_IMAGE_POD=$(oc get taskrun -n vp-gitops -l tekton.dev/pipelineTask=qtodo-sign-image -o jsonpath='{ .items[0].status.podName }')
+    oc logs -n vp-gitops ${SIGN_IMAGE_POD} | grep 'verification code'
 
-    export SIGN_SBOM_POD=$(oc get taskrun -n layered-zero-trust-hub -l tekton.dev/pipelineTask=qtodo-sbom-attestation -o jsonpath='{ .items[0].status.podName }')
-    oc logs -n layered-zero-trust-hub ${SIGN_SBOM_POD} | grep 'verification code'
+    export SIGN_SBOM_POD=$(oc get taskrun -n vp-gitops -l tekton.dev/pipelineTask=qtodo-sbom-attestation -o jsonpath='{ .items[0].status.podName }')
+    oc logs -n vp-gitops ${SIGN_SBOM_POD} | grep 'verification code'
     ```
 
 4. Go to [https://login.microsoft.com/device](https://login.microsoft.com/device) and enter the verification code
@@ -827,7 +827,7 @@ vault_jwt_roles:
 **Key Parameters**:
 
 * **audience**: Internal identifier for supply chain Vault authentication (`supply-chain`)
-* **subject**: The SPIFFE ID of the Tekton pipeline service account (e.g., `spiffe://apps.<domain>/ns/layered-zero-trust-hub/sa/pipeline`)
+* **subject**: The SPIFFE ID of the Tekton pipeline service account (e.g., `spiffe://apps.<domain>/ns/vp-gitops/sa/pipeline`)
 * **policies**: Vault policies granting access to supply chain secrets
 
 **Vault Policy for Supply Chain**:
