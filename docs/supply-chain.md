@@ -261,7 +261,7 @@ Once the supply-chain application has synced in Argo CD, start the pipeline usin
 
 1. Launch the OpenShift Web console.
 2. Select **Pipelines -> Pipelines** from the left hand navigation bar.
-3. Locate the **qtodo-supply-chain** pipeline. It's within the **layered-zero-trust-hub** project.
+3. Locate the **qtodo-supply-chain** pipeline. It's within the **vp-gitops** project.
 4. In the kebab menu (three vertical dots) from the right-hand, select **Start**.
 
    Review the configurable parameters. Most parameters should be correct with their default values if we are in single-cluster mode. But, double-check their values just in case.
@@ -287,7 +287,7 @@ apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
   generateName: qtodo-manual-run-
-  namespace: layered-zero-trust-hub
+  namespace: vp-gitops
 spec:
   pipelineRef:
     name: qtodo-supply-chain
@@ -318,7 +318,7 @@ apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
   generateName: qtodo-manual-run-
-  namespace: layered-zero-trust-hub
+  namespace: vp-gitops
 spec:
   pipelineRef:
     name: qtodo-supply-chain
@@ -348,20 +348,20 @@ oc create -f qtodo-pipeline.yaml
 You can review the current pipeline logs using the [Tekton CLI](https://tekton.dev/docs/cli/).
 
 ```shell
-tkn pipeline logs -n layered-zero-trust-hub -L -f
+tkn pipeline logs -n vp-gitops -L -f
 ```
 
 Or use `oc` commands to monitor progress:
 
 ```shell
 # List pipeline runs
-oc get pipelinerun -n layered-zero-trust-hub
+oc get pipelinerun -n vp-gitops
 
 # Check task status for a specific run
-oc get taskruns -n layered-zero-trust-hub -l tekton.dev/pipelineRun=<pipelinerun-name>
+oc get taskruns -n vp-gitops -l tekton.dev/pipelineRun=<pipelinerun-name>
 
 # View logs for a specific task
-oc logs -n layered-zero-trust-hub -l tekton.dev/pipelineRun=<pipelinerun-name>,tekton.dev/pipelineTask=<task-name>
+oc logs -n vp-gitops -l tekton.dev/pipelineRun=<pipelinerun-name>,tekton.dev/pipelineTask=<task-name>
 ```
 
 ### Protected Repositories
@@ -498,7 +498,7 @@ This section applies whenever the pipeline clones from a Git server whose TLS ce
 
 When a repository is hosted on an internal Git server (e.g. GitLab behind a corporate CA), the `git-clone` task will fail with `SSL certificate problem: self-signed certificate in certificate chain` because the pod does not trust the corporate CA.
 
-The `ztvp-certificates` chart already extracts and distributes the cluster's CA bundle (ingress, service, and any custom/corporate CAs). When the `supply-chain` feature is enabled, the `ztvp-trusted-ca` ConfigMap is automatically distributed to the pipeline namespace (`layered-zero-trust-hub`) via ACM policy.
+The `ztvp-certificates` chart already extracts and distributes the cluster's CA bundle (ingress, service, and any custom/corporate CAs). When the `supply-chain` feature is enabled, the `ztvp-trusted-ca` ConfigMap is automatically distributed to the pipeline namespace (`vp-gitops`) via ACM policy.
 
 To make the `git-clone` task use this CA bundle, enable the SSL CA bundle mount in the `supply-chain` application overrides:
 
@@ -553,7 +553,7 @@ The pipeline we have prepared has the following steps:
 
 1. Launch the OpenShift Web console.
 2. Select **Pipelines -> Pipelines** from the left hand navigation bar.
-3. Locate the **qtodo-supply-chain** pipeline (**layered-zero-trust-hub** project).
+3. Locate the **qtodo-supply-chain** pipeline (**vp-gitops** project).
 4. Select the **PipelineRun** link in the column **Last run**.
 5. In the **Details** tab we can see a summary of the pipeline execution and tasks.
 6. By **clicking** on each individual task, or on the **Logs** tab, we can see the output of the tasks.
@@ -563,7 +563,7 @@ The pipeline we have prepared has the following steps:
 The first thing we'll check is whether our pipeline has finished successfully.
 
 ```shell
-oc get pipelinerun -n layered-zero-trust-hub
+oc get pipelinerun -n vp-gitops
 
 NAME                        SUCCEEDED   REASON      STARTTIME   COMPLETIONTIME
 qtodo-manual-run-p46f7      True        Succeeded   7m4s        2m12s
@@ -572,7 +572,7 @@ qtodo-manual-run-p46f7      True        Succeeded   7m4s        2m12s
 We can see the individual result of each step by reviewing the `TaskRuns`.
 
 ```shell
-oc get taskruns -n layered-zero-trust-hub
+oc get taskruns -n vp-gitops
 
 NAME                                               SUCCEEDED   REASON             STARTTIME   COMPLETIONTIME
 qtodo-manual-run-p46f7-qtodo-build-artifact        True        Succeeded          7m44s       5m17s
@@ -587,10 +587,10 @@ qtodo-manual-run-p46f7-qtodo-verify-artifact       True        Succeeded        
 qtodo-manual-run-p46f7-qtodo-verify-image          True        Succeeded          3m22s       3m3s
 ```
 
-Tasks run as pods within OpenShift. We can find these pods in the namespace `layered-zero-trust-hub`.
+Tasks run as pods within OpenShift. We can find these pods in the namespace `vp-gitops`.
 
 ```shell
-oc get pods -n layered-zero-trust-hub
+oc get pods -n vp-gitops
 
 NAME                                                    READY   STATUS      RESTARTS   AGE
 qtodo-manual-run-p46f7-qtodo-build-artifact-pod         0/1     Completed   0          10m
@@ -608,7 +608,7 @@ qtodo-manual-run-p46f7-qtodo-verify-image-pod           0/1     Completed   0   
 If we want to see the output of a particular step, we can view this information in the pod logs. For example, let's look at the image verification messages:
 
 ```shell
-oc logs -n layered-zero-trust-hub qtodo-manual-run-p46f7-qtodo-verify-image-pod
+oc logs -n vp-gitops qtodo-manual-run-p46f7-qtodo-verify-image-pod
 
 Success: true
 Result: SUCCESS
@@ -649,7 +649,7 @@ The credentials to access the Quay web interface can be obtained as follows:
 * Quay password:
 
   ```shell
-  oc get secret -n layered-zero-trust-hub qtodo-quay-password -o json | jq '.data["password"] | @base64d'
+  oc get secret -n vp-gitops qtodo-quay-password -o json | jq '.data["password"] | @base64d'
   ```
 
 Now that we have the credentials, we can check the content in Quay.

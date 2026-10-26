@@ -177,7 +177,7 @@ def get_workload_namespaces() -> set:
 
     Namespaces with the argocd.argoproj.io/managed-by label are ZTVP workload
     namespaces.  The label value is the ArgoCD instance namespace itself
-    (e.g. layered-zero-trust-hub), which we exclude since it contains ArgoCD
+    (e.g. vp-gitops), which we exclude since it contains ArgoCD
     infrastructure images already covered by the GitOps operator catalog.
     """
     # Always include these regardless of ArgoCD labels
