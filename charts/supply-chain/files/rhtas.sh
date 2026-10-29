@@ -178,13 +178,26 @@ verify_image() {
     --certificate-oidc-issuer "${OIDC_ISSUER}" \
     --rekor-url "${REKOR_URL}"
 
+  # Rekor builds its Merkle tree asynchronously after accepting a new entry.
+  # The SBOM attestation is pushed seconds before this step runs, so the
+  # inclusion proof may not yet be in the tree.  Retry up to 5 times
+  # (75 s total) to let Rekor catch up before giving up.
   log_msg "Verifying SBOM attestation"
-  cosign verify-attestation "${image_ref}" \
-    --type spdxjson \
-    --certificate-identity "${OIDC_IDENTITY}" \
-    --certificate-oidc-issuer "${OIDC_ISSUER}" \
-    --rekor-url "${REKOR_URL}" \
-    > /dev/null
+  for attempt in 1 2 3 4 5; do
+    cosign verify-attestation "${image_ref}" \
+      --type spdxjson \
+      --certificate-identity "${OIDC_IDENTITY}" \
+      --certificate-oidc-issuer "${OIDC_ISSUER}" \
+      --rekor-url "${REKOR_URL}" \
+      > /dev/null && break
+    if [ "${attempt}" -lt 5 ]; then
+      log_msg "SBOM attestation verification attempt ${attempt} failed, retrying in 15s..."
+      sleep 15
+    else
+      log_msg "SBOM attestation verification failed after ${attempt} attempts"
+      exit 1
+    fi
+  done
 }
 
 # Verify the artifact
