@@ -153,15 +153,22 @@ verify_image() {
 
   image_ref="$(get_image_reference "${1}")"
 
+  # EC must accept signatures from both the pipeline SA (image signature + SBOM
+  # attestation) and the Tekton Chains controller (SLSA provenance attestation).
+  # Both live in the same SPIFFE trust domain; derive the Chains identity from it.
+  trust_domain=$(echo "${OIDC_IDENTITY}" | sed 's|spiffe://||' | cut -d'/' -f1)
+  chains_identity="spiffe://${trust_domain}/ns/openshift-pipelines/sa/tekton-chains-controller"
+
   log_msg "Verifying image"
   log_msg "REKOR_URL: ${REKOR_URL}"
   log_msg "image_ref: ${image_ref}"
   log_msg "OIDC_IDENTITY: ${OIDC_IDENTITY}"
   log_msg "OIDC_ISSUER: ${OIDC_ISSUER}"
+  log_msg "CHAINS_IDENTITY: ${chains_identity}"
 
   ec validate image \
     --image "${image_ref}" \
-    --certificate-identity "${OIDC_IDENTITY}" \
+    --certificate-identity-regexp "${OIDC_IDENTITY}|${chains_identity}" \
     --certificate-oidc-issuer "${OIDC_ISSUER}" \
     --rekor-url "${REKOR_URL}" \
     --show-successes
