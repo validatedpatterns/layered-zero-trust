@@ -146,32 +146,45 @@ sign_image() {
     --yes
 }
 
-# Verify the SBOM of the image
+# Verify the image signature and SBOM attestation
+#
+# NOTE: We deliberately use 'cosign verify' + 'cosign verify-attestation' here
+# instead of 'ec validate image'.  Tekton Chains creates its SLSA provenance
+# attestation *after* the PipelineRun completes, so the attestation does not
+# exist in the OCI registry while verify-image is still running (it is the last
+# pipeline step).  EC v0.9.125+ (RHTAS ≥ v1.4.4) enforces builtin.attestation
+# .syntax_check which requires valid SLSA provenance — an attestation that can
+# never be present at this point in the pipeline.
+#
+# Using cosign directly verifies exactly what the pipeline itself produces:
+#   1. The image signature  (created by the sign-image step)
+#   2. The SBOM attestation (created by the sbom-attestation step)
+# Both are written to the OCI registry before verify-image starts.
 verify_image() {
 
   initialize_cosign
 
   image_ref="$(get_image_reference "${1}")"
 
-  # EC must accept signatures from both the pipeline SA (image signature + SBOM
-  # attestation) and the Tekton Chains controller (SLSA provenance attestation).
-  # Both live in the same SPIFFE trust domain; derive the Chains identity from it.
-  trust_domain=$(echo "${OIDC_IDENTITY}" | sed 's|spiffe://||' | cut -d'/' -f1)
-  chains_identity="spiffe://${trust_domain}/ns/openshift-pipelines/sa/tekton-chains-controller"
-
   log_msg "Verifying image"
   log_msg "REKOR_URL: ${REKOR_URL}"
   log_msg "image_ref: ${image_ref}"
   log_msg "OIDC_IDENTITY: ${OIDC_IDENTITY}"
   log_msg "OIDC_ISSUER: ${OIDC_ISSUER}"
-  log_msg "CHAINS_IDENTITY: ${chains_identity}"
 
-  ec validate image \
-    --image "${image_ref}" \
-    --certificate-identity-regexp "${OIDC_IDENTITY}|${chains_identity}" \
+  log_msg "Verifying image signature"
+  cosign verify "${image_ref}" \
+    --certificate-identity "${OIDC_IDENTITY}" \
+    --certificate-oidc-issuer "${OIDC_ISSUER}" \
+    --rekor-url "${REKOR_URL}"
+
+  log_msg "Verifying SBOM attestation"
+  cosign verify-attestation "${image_ref}" \
+    --type spdxjson \
+    --certificate-identity "${OIDC_IDENTITY}" \
     --certificate-oidc-issuer "${OIDC_ISSUER}" \
     --rekor-url "${REKOR_URL}" \
-    --show-successes
+    > /dev/null
 }
 
 # Verify the artifact
@@ -223,4 +236,3 @@ attest_sbom_image() {
 # Main
 import_ca
 download_cosign
-download_ec
