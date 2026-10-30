@@ -18,8 +18,8 @@ operator-deploy operator-upgrade: ## Installs/updates the pattern on a cluster (
 	@$(ANSIBLE_RUN) rhvp.cluster_utils.operator_deploy
 
 .PHONY: install
-#install: pattern-install ## Installs the pattern onto a cluster (Loads secrets as well if configured)
-install: operator-deploy load-secrets
+install: pattern-install ## Installs the pattern onto a cluster (Loads secrets as well if configured)
+	@$(ANSIBLE_RUN) rhvp.cluster_utils.install
 
 .PHONY: uninstall ## Prints a notice that patterns cannot currently be uninstalled
 uninstall:
@@ -56,5 +56,5 @@ argo-healthcheck: ## Checks if all argo applications are synced
 
 ##@ Testing (CI) Tasks
 .PHONY: run-ci-tests
-run-ci-tests: argo-healthcheck ## To run ci-tests, set any needed env vars
+run-ci-tests: ## To run ci-tests, set any needed env vars
 	@$(ANSIBLE_RUN) rhvp.cluster_utils.run_ci_tests

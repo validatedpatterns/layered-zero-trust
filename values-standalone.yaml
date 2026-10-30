@@ -31,7 +31,7 @@ clusterGroup:
       namespace: vault
       argoProject: hub
       chart: hashicorp-vault
-      chartVersion: 0.1.10
+      chartVersion: 0.1.*
     openshift-external-secrets:
       name: openshift-external-secrets
       namespace: external-secrets

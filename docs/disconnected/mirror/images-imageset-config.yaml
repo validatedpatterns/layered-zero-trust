@@ -65,11 +65,13 @@ mirror:
   - name: registry.access.redhat.com/ubi9/skopeo:9.5-1745865345@sha256:d91eb0dac7308ddfb12193368a42009509925edba80da9ffd3b82d03427dc3ed
   # UBI used by cosign signing and RHTPA upload tasks
   - name: registry.access.redhat.com/ubi9/ubi:9.7-1764794285
+  # HashiCorp Vault server (deployed by hashicorp-vault chart, namespace: vault)
+  - name: registry.connect.redhat.com/hashicorp/vault:2.1.2-ubi
 
   # Validated Patterns Helm charts (stored as OCI images)
   - name: quay.io/validatedpatterns/acm:0.2.11  # acm 0.2.*
   - name: quay.io/validatedpatterns/clustergroup:0.9.58  # clustergroup 0.9.*
-  - name: quay.io/validatedpatterns/hashicorp-vault:0.1.10  # hashicorp-vault 0.1.10
+  - name: quay.io/validatedpatterns/hashicorp-vault:0.1.11  # hashicorp-vault 0.1.*
   - name: quay.io/validatedpatterns/ocp-certmanager:0.2.0  # ocp-certmanager 0.2.*
   - name: quay.io/validatedpatterns/ocp-compliance-scanning:0.0.3  # ocp-compliance-scanning 0.0.*
   - name: quay.io/validatedpatterns/openshift-external-secrets:0.0.4  # openshift-external-secrets 0.0.*

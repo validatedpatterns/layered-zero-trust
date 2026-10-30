@@ -369,7 +369,7 @@ clusterGroup:
       namespace: vault
       argoProject: hub
       chart: hashicorp-vault
-      chartVersion: 0.1.10
+      chartVersion: 0.1.*
       extraValueFiles:
         - /overrides/values-vault-network-policy.yaml
       annotations:
