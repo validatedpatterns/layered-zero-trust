@@ -25,6 +25,12 @@ function is_container() {
 
 if is_container; then
     echo "Already running in a container"
+    # In CI, the interop-test Tekton task sets VP_HUBCONFIG but not KUBECONFIG.
+    # Map VP_HUBCONFIG -> KUBECONFIG so ansible playbooks (e.g. argo-healthcheck)
+    # use the target cluster credentials instead of the in-cluster SA token.
+    if [ -z "${KUBECONFIG:-}" ] && [ -n "${VP_HUBCONFIG:-}" ]; then
+        export KUBECONFIG="${VP_HUBCONFIG}"
+    fi
     exec "$@"
 fi
 
