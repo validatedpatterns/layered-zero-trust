@@ -146,7 +146,20 @@ sign_image() {
     --yes
 }
 
-# Verify the SBOM of the image
+# Verify the image signature and SBOM attestation
+#
+# NOTE: We deliberately use 'cosign verify' + 'cosign verify-attestation' here
+# instead of 'ec validate image'.  Tekton Chains creates its SLSA provenance
+# attestation *after* the PipelineRun completes, so the attestation does not
+# exist in the OCI registry while verify-image is still running (it is the last
+# pipeline step).  EC v0.9.125+ (RHTAS ≥ v1.4.4) enforces builtin.attestation
+# .syntax_check which requires valid SLSA provenance — an attestation that can
+# never be present at this point in the pipeline.
+#
+# Using cosign directly verifies exactly what the pipeline itself produces:
+#   1. The image signature  (created by the sign-image step)
+#   2. The SBOM attestation (created by the sbom-attestation step)
+# Both are written to the OCI registry before verify-image starts.
 verify_image() {
 
   initialize_cosign
@@ -159,12 +172,32 @@ verify_image() {
   log_msg "OIDC_IDENTITY: ${OIDC_IDENTITY}"
   log_msg "OIDC_ISSUER: ${OIDC_ISSUER}"
 
-  ec validate image \
-    --image "${image_ref}" \
+  log_msg "Verifying image signature"
+  cosign verify "${image_ref}" \
     --certificate-identity "${OIDC_IDENTITY}" \
     --certificate-oidc-issuer "${OIDC_ISSUER}" \
-    --rekor-url "${REKOR_URL}" \
-    --show-successes
+    --rekor-url "${REKOR_URL}"
+
+  # Rekor builds its Merkle tree asynchronously after accepting a new entry.
+  # The SBOM attestation is pushed seconds before this step runs, so the
+  # inclusion proof may not yet be in the tree.  Retry up to 5 times
+  # (75 s total) to let Rekor catch up before giving up.
+  log_msg "Verifying SBOM attestation"
+  for attempt in 1 2 3 4 5; do
+    cosign verify-attestation "${image_ref}" \
+      --type spdxjson \
+      --certificate-identity "${OIDC_IDENTITY}" \
+      --certificate-oidc-issuer "${OIDC_ISSUER}" \
+      --rekor-url "${REKOR_URL}" \
+      > /dev/null && break
+    if [ "${attempt}" -lt 5 ]; then
+      log_msg "SBOM attestation verification attempt ${attempt} failed, retrying in 15s..."
+      sleep 15
+    else
+      log_msg "SBOM attestation verification failed after ${attempt} attempts"
+      exit 1
+    fi
+  done
 }
 
 # Verify the artifact
@@ -216,4 +249,3 @@ attest_sbom_image() {
 # Main
 import_ca
 download_cosign
-download_ec
