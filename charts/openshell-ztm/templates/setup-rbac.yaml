@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openshell-setup
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "ztm.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: openshell-setup
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "ztm.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "services", "configmaps", "secrets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["agents.x-k8s.io"]
+    resources: ["sandboxes"]
+    verbs: ["get", "list", "watch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: openshell-setup
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "ztm.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: openshell-setup
+subjects:
+  - kind: ServiceAccount
+    name: openshell-setup
+    namespace: {{ .Values.namespace }}

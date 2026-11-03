@@ -1,0 +1,184 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pi-sandbox-setup-{{ .Release.Revision }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "ztm.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: pi-sandbox-setup
+    spec:
+      serviceAccountName: openshell-setup
+      restartPolicy: Never
+      containers:
+        - name: setup
+          image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+          env:
+            - name: MAAS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: maas-api-key
+                  key: api_key
+                  optional: true
+            {{- if .Values.deepseek.enabled }}
+            - name: DEEPSEEK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: deepseek-api-key
+                  key: api_key
+                  optional: true
+            {{- end }}
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -eo pipefail
+
+              NS="{{ .Values.namespace }}"
+              SANDBOX="{{ .Values.pi.sandbox.name }}"
+              IMAGE="{{ .Values.pi.sandbox.image }}"
+              GW="{{ include "ztm.gatewayEndpoint" . }}"
+
+              # ── Step 1: Install OpenShell CLI ────────────────────────
+              echo "==> Step 1: Installing OpenShell CLI..."
+              CLI_URL="https://github.com/NVIDIA/OpenShell/releases/download/v0.1.6/openshell-x86_64-unknown-linux-musl.tar.gz"
+              cd /tmp
+              curl -LsSf -o openshell.tar.gz "${CLI_URL}"
+              tar xzf openshell.tar.gz
+              chmod +x openshell
+              export PATH="/tmp:${PATH}"
+              openshell --version
+
+              export OPENSHELL_GATEWAY_ENDPOINT="${GW}"
+              export OPENSHELL_GATEWAY_INSECURE=true
+
+              # ── Step 2: Wait for gateway to accept connections ─────────
+              echo "==> Step 2: Waiting for OpenShell gateway..."
+              for i in $(seq 1 60); do
+                if openshell sandbox list >/dev/null 2>&1; then
+                  echo "    Gateway responding"
+                  break
+                fi
+                if [ "$i" -eq 60 ]; then
+                  echo "    ERROR: Gateway did not respond in 10 min"
+                  exit 1
+                fi
+                echo "    Attempt $i/60..."
+                sleep 10
+              done
+
+              # ── Step 3: Import MAAS provider profile ───────────────────
+              echo "==> Step 3: Importing MAAS provider profile..."
+              openshell provider profile import \
+                --file /config/maas-profile.yaml 2>&1 || \
+                echo "    WARN: profile import returned non-zero (may already exist)"
+
+              # ── Step 4: Create MAAS provider (global) ──────────────────
+              echo "==> Step 4: Creating MAAS provider..."
+              MAAS_KEY="${MAAS_API_KEY}"
+              if [ -n "${MAAS_KEY}" ]; then
+                openshell provider create \
+                  --name maas \
+                  --type maas \
+                  --credential "MAAS_API_KEY=${MAAS_KEY}" 2>&1 || \
+                  echo "    WARN: provider create returned non-zero (may already exist)"
+              else
+                echo "    SKIP: No MAAS API key — creating provider without credential"
+                openshell provider create \
+                  --name maas \
+                  --type maas 2>&1 || true
+              fi
+
+              {{- if .Values.deepseek.enabled }}
+              # ── Step 4b: Import DeepSeek provider profile ──────────────
+              echo "==> Step 4b: Importing DeepSeek provider profile..."
+              openshell provider profile import \
+                --file /config/deepseek-profile.yaml 2>&1 || \
+                echo "    WARN: DeepSeek profile import returned non-zero (may already exist)"
+
+              # ── Step 4c: Create DeepSeek provider ──────────────────────
+              echo "==> Step 4c: Creating DeepSeek provider..."
+              DS_KEY="${DEEPSEEK_API_KEY}"
+              if [ -n "${DS_KEY}" ]; then
+                openshell provider create \
+                  --name deepseek \
+                  --type deepseek \
+                  --credential "DEEPSEEK_API_KEY=${DS_KEY}" 2>&1 || \
+                  echo "    WARN: DeepSeek provider create returned non-zero (may already exist)"
+              else
+                echo "    SKIP: No DeepSeek API key"
+              fi
+              {{- end }}
+
+              # ── Step 5: Clean up any stale sandbox ─────────────────────
+              echo "==> Step 5: Cleaning up any previous sandbox..."
+              openshell sandbox delete "${SANDBOX}" 2>&1 || true
+              sleep 3
+
+              # ── Step 6: Create sandbox with pre-built image ────────────
+              echo "==> Step 6: Creating sandbox: ${SANDBOX} (image: ${IMAGE})..."
+              openshell sandbox create \
+                --name "${SANDBOX}" \
+                --from "${IMAGE}" \
+                --provider maas \
+                {{- if .Values.deepseek.enabled }}
+                --provider deepseek \
+                {{- end }}
+                --detach 2>&1
+
+              # ── Step 7: Wait for sandbox Ready ─────────────────────────
+              echo "==> Step 7: Waiting for sandbox to be Ready..."
+              for i in $(seq 1 30); do
+                PHASE=$(openshell sandbox list 2>/dev/null \
+                  | grep "${SANDBOX}" | awk '{print $NF}' || echo "unknown")
+                if [ "${PHASE}" = "Ready" ]; then
+                  echo "    Sandbox is Ready"
+                  break
+                fi
+                if [ "$i" -eq 30 ]; then
+                  echo "    WARN: Sandbox did not reach Ready in 5 min"
+                fi
+                echo "    Phase: ${PHASE} (attempt $i/30)"
+                sleep 10
+              done
+
+              # ── Step 8: Inject Pi models.json into sandbox ──────────────
+              echo "==> Step 8: Injecting Pi models.json (providers: MAAS{{- if .Values.deepseek.enabled }}, DeepSeek{{- end }})..."
+              MODELS_B64=$(base64 < /config/models.json | tr -d '\n')
+              openshell sandbox exec "${SANDBOX}" -- sh -c \
+                "mkdir -p /sandbox/.pi/agent && echo ${MODELS_B64} | base64 -d > /sandbox/.pi/agent/models.json" \
+                2>&1 || echo "    WARN: models.json injection returned non-zero"
+
+              # ── Step 9: Apply zero-trust policy ────────────────────────
+              echo "==> Step 9: Applying zero-trust policy..."
+              openshell policy set \
+                --policy /config/policy.yaml \
+                "${SANDBOX}" 2>&1
+
+              echo ""
+              echo "============================================"
+              echo "  Setup complete — sandbox '${SANDBOX}' is"
+              echo "  demo-ready with zero-trust policy applied"
+              {{- if .Values.deepseek.enabled }}
+              echo "  Providers: MAAS ({{ .Values.maas.model }}) + DeepSeek"
+              {{- else }}
+              echo "  Provider: MAAS ({{ .Values.maas.model }})"
+              {{- end }}
+              echo "============================================"
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: pi-sandbox-policy

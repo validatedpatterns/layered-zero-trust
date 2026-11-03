@@ -1,0 +1,168 @@
+## ─── Global ─────────────────────────────────────────────────────────
+## localClusterDomain is set by the VP framework; used for route/URL derivation.
+global:
+  localClusterDomain: apps.example.com
+  secretStore:
+    name: "vault-backend"
+    kind: "ClusterSecretStore"
+
+## ─── Namespace ──────────────────────────────────────────────────────
+namespace: openshell-system
+
+## ─── MAAS LLM Provider (Red Hat Model-as-a-Service) ─────────────────
+## API key is provided via values-secret.yaml.template → Vault → ESO.
+## Only set endpoint/model here; the key flows through Vault automatically.
+maas:
+  enabled: true
+  endpoint: https://maas-rhdp.apps.maas.redhatworkshops.io/v1
+  model: gpt-oss-120b
+
+## ─── Vault (External Secrets Operator) ──────────────────────────────
+## These defaults match the ZTVP validated pattern.
+vault:
+  enabled: true
+  namespace: vault
+  internalUrl: "https://vault.vault.svc.cluster.local:8200"
+  role: openshell-admin
+  secretPath: secret/data/hub/infra/openshell/maas
+  authPath: auth/hub
+  clusterSecretStoreName: vault-backend
+
+## ─── Keycloak SSO ───────────────────────────────────────────────────
+keycloak:
+  enabled: true
+  namespace: keycloak-system
+  realm: ztvp
+  clientId: openshell-gateway
+
+## ─── SPIFFE / SPIRE ─────────────────────────────────────────────────
+spiffe:
+  enabled: true
+
+## ─── Pi Agent Sandbox ───────────────────────────────────────────────
+pi:
+  sandbox:
+    name: pi-agent-demo
+    image: ghcr.io/avijra/pi-sandbox:v1.0
+    policy:
+      filesystemReadOnly:
+        - /bin
+        - /usr
+        - /lib
+        - /proc
+        - /dev/urandom
+        - /app
+        - /etc
+        - /var/log
+      filesystemReadWrite:
+        - /sandbox
+        - /tmp
+        - /dev/null
+      networkPolicies:
+        maas_api:
+          name: Red Hat MAAS
+          endpoints:
+            - host: maas-rhdp.apps.maas.redhatworkshops.io
+              port: 443
+              protocol: rest
+              enforcement: enforce
+              access: read-write
+          binaries:
+            - /usr/bin/curl
+            - /usr/bin/node
+        github:
+          name: GitHub
+          endpoints:
+            - host: github.com
+              port: 443
+            - host: api.github.com
+              port: 443
+              protocol: rest
+              enforcement: enforce
+              access: read-only
+          binaries:
+            - /usr/bin/git
+            - /usr/bin/curl
+        npm_registry:
+          name: npm Registry
+          endpoints:
+            - host: registry.npmjs.org
+              port: 443
+          binaries:
+            - /usr/bin/npm
+            - /usr/bin/node
+
+## ─── Official OpenShell subchart values ─────────────────────────────
+openshell:
+  nameOverride: openshell
+  replicaCount: 1
+  workload:
+    kind: statefulset
+  global:
+    image:
+      registry: ghcr.io/nvidia
+      pullPolicy: IfNotPresent
+  gateway:
+    image:
+      repository: openshell/gateway
+      tag: "0.1.6"
+  supervisor:
+    replicas: 1
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: null
+      runAsGroup: null
+      fsGroup: null
+      seccompProfile:
+        type: RuntimeDefault
+  sandbox:
+    image:
+      repository: nvcr.io/nvidia/base/ubuntu
+      tag: "24.04"
+  podSecurityContext:
+    fsGroup: null
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: null
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+    seccompProfile:
+      type: RuntimeDefault
+  server:
+    disableTls: false
+    telemetryEnabled: false
+    logLevel: info
+    sandboxNamespace: ""
+    credentialDrivers:
+      vault:
+        enabled: true
+        address: "https://vault.vault.svc.cluster.local:8200"
+        mount: secret
+        kvVersion: "2"
+        authMethod: kubernetes
+        role: openshell-admin
+        kubernetesAuthMount: hub
+      kubernetesSecrets:
+        enabled: false
+    auth:
+      allowUnauthenticatedUsers: true
+    oidc:
+      issuer: ""
+      audience: "openshell-gateway"
+    providerTokenGrants:
+      spiffe:
+        enabled: false
+  openshiftRoute:
+    enabled: true
+    host: ""
+  pkiInitJob:
+    serverDnsNames: []
+  credentialDrivers:
+    vault:
+      caConfigMapName: vault-ca
+  networkPolicy:
+    enabled: true
+  agentSandbox:
+    preflight:
+      enabled: false
