@@ -57,6 +57,12 @@ If the source repository is **private** (protected), add the `protected-repos` f
 python3 scripts/gen-feature-variants.py --base values-hub.yaml --features supply-chain,protected-repos --registry-option <id>
 ```
 
+To use one-hour Quay robot tokens instead of the Quay admin password with the built-in Quay registry (option 1 only), add the `quay-token-generator` feature. See [Short-lived Quay robot tokens](quay-short-lived-tokens.md).
+
+```shell
+python3 scripts/gen-feature-variants.py --base values-hub.yaml --features supply-chain,quay-token-generator --registry-option 1
+```
+
 Where `<id>` is one of the options available in _Bring Your Own (BYO) Container Registry_:
 
 1. Embedded Quay Registry
@@ -118,7 +124,7 @@ By default, ZTVP deploys a built-in Red Hat Quay registry. However, you can use 
    See the **Registry Options** section at the top of `values-hub.yaml` for the full set of option blocks (built-in Quay, BYO, embedded OpenShift).
 
 4. **Enable supply-chain-specific overrides** (if needed): The `supply-chain` application may need additional overrides depending on the registry type. These are set in the `supply-chain` overrides section of `values-hub.yaml`:
-   * **Built-in Quay**: Set `registry.tlsVerify: "false"` (self-signed certs). Users, organizations, and repositories are provisioned by the external `quay` chart (`quayConfig` in `overrides/values-quay.yaml`), not the supply-chain chart.
+   * **Built-in Quay**: Set `registry.tlsVerify: "false"` (self-signed certs). Users, organizations, and repositories are provisioned by the external `quay` chart (`quayConfig` in `overrides/values-quay.yaml`), not the supply-chain chart. Optionally add the `quay-token-generator` feature (or set `global.registry.quayTokenGenerator.enabled: true`) so the pipeline and `qtodo` use one-hour Quay robot tokens instead of the Quay admin password (see [Short-lived Quay robot tokens](quay-short-lived-tokens.md)).
    * **Embedded OpenShift**: Enable `registry.embeddedOpenShift.ensureImageNamespaceRBAC` (creates image namespace and push RBAC) and optionally `registry.embeddedOpenShift.tokenRefresher.enabled` (see [Embedded OpenShift Registry](#embedded-openshift-registry)).
    * **BYO/External**: No extra overrides needed.
 

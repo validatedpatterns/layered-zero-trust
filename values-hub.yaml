@@ -28,6 +28,10 @@ spire:
 #     user: quay-admin
 #     vaultPath: "secret/data/hub/infra/quay/quay-users"
 #     passwordVaultKey: "quay-admin-password"
+#     # Short-lived robot tokens instead of the admin password
+#     # (see docs/quay-short-lived-tokens.md for prerequisites)
+#     quayTokenGenerator:
+#       enabled: false
 # OPTION 2: BYO/External Registry (quay.io, ghcr.io, etc.)
 # global:
 #   registry:
@@ -239,6 +243,7 @@ clusterGroup:
     - '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
     - '/overrides/values-{{ $.Values.global.clusterVersion }}-{{ $.Values.clusterGroup.name }}.yaml'
     - '/overrides/values-vault-jwt.yaml'
+    - '/overrides/values-vault-quay-federation.yaml'
   # sharedValueFiles is a flexible mechanism that will add the listed valuefiles to every app defined in the
   # applications section. We intend this to supplement and possibly even replace previous "magic" mechanisms, though
   # we do not at present have a target date for removal.
@@ -815,7 +820,13 @@ clusterGroup:
     # The default schedule is every 10 minutes: imperative.schedule
     # Total timeout of all jobs is 1h: imperative.activeDeadlineSeconds
     # imagePullPolicy is set to always: imperative.imagePullPolicy
-    jobs: []
+    jobs:
+    # Vault identity tokens for short-lived Quay robot tokens.
+    # No-op unless global.registry.quayTokenGenerator.enabled is true.
+    # Configuration: overrides/values-vault-quay-federation.yaml
+    - name: configure-vault-quay-federation
+      playbook: ansible/configure-vault-quay-federation.yaml
+      timeout: 900
   managedClusterGroups: {}
   # This configuration can be used for use cases Pipeline/Secure Supply Chain
   #  devel:

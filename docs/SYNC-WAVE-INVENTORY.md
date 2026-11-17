@@ -47,8 +47,10 @@ Every sync-wave in the repository, in order. **App** = hub-level Argo CD Applica
 | 33 | └ noobaa-mcg | chart | noobaa-system |
 | 34 | └ rhtpa-operator | chart | oidc-cli-secret |
 | 34 | └ noobaa-mcg | chart | bucket-class |
+| 34 | └ qtodo | chart | qtodo-quay-federation-jwt VaultDynamicSecret + ExternalSecret (optional, built-in Quay short-lived pull token) |
 | 35 | rh-keycloak | **App** | |
 | 35 | └ qtodo-db | chart | udn-cluster-user-defined-network (ClusterUserDefinedNetwork shared by qtodo and qtodo-db) |
+| 35 | └ qtodo | chart | qtodo-quay-token Webhook (optional, built-in Quay short-lived pull token) |
 | 36 | noobaa-mcg | **App** | |
 | 36 | └ rhtpa-operator | chart | postgresql-serviceaccount, postgresql-external-secret, object-bucket-claim |
 | 36 | └ keycloak | chart | keycloak.yaml (Keycloak CR) |
@@ -98,7 +100,10 @@ Every sync-wave in the repository, in order. **App** = hub-level Argo CD Applica
 | 48 | supply-chain | **App** | |
 | 48+0 | └ supply-chain | chart | registry-image-namespace (Namespace, RBAC), pipeline-sa, tasks (incl. restart-qtodo), secrets (quay-pass, rhtpa-pass), quay-user, rhtas/rhtpa-config, pipeline-qtodo-restarter (Role+RoleBinding in qtodo ns) |
 | 48+1 | └ supply-chain | chart (hook) | enable-registry-default-route (Sync hook Job) |
+| 48+5 | └ supply-chain | chart | pipeline-quay-federation-jwt VaultDynamicSecret + ExternalSecret (optional, built-in Quay) |
 | 48+10 | └ supply-chain | chart (hook) | registry-token-refresher-seed (Sync hook Job — writes SA token to Vault) |
+| 48+10 | └ supply-chain | chart (hook) | quay-robot-provisioner-seed (Sync hook Job — optional, creates federated Quay robots) |
+| 48+14 | └ supply-chain | chart | pipeline-quay-token Webhook (optional, built-in Quay) |
 | 48+15 | └ supply-chain | chart | qtodo-registry-auth ExternalSecret (reads token from Vault) |
 | 49 | └ rhtpa-operator | chart | spiffe-helper-config |
 | 51 | acs-policies | **App** | After ACS Central + Secured Cluster |
@@ -317,7 +322,10 @@ Resources without an explicit sync-wave default to wave 0. These include: pipeli
 | --- | ---: | ---: | --- |
 | registry-image-namespace.yaml (Namespace, RoleBinding, SA, ClusterRole, ClusterRoleBinding) | — | 0 | Foundation RBAC for embedded OpenShift registry |
 | enable-registry-default-route (Sync hook Job) | — | 1 | Exposes the OpenShift image registry route |
+| pipeline-quay-federation-jwt VaultDynamicSecret + ExternalSecret | — | 5 | Optional (`quayTokenGenerator`): short-lived Vault identity JWT |
 | registry-token-refresher-seed (Sync hook Job) | — | 10 | Writes initial SA token to Vault |
+| quay-robot-provisioner-seed (Sync hook Job) | — | 10 | Optional (`quayTokenGenerator`): creates federated Quay robots and permissions |
+| pipeline-quay-token Webhook | — | 14 | Optional (`quayTokenGenerator`): exchanges the JWT for a one-hour Quay robot token |
 | qtodo-registry-auth ExternalSecret | — | 15 | Reads registry token from Vault; must run after seed Job |
 | workspaces.yaml | 20 | 51 | Pipeline PVCs |
 | pipelinerun-qtodo.yaml (PostSync hook Job + RBAC) | — | — | Job wraps `oc create` of PipelineRun (PipelineRun is excluded from Argo CD tracking) |

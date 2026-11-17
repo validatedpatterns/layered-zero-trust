@@ -60,6 +60,11 @@ python3 scripts/gen-feature-variants.py --features supply-chain --registry-optio
 # Generate all three supply-chain registry variants at once
 python3 scripts/gen-feature-variants.py --features supply-chain --registry-option all
 
+# Supply chain with built-in Quay and short-lived Quay robot tokens
+python3 scripts/gen-feature-variants.py \
+    --features supply-chain,quay-token-generator \
+    --registry-option 1
+
 # Supply chain with protected (private) Git repository support
 python3 scripts/gen-feature-variants.py \
     --features supply-chain,protected-repos \
@@ -132,6 +137,43 @@ For an **SSH** URL:
 
 See [Protected Repositories](../docs/supply-chain.md#protected-repositories)
 for the full setup (Vault credentials, ExternalSecret, workspace selection).
+
+## Short-lived Quay Robot Tokens (`quay-token-generator`)
+
+Replaces the Quay admin password used by the supply-chain pipeline (push)
+and by `qtodo` (pull) with one-hour Quay robot tokens. The External Secrets
+Operator gets a short-lived Vault identity JWT and exchanges it for a robot
+token through Quay robot account federation.
+
+The feature depends on `supply-chain` and only works with the built-in Quay
+registry, so `--registry-option 1` is **required**; any other value (including
+`all`) is rejected:
+
+```bash
+python3 scripts/gen-feature-variants.py \
+    --features supply-chain,quay-token-generator \
+    --registry-option 1
+```
+
+The generated file is named
+`values-hub-supply-chain-quay-quay-token-generator.yaml` and sets:
+
+```yaml
+global:
+  registry:
+    quayTokenGenerator:
+      enabled: true
+```
+
+The rest of the configuration is already part of the base `values-hub.yaml`
+and does nothing while the flag is `false`:
+
+* `/overrides/values-vault-quay-federation.yaml` in
+  `clusterGroup.sharedValueFiles` (Vault identity configuration)
+* the `configure-vault-quay-federation` job in `clusterGroup.imperative.jobs`
+
+See [Short-lived Quay robot tokens](../docs/quay-short-lived-tokens.md) for
+the architecture, prerequisites and verification steps.
 
 ## Azure Entra ID Integration
 
@@ -224,3 +266,10 @@ MultiNetworkPolicy prerequisite and verification steps.
    any `depends_on` entries.
 3. If the feature needs to modify an existing application (e.g. add a Vault
    JWT role), use the `merge_into_applications` key under `clusterGroup`.
+4. If the feature only works with some registry options, list them in
+   `registry_options_allowed` (e.g. `[1]`); the script rejects any other
+   `--registry-option`.
+
+> **Note:** Feature fragments are merged before the registry option fragment.
+> Do not set in a registry option fragment a key that a feature fragment
+> enables, or the registry option value overrides it.

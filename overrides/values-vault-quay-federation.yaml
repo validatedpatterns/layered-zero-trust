@@ -1,0 +1,42 @@
+# Vault configuration for short-lived Quay robot tokens
+# (global.registry.quayTokenGenerator, see docs/quay-short-lived-tokens.md)
+#
+# Applied by the configure-vault-quay-federation imperative job
+# (ansible/configure-vault-quay-federation.yaml). The job is a no-op unless
+# global.registry.quayTokenGenerator.enabled is true.
+#
+# Each identity gets:
+#   - a Kubernetes auth role on the hub mount, bound to a dedicated
+#     ServiceAccount that no pod mounts (only ESO requests its tokens),
+#   - a Vault identity OIDC role that signs short-lived JWTs (aud=clientId),
+#   - a policy that only allows reading identity/oidc/token/<name>.
+# Quay robots federate with the Vault OIDC issuer and the Vault entity
+# (JWT "sub") of each identity.
+vault_quay_federation:
+  # Public issuer of the Vault identity tokens. Quay downloads the OIDC
+  # discovery document and JWKS from <issuer>/v1/identity/oidc/.well-known/
+  # (unauthenticated by design, public keys only).
+  issuer: "https://vault-vault.{{ $.Values.global.hubClusterDomain }}"
+  key:
+    name: quay-federation
+    algorithm: RS256
+    # Seconds. verification_ttl must be >= every role tokenTTL
+    rotationPeriod: 86400
+    verificationTTL: 86400
+  # Audience ("aud") of the identity tokens
+  clientId: quay
+  # Lifetime (seconds) of the identity tokens exchanged with Quay
+  tokenTTL: 900
+  # Kubernetes auth settings for the ESO VaultDynamicSecret generators
+  authMount: hub
+  authAudience: vault
+  # Lifetime (seconds) of the Vault token issued at login
+  authTokenTTL: 300
+  identities:
+    - name: quay-pipeline-pusher
+      serviceAccount: quay-push-token
+      # Namespace of the supply-chain application (Argo CD namespace)
+      namespace: "{{ if $.Values.global.singleArgoCD }}{{ $.Values.global.vpArgoNamespace }}{{ else }}{{ $.Values.global.pattern }}-{{ $.Values.clusterGroup.name }}{{ end }}"
+    - name: quay-qtodo-puller
+      serviceAccount: quay-pull-token
+      namespace: qtodo
