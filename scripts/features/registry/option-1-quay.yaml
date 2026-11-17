@@ -12,6 +12,8 @@ global:
     user: quay-admin
     vaultPath: "secret/data/hub/infra/quay/quay-users"
     passwordVaultKey: "quay-admin-password"
+    # Short-lived Quay robot tokens instead of the admin password:
+    # add --features quay-token-generator (see docs/quay-short-lived-tokens.md)
 
 clusterGroup:
   namespaces:

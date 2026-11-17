@@ -119,3 +119,27 @@ support Kubernetes Services), otherwise the cluster-network Service DNS name.
 {{- .Values.postgresql.host -}}
 {{- end -}}
 {{- end -}}
+{{/*
+Whether the short-lived Quay robot token generator is enabled
+(app.images.main.registry.quayTokenGenerator.enabled or global.registry.quayTokenGenerator.enabled)
+*/}}
+{{- define "qtodo.quayTokenGenerator.enabled" -}}
+{{- $local := dig "quayTokenGenerator" "enabled" false (.Values.app.images.main.registry | default dict) -}}
+{{- $global := dig "registry" "quayTokenGenerator" "enabled" false (.Values.global | default dict) -}}
+{{- if or $local $global -}}true{{- end -}}
+{{- end }}
+
+{{/*
+Whether the qtodo registry pull secret is managed by this chart
+*/}}
+{{- define "qtodo.registryAuth.enabled" -}}
+{{- if or .Values.app.images.main.registry.auth (and .Values.global.registry.enabled (or .Values.global.registry.vaultPath (include "qtodo.quayTokenGenerator.enabled" .))) -}}true{{- end -}}
+{{- end }}
+
+{{/*
+Vault URL used by the Quay token generator (Vault route by default)
+*/}}
+{{- define "qtodo.quayTokenGenerator.vaultUrl" -}}
+{{- $domain := .Values.global.hubClusterDomain | default .Values.global.localClusterDomain -}}
+{{- .Values.app.images.main.registry.quayTokenGenerator.vaultUrl | default (printf "https://vault-vault.%s" $domain) }}
+{{- end }}

@@ -1,0 +1,105 @@
+{{- if include "supply-chain.quayTokenGenerator.enabled" . }}
+{{- $gen := .Values.quayTokenGenerator }}
+{{- $regDomain := tpl (required "registry.domain (or global.registry.domain) is required" (.Values.registry.domain | default .Values.global.registry.domain)) . }}
+{{- $robot := printf "%s+%s" (include "supply-chain.quayTokenGenerator.organization" .) $gen.pusher.robot }}
+# ============================================================
+# Short-lived Quay push token for the pipeline
+#
+# 1. pipeline-quay-federation-jwt (VaultDynamicSecret): ESO logs in to
+#    Vault with a token of the quay-push-token SA (Kubernetes auth,
+#    validated with TokenReview) and reads identity/oidc/token/<vaultRole>:
+#    a JWT signed by Vault, sub=<Vault entity>, aud=quay, ~15 min lifetime.
+# 2. pipeline-quay-token (Webhook): ESO exchanges that JWT at
+#    https://<registry>/oauth2/federation/robot/token for a one-hour token
+#    of the <org>+<pusher.robot> robot (role "write" on the repository).
+# 3. qtodo-registry-auth renders the robot token as dockerconfigjson.
+# The Quay robot federation trusts the Vault OIDC issuer and the Vault
+# entity of this identity (see quay-robot-provisioner.yaml).
+# ============================================================
+---
+# Identity of the push robot. No pod runs with it: only ESO requests
+# tokens for it (audience quayTokenGenerator.vault.audience).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $gen.pusher.serviceAccount }}
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+automountServiceAccountToken: false
+---
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: VaultDynamicSecret
+metadata:
+  name: pipeline-quay-federation-jwt
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  method: GET
+  path: {{ printf "identity/oidc/token/%s" $gen.pusher.vaultRole | quote }}
+  resultType: Data
+  provider:
+    server: {{ include "supply-chain.quayTokenGenerator.vaultUrl" . | quote }}
+    caProvider:
+      type: ConfigMap
+      name: kube-root-ca.crt
+      key: ca.crt
+    auth:
+      kubernetes:
+        mountPath: {{ $gen.vault.authMount | quote }}
+        role: {{ $gen.pusher.vaultRole | quote }}
+        serviceAccountRef:
+          name: {{ $gen.pusher.serviceAccount }}
+          audiences:
+            - {{ $gen.vault.audience | quote }}
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: {{ $gen.pusher.federationSecret }}
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  refreshInterval: {{ $gen.federationTokenRefreshInterval | quote }}
+  target:
+    name: {{ $gen.pusher.federationSecret }}
+    template:
+      type: Opaque
+      metadata:
+        labels:
+          # Required by ESO to allow the Webhook generator to read it
+          external-secrets.io/type: webhook
+      data:
+        token: "{{ `{{ .token }}` }}"
+  dataFrom:
+  - sourceRef:
+      generatorRef:
+        apiVersion: generators.external-secrets.io/v1alpha1
+        kind: VaultDynamicSecret
+        name: pipeline-quay-federation-jwt
+---
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Webhook
+metadata:
+  name: pipeline-quay-token
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "14"
+spec:
+  method: GET
+  url: {{ printf "https://%s/oauth2/federation/robot/token" $regDomain | quote }}
+  headers:
+    Authorization: {{ printf "Basic {{ print %q \":\" .federation.token | b64enc }}" $robot | quote }}
+  caProvider:
+    type: ConfigMap
+    name: kube-root-ca.crt
+    key: ca.crt
+  # Quay answers {"token": "<robot token>"}; every key becomes an output key
+  result: {}
+  secrets:
+  - name: federation
+    secretRef:
+      name: {{ $gen.pusher.federationSecret }}
+{{- end }}

@@ -11,6 +11,9 @@ global:
     user: ""
     vaultPath: ""
     passwordVaultKey: ""
+    # Short-lived Quay robot tokens (built-in Quay registry only)
+    quayTokenGenerator:
+      enabled: false
 
 # QTodo application configuration
 app:
@@ -34,6 +37,35 @@ app:
         # Vault path and key for registry password (set for your scenario)
         vaultPath: ""
         passwordVaultKey: ""
+        # Built-in Quay registry: build the pull secret from a one-hour Quay
+        # robot token instead of the static registry password. ESO gets a
+        # short-lived Vault identity JWT (VaultDynamicSecret, Kubernetes auth)
+        # and exchanges it for a token of a robot that only has "read" on the
+        # repository (Webhook generator, Quay robot account federation).
+        # The robot, its federation and permission are created by the
+        # supply-chain chart (quayTokenGenerator.pullers); the Vault identity
+        # by overrides/values-vault-quay-federation.yaml.
+        # Also enabled when global.registry.quayTokenGenerator.enabled=true.
+        # See docs/quay-short-lived-tokens.md.
+        quayTokenGenerator:
+          enabled: false
+          # Robot short name; the organization is the first component of
+          # global.registry.repository (e.g. "ztvp" -> ztvp+qtodo)
+          robot: "qtodo"
+          # ServiceAccount of the identity (no pods use it)
+          serviceAccount: "quay-pull-token"
+          # Vault Kubernetes auth role and identity OIDC role (same name)
+          vaultRole: "quay-qtodo-puller"
+          vaultAuthMount: "hub"
+          vaultAudience: "vault"
+          # Defaults to the Vault route: https://vault-vault.<global.hubClusterDomain>
+          vaultUrl: ""
+          # Secret holding the short-lived Vault identity JWT
+          federationSecret: "quay-pull-federation-jwt"
+          # Vault identity JWTs last 15 min by default
+          federationTokenRefreshInterval: "10m"
+          # Quay robot tokens last one hour
+          refreshInterval: "55m"
     spiffeHelper:
       name: registry.redhat.io/zero-trust-workload-identity-manager/spiffe-helper-rhel9
       version: v0.10.0
