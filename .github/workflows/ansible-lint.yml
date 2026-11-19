@@ -15,7 +15,7 @@ jobs:
           persist-credentials: false
 
       - name: Lint Ansible Playbook
-        uses: ansible/ansible-lint@9bce2bfb8f4a984e6b13767bc0d6bf0a49492164 # v26
+        uses: ansible/ansible-lint@9bce2bfb8f4a984e6b13767bc0d6bf0a49492164 # v26.10.1
         # Let's point it to the path
         with:
           args: "-c .ansible-lint ansible/"
