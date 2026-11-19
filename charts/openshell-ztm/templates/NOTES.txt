@@ -1,0 +1,56 @@
+╔═══════════════════════════════════════════════════════════════════╗
+║  OpenShell + Pi AI Agent on Zero Trust Mesh — v{{ .Chart.Version }}         ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+Gateway URL:
+  https://{{ include "ztm.routeHostname" . }}
+
+Pi Sandbox:  {{ .Values.pi.sandbox.name }}
+Namespace:   {{ .Values.namespace }}
+
+── Quick Start ─────────────────────────────────────────────────────
+
+1. Install the OpenShell CLI:
+   curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
+
+2. Point to the gateway:
+   export OPENSHELL_GATEWAY="https://{{ include "ztm.routeHostname" . }}"
+
+3. Verify sandbox is ready:
+   openshell sandbox list
+
+4. Connect:
+   openshell sandbox exec {{ .Values.pi.sandbox.name }}
+
+5. Inside the sandbox, run Pi:
+   pi "Write a hello world in Python"
+
+── Demo Scenarios ──────────────────────────────────────────────────
+
+A) Network Deny — try reaching an unauthorized host:
+   curl https://evil.example.com
+   → BLOCKED. Only maas-rhdp.apps.maas..., github.com, npm are allowed.
+
+B) Filesystem Deny — try writing outside allowed paths:
+   touch /etc/shadow
+   → DENIED by Landlock LSM. Only /sandbox and /tmp are writable.
+
+C) Credential Security — API key never visible inside sandbox:
+   env | grep MAAS
+   → Shows openshell:resolve:... not the real key.
+
+D) Dynamic Policy Update — add access on the fly:
+   openshell policy update --sandbox {{ .Values.pi.sandbox.name }} \
+     --add-endpoint "https://pypi.org:443"
+
+── Clean Uninstall ─────────────────────────────────────────────────
+
+  helm uninstall {{ .Release.Name }} -n {{ .Values.namespace }}
+
+  To also remove the namespace:
+  oc delete namespace {{ .Values.namespace }}
+
+  To reinstall fresh:
+  helm install {{ .Release.Name }} openshell-ztm-demo/openshell-ztm-demo \
+    -n {{ .Values.namespace }} --create-namespace \
+    --set maas.apiKey=<YOUR_KEY>

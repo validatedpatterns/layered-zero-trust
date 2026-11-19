@@ -1,0 +1,28 @@
+apiVersion: v2
+name: openshell-ztm
+description: |
+  NVIDIA OpenShell AI Agent Sandbox with Zero Trust integration.
+  Wraps the official NVIDIA OpenShell Helm chart and adds ZTVP
+  integration (Vault, ESO, Keycloak, SPIFFE/SPIRE, ACS) plus a
+  pre-configured Pi agent sandbox with zero-trust policies.
+version: 1.3.1
+appVersion: "0.1.6"
+type: application
+keywords:
+  - zero-trust
+  - ai-agents
+  - openshell
+  - security
+  - sandbox
+  - maas
+maintainers:
+  - name: Zero Trust Validated Patterns Team
+    email: ztvp-arch-group@redhat.com
+sources:
+  - https://github.com/NVIDIA/OpenShell
+  - https://github.com/validatedpatterns/layered-zero-trust
+dependencies:
+  - name: helm-chart
+    version: "0.1.6"
+    repository: "oci://ghcr.io/nvidia/openshell"
+    alias: openshell

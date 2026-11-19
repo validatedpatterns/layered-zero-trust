@@ -1,0 +1,13 @@
+{{- if and .Values.vault.enabled (or (and .Values.deepseek.enabled .Values.deepseek.apiKey) (and .Values.maas.enabled .Values.maas.apiKey)) }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-seed-job
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "ztm.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-9"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+{{- end }}

@@ -1,0 +1,17 @@
+{{- if .Values.spiffe.enabled }}
+apiVersion: spire.spiffe.io/v1alpha1
+kind: ClusterSPIFFEID
+metadata:
+  name: openshell-gateway
+  labels:
+    {{- include "ztm.labels" . | nindent 4 }}
+spec:
+  className: openshift
+  spiffeIDTemplate: "spiffe://{{ include "ztm.trustDomain" . }}/ns/{{ .Values.namespace }}/sa/openshell"
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: openshell
+  namespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: {{ .Values.namespace }}
+{{- end }}
