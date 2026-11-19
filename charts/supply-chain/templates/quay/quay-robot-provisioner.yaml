@@ -1,0 +1,139 @@
+{{- if include "supply-chain.quayTokenGenerator.enabled" . }}
+{{- $gen := .Values.quayTokenGenerator }}
+{{- $regVaultPath := .Values.registry.vaultPath | default .Values.global.registry.vaultPath }}
+{{- $regPasswordKey := .Values.registry.passwordVaultKey | default .Values.global.registry.passwordVaultKey }}
+{{- $robots := list (dict "robot" $gen.pusher.robot "namespace" .Values.global.namespace "federationSecret" $gen.pusher.federationSecret "role" "write") }}
+{{- range $gen.pullers }}
+{{- $robots = append $robots (dict "robot" .robot "namespace" .namespace "federationSecret" .federationSecret "role" "read") }}
+{{- end }}
+# ============================================================
+# Quay robot provisioner (short-lived Quay robot tokens)
+# Creates the federated robot accounts used by the token generators and
+# grants each robot its role on the repository. The federation issuer and
+# subject are read from the short-lived Vault identity JWT that ESO keeps in
+# each identity's federationSecret (iss = Vault OIDC issuer, sub = Vault
+# entity of the identity), so they always match what Quay receives.
+# This is the only consumer of the Quay admin password when the token
+# generator is enabled.
+# ============================================================
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $gen.provisioner.serviceAccount }}
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+{{- range $robots }}
+---
+# Read-only access to the identity JWT Secret (to learn iss/sub/aud)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: quay-robot-provisioner-{{ .robot }}
+  namespace: {{ .namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  resourceNames: [{{ .federationSecret | quote }}]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: quay-robot-provisioner-{{ .robot }}
+  namespace: {{ .namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: quay-robot-provisioner-{{ .robot }}
+subjects:
+- kind: ServiceAccount
+  name: {{ $gen.provisioner.serviceAccount }}
+  namespace: {{ $.Values.global.namespace }}
+{{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: quay-robot-provisioner
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+data:
+  quay_robots.py: |
+{{- .Files.Get "files/quay_robots.py" | nindent 4 }}
+  robots.json: |
+{{- toPrettyJson $robots | nindent 4 }}
+---
+apiVersion: "external-secrets.io/v1"
+kind: ExternalSecret
+metadata:
+  name: quay-robot-provisioner-credentials
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  refreshInterval: 15s
+  secretStoreRef:
+    name: {{ .Values.global.secretStore.name }}
+    kind: {{ .Values.global.secretStore.kind }}
+  target:
+    name: quay-robot-provisioner-credentials
+    template:
+      type: Opaque
+      data:
+        password: "{{ `{{ .password }}` }}"
+  data:
+  - secretKey: password
+    remoteRef:
+      key: {{ required "registry.vaultPath (or global.registry.vaultPath) is required for the Quay admin password" $regVaultPath }}
+      property: {{ required "registry.passwordVaultKey (or global.registry.passwordVaultKey) is required for the Quay admin password" $regPasswordKey }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: quay-robot-provisioner
+  namespace: {{ .Values.global.namespace }}
+spec:
+  schedule: {{ $gen.provisioner.schedule | quote }}
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: quay-robot-provisioner
+        spec:
+{{- include "supply-chain.quayRobotProvisioner.podSpec" (dict "ctx" . "softFail" false) | nindent 10 }}
+---
+# Initial run so the robots are federated before the qtodo-registry-auth
+# ExternalSecret (wave 15) exchanges its first token. It waits until ESO
+# has produced the identity JWT Secrets (wave 5). SOFT_FAIL: if Vault or
+# Quay are not ready within the budget it exits 0 instead of failing the
+# Argo CD sync; the CronJob converges later.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: quay-robot-provisioner-seed
+  namespace: {{ .Values.global.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded,BeforeHookCreation
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 900
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: quay-robot-provisioner
+    spec:
+{{- include "supply-chain.quayRobotProvisioner.podSpec" (dict "ctx" . "softFail" true) | nindent 6 }}
+{{- end }}

@@ -1,0 +1,187 @@
+---
+# Configure Vault for short-lived Quay robot tokens
+# (global.registry.quayTokenGenerator, see docs/quay-short-lived-tokens.md)
+#
+# Runs as an imperative job (imperative-sa can exec into the Vault pod, the
+# same mechanism used by rhvp.cluster_utils.vault_utils). Configuration comes
+# from overrides/values-vault-quay-federation.yaml (vault_quay_federation).
+#
+# For every identity it creates:
+#   - policy <name>: read identity/oidc/token/<name>
+#   - Kubernetes auth role auth/<authMount>/role/<name>, bound to the
+#     identity ServiceAccount, audience <authAudience>
+#   - identity OIDC role identity/oidc/role/<name> signing JWTs with
+#     aud=<clientId> and a <tokenTTL> lifetime
+# plus the identity OIDC issuer and signing key shared by all identities.
+
+- name: Configure Vault identity tokens for Quay robot federation
+  become: false
+  connection: local
+  hosts: localhost
+  gather_facts: false
+  vars:
+    vault_ns: "vault"
+    vault_pod: "vault-0"
+    qf: "{{ vault_quay_federation | default({}) }}"
+    qf_enabled: "{{ global.registry.quayTokenGenerator.enabled | default(false) | bool }}"
+  tasks:
+    - name: Skip when the Quay token generator is disabled
+      ansible.builtin.meta: end_play
+      when: not qf_enabled | bool
+
+    - name: Fail when the Vault configuration is missing
+      ansible.builtin.fail:
+        msg: "vault_quay_federation is not defined (overrides/values-vault-quay-federation.yaml)"
+      when: qf.issuer is not defined or qf.identities is not defined
+
+    - name: Wait until the Vault CLI in the pod is authenticated # noqa: syntax-check[unknown-module]
+      kubernetes.core.k8s_exec:
+        namespace: "{{ vault_ns }}"
+        pod: "{{ vault_pod }}"
+        command: vault token lookup -format=json
+      register: token_lookup
+      until: token_lookup.rc is defined and token_lookup.rc == 0
+      retries: 20
+      delay: 30
+      changed_when: false
+      no_log: true
+
+    # ---------------------------------------------------------------
+    # Identity OIDC issuer
+    # ---------------------------------------------------------------
+    - name: Read identity OIDC configuration
+      kubernetes.core.k8s_exec:
+        namespace: "{{ vault_ns }}"
+        pod: "{{ vault_pod }}"
+        command: vault read -format=json identity/oidc/config
+      register: oidc_config
+      changed_when: false
+
+    - name: Configure identity OIDC issuer
+      kubernetes.core.k8s_exec:
+        namespace: "{{ vault_ns }}"
+        pod: "{{ vault_pod }}"
+        command: vault write identity/oidc/config issuer={{ qf.issuer }}
+      when: (oidc_config.stdout | from_json).data.issuer | default('') != qf.issuer
+
+    # ---------------------------------------------------------------
+    # Signing key
+    # ---------------------------------------------------------------
+    - name: Read identity OIDC key
+      kubernetes.core.k8s_exec:
+        namespace: "{{ vault_ns }}"
+        pod: "{{ vault_pod }}"
+        command: vault read -format=json identity/oidc/key/{{ qf.key.name }}
+      register: oidc_key
+      changed_when: false
+      failed_when: false
+
+    - name: Set identity OIDC key facts
+      ansible.builtin.set_fact:
+        oidc_key_current: "{{ (oidc_key.stdout | from_json).data if oidc_key.rc == 0 else {} }}"
+
+    - name: Write identity OIDC key
+      kubernetes.core.k8s_exec:
+        namespace: "{{ vault_ns }}"
+        pod: "{{ vault_pod }}"
+        command: >
+          vault write identity/oidc/key/{{ qf.key.name }}
+            algorithm={{ qf.key.algorithm }}
+            rotation_period={{ qf.key.rotationPeriod }}
+            verification_ttl={{ qf.key.verificationTTL }}
+            allowed_client_ids={{ qf.clientId }}
+      when: >-
+        oidc_key.rc != 0 or
+        oidc_key_current.algorithm | default('') != qf.key.algorithm or
+        oidc_key_current.rotation_period | default(0) | int != qf.key.rotationPeriod | int or
+        oidc_key_current.verification_ttl | default(0) | int != qf.key.verificationTTL | int or
+        oidc_key_current.allowed_client_ids | default([]) != [qf.clientId]
+
+    # ---------------------------------------------------------------
+    # Per identity: policy, identity OIDC role, Kubernetes auth role
+    # ---------------------------------------------------------------
+    - name: Write identity token policies
+      kubernetes.core.k8s_exec:
+        namespace: "{{ vault_ns }}"
+        pod: "{{ vault_pod }}"
+        command: |
+          bash -e -c 'cat <<EOF | vault policy write {{ item.name }} -
+          path "identity/oidc/token/{{ item.name }}" {
+            capabilities = ["read"]
+          }
+          EOF'
+      loop: "{{ qf.identities }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Read identity OIDC roles
+      kubernetes.core.k8s_exec:
+        namespace: "{{ vault_ns }}"
+        pod: "{{ vault_pod }}"
+        command: vault read -format=json identity/oidc/role/{{ item.name }}
+      loop: "{{ qf.identities }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: oidc_roles
+      changed_when: false
+      failed_when: false
+
+    - name: Write identity OIDC roles
+      kubernetes.core.k8s_exec:
+        namespace: "{{ vault_ns }}"
+        pod: "{{ vault_pod }}"
+        command: >
+          vault write identity/oidc/role/{{ item.item.name }}
+            key={{ qf.key.name }}
+            ttl={{ qf.tokenTTL }}
+            client_id={{ qf.clientId }}
+      loop: "{{ oidc_roles.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      vars:
+        current: "{{ (item.stdout | from_json).data if item.rc == 0 else {} }}"
+      when: >-
+        item.rc != 0 or
+        current.key | default('') != qf.key.name or
+        current.ttl | default(0) | int != qf.tokenTTL | int or
+        current.client_id | default('') != qf.clientId
+
+    - name: Read Kubernetes auth roles
+      kubernetes.core.k8s_exec:
+        namespace: "{{ vault_ns }}"
+        pod: "{{ vault_pod }}"
+        command: vault read -format=json auth/{{ qf.authMount }}/role/{{ item.name }}
+      loop: "{{ qf.identities }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: auth_roles
+      changed_when: false
+      failed_when: false
+
+    # alias_name_source=serviceaccount_name keeps the Vault entity (JWT "sub")
+    # stable if the ServiceAccount is recreated.
+    - name: Write Kubernetes auth roles
+      kubernetes.core.k8s_exec:
+        namespace: "{{ vault_ns }}"
+        pod: "{{ vault_pod }}"
+        command: >
+          vault write auth/{{ qf.authMount }}/role/{{ item.item.name }}
+            bound_service_account_names={{ item.item.serviceAccount }}
+            bound_service_account_namespaces={{ item.item.namespace }}
+            audience={{ qf.authAudience }}
+            alias_name_source=serviceaccount_name
+            token_policies={{ item.item.name }}
+            token_ttl={{ qf.authTokenTTL }}
+      loop: "{{ auth_roles.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+      vars:
+        current: "{{ (item.stdout | from_json).data if item.rc == 0 else {} }}"
+      when: >-
+        item.rc != 0 or
+        current.bound_service_account_names | default([]) != [item.item.serviceAccount] or
+        current.bound_service_account_namespaces | default([]) != [item.item.namespace] or
+        current.audience | default('') != qf.authAudience or
+        current.alias_name_source | default('') != 'serviceaccount_name' or
+        current.token_policies | default([]) != [item.item.name] or
+        current.token_ttl | default(0) | int != qf.authTokenTTL | int

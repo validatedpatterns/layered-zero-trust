@@ -37,6 +37,11 @@ features:
     org: ztvp
     image_name: qtodo
 
+  quay-token-generator:
+    description: "Short-lived Quay robot tokens for supply-chain (built-in Quay only)"
+    depends_on: [supply-chain]
+    registry_options_allowed: [1]
+
   protected-repos:
     description: "Protected (private) Git repository support for supply-chain"
     depends_on: [supply-chain]

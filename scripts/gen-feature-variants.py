@@ -545,7 +545,11 @@ def build_output_name(features, registry_option=None):
     """Construct the output filename from features and optional registry option."""
     if "supply-chain" in features:
         label = REGISTRY_LABELS.get(registry_option, f"option-{registry_option}")
-        suffix = "-protected-repos" if "protected-repos" in features else ""
+        suffix = "".join(
+            f"-{f}"
+            for f in ("protected-repos", "quay-token-generator")
+            if f in features
+        )
         return f"values-hub-supply-chain-{label}{suffix}.yaml"
     return f"values-hub-{'-'.join(features)}.yaml"
 
@@ -600,7 +604,13 @@ def main():
         print("Available features:")
         for name, info in feature_defs.items():
             deps = ", ".join(info.get("depends_on", [])) or "none"
-            print(f"  {name:20s} - {info['description']}  (deps: {deps})")
+            allowed = info.get("registry_options_allowed")
+            extra = (
+                f", registry options: {', '.join(str(o) for o in allowed)}"
+                if allowed
+                else ""
+            )
+            print(f"  {name:20s} - {info['description']}  (deps: {deps}{extra})")
         if registry_opts:
             print("\nRegistry options (for --registry-option with supply-chain):")
             for num, info in registry_opts.items():
@@ -646,6 +656,20 @@ def main():
             file=sys.stderr,
         )
         sys.exit(1)
+
+    for f in resolved:
+        allowed = feature_defs.get(f, {}).get("registry_options_allowed")
+        if allowed and (
+            not args.registry_option
+            or args.registry_option == "all"
+            or int(args.registry_option) not in allowed
+        ):
+            print(
+                f"ERROR: feature '{f}' requires --registry-option "
+                f"{' or '.join(str(o) for o in allowed)}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     needs_git_repo = any(
         feature_defs.get(f, {}).get("git_repo_required") for f in resolved
