@@ -31,13 +31,13 @@ clusterGroup:
         - name: "distribution.targetNamespaces[0]"
           value: "qtodo"
         - name: "distribution.targetNamespaces[1]"
-          value: "{{ $.Values.global.pattern }}-hub"
+          value: "vp-gitops"
     vault:
       jwt:
         roles:
           - name: supply-chain
             audience: supply-chain
-            subject: "spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/{{ $.Values.global.pattern }}-hub/sa/pipeline"
+            subject: "spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/vp-gitops/sa/pipeline"
             policies:
               - hub-supply-chain-jwt-secret
     supply-chain: {}

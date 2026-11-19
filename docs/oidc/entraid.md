@@ -819,7 +819,7 @@ To enable the supply chain pipelines to authenticate to HashiCorp Vault using SP
 vault_jwt_roles:
 - name: supply-chain
   audience: supply-chain
-  subject: "spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/{{ $.Values.global.pattern }}-hub/sa/pipeline"
+  subject: "spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/vp-gitops/sa/pipeline"
   policies:
   - hub-supply-chain-jwt-secret
 ```
