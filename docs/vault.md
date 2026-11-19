@@ -84,7 +84,7 @@ binds a specific SPIFFE ID to a set of policies:
 | --- | --- | --- | --- |
 | `qtodo` | `spiffe://apps.<domain>/ns/qtodo/sa/qtodo` | `https://keycloak.apps.<domain>/realms/ztvp` | `apps-qtodo-jwt-secret` |
 | `rhtpa` | `spiffe://apps.<domain>/ns/trusted-profile-analyzer/sa/rhtpa` | `rhtpa` | `hub-infra-rhtpa-jwt-secret` |
-| `supply-chain` | `spiffe://apps.<domain>/ns/<pattern>-hub/sa/pipeline` | `supply-chain` | `hub-supply-chain-jwt-secret` |
+| `supply-chain` | `spiffe://apps.<domain>/ns/vp-gitops/sa/pipeline` | `supply-chain` | `hub-supply-chain-jwt-secret` |
 
 The `qtodo` role is active by default. The `rhtpa` and `supply-chain` roles are
 activated when their respective features are enabled.

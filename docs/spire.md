@@ -87,7 +87,7 @@ node runs its own SPIRE agent. The Tekton Chains controller uses this approach
 | --- | --- | --- | --- |
 | qtodo | `spiffe://apps.<domain>/ns/qtodo/sa/qtodo` | ClusterSPIFFEID | `qtodo` |
 | RHTPA | `spiffe://apps.<domain>/ns/trusted-profile-analyzer/sa/rhtpa` | ClusterSPIFFEID | `rhtpa` |
-| Supply chain pipeline | `spiffe://apps.<domain>/ns/<pattern>-hub/sa/pipeline` | ClusterSPIFFEID | `supply-chain` |
+| Supply chain pipeline | `spiffe://apps.<domain>/ns/vp-gitops/sa/pipeline` | ClusterSPIFFEID | `supply-chain` |
 | Tekton Chains controller | `spiffe://apps.<domain>/ns/openshift-pipelines/sa/tekton-chains-controller` | ClusterStaticEntry | (used with Fulcio) |
 
 ## OIDC Discovery Provider
