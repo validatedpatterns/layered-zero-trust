@@ -45,7 +45,7 @@ vault_jwt_roles:
   # Supply chain vault role (for Tekton pipelines; enable with supply-chain app / Option 3 or BYO registry)
   # - name: supply-chain
   #   audience: supply-chain
-  #   subject: spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/{{ $.Values.global.pattern }}-hub/sa/pipeline
+  #   subject: spiffe://apps.{{ $.Values.global.clusterDomain }}/ns/vp-gitops/sa/pipeline
   #   policies:
   #     - hub-supply-chain-jwt-secret
 oidc_discovery_url: https://spire-spiffe-oidc-discovery-provider.zero-trust-workload-identity-manager.svc.cluster.local
