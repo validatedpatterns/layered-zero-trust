@@ -1,0 +1,150 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pi-sandbox-policy
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "ztm.labels" . | nindent 4 }}
+data:
+  policy.yaml: |
+    version: 1
+    filesystem_policy:
+      include_workdir: true
+      read_only:
+        {{- range .Values.pi.sandbox.policy.filesystemReadOnly }}
+        - {{ . }}
+        {{- end }}
+      read_write:
+        {{- range .Values.pi.sandbox.policy.filesystemReadWrite }}
+        - {{ . }}
+        {{- end }}
+    landlock:
+      compatibility: best_effort
+    network_policies:
+      {{- range $key, $rule := .Values.pi.sandbox.policy.networkPolicies }}
+      {{ $key }}:
+        name: {{ $rule.name }}
+        endpoints:
+          {{- range $rule.endpoints }}
+          - host: {{ .host }}
+            port: {{ .port }}
+            {{- if .protocol }}
+            protocol: {{ .protocol }}
+            {{- end }}
+            {{- if .enforcement }}
+            enforcement: {{ .enforcement }}
+            {{- end }}
+            {{- if .access }}
+            access: {{ .access }}
+            {{- end }}
+          {{- end }}
+        {{- if $rule.binaries }}
+        binaries:
+          {{- range $rule.binaries }}
+          - { path: {{ . }} }
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- if .Values.deepseek.enabled }}
+      deepseek_api:
+        name: "DeepSeek API"
+        endpoints:
+          - host: api.deepseek.com
+            port: 443
+            protocol: rest
+            enforcement: enforce
+            access: read-write
+        binaries:
+          - { path: /usr/bin/curl }
+          - { path: /usr/bin/node }
+      {{- end }}
+  maas-profile.yaml: |
+    id: maas
+    display_name: "Red Hat MAAS ({{ .Values.maas.model }})"
+    description: Red Hat Model-as-a-Service — OpenAI-compatible LLM endpoint
+    category: inference
+    inference_capable: true
+    credentials:
+      - name: api_key
+        description: MAAS API key
+        env_vars: [MAAS_API_KEY]
+        required: true
+        auth_style: bearer
+        header_name: authorization
+    discovery:
+      credentials: [api_key]
+    endpoints:
+      - host: {{ (urlParse .Values.maas.endpoint).host }}
+        port: 443
+        protocol: rest
+        access: read-write
+        enforcement: enforce
+    binaries: [/usr/bin/curl, /usr/local/bin/curl, /usr/bin/node, /usr/local/bin/node]
+  {{- if .Values.deepseek.enabled }}
+  deepseek-profile.yaml: |
+    id: deepseek
+    display_name: DeepSeek
+    description: DeepSeek inference API (OpenAI-compatible)
+    category: inference
+    inference_capable: true
+    credentials:
+      - name: api_key
+        description: DeepSeek API key
+        env_vars: [DEEPSEEK_API_KEY]
+        required: true
+        auth_style: bearer
+        header_name: authorization
+    discovery:
+      credentials: [api_key]
+    endpoints:
+      - host: api.deepseek.com
+        port: 443
+        protocol: rest
+        access: read-write
+        enforcement: enforce
+    binaries: [/usr/bin/curl, /usr/local/bin/curl, /usr/bin/node, /usr/local/bin/node]
+  {{- end }}
+  models.json: |
+    {
+      "providers": {
+        "maas": {
+          "baseUrl": "{{ .Values.maas.endpoint }}",
+          "api": "openai-completions",
+          "apiKey": "$MAAS_API_KEY",
+          "models": [
+            {
+              "id": "{{ .Values.maas.model }}",
+              "name": "Red Hat MAAS {{ .Values.maas.model }}",
+              "contextWindow": 131072,
+              "maxTokens": 4096,
+              "input": ["text"],
+              "reasoning": false,
+              "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 }
+            }
+          ]
+        }
+        {{- if .Values.deepseek.enabled }},
+        "deepseek": {
+          "baseUrl": "{{ .Values.deepseek.endpoint }}",
+          "api": "openai-completions",
+          "apiKey": "$DEEPSEEK_API_KEY",
+          "models": [
+            {
+              "id": "deepseek-chat",
+              "name": "DeepSeek Chat",
+              "contextWindow": 1048576,
+              "maxTokens": 393216,
+              "input": ["text"],
+              "reasoning": true,
+              "cost": { "input": 0.14, "output": 0.28, "cacheRead": 0.028, "cacheWrite": 0 },
+              "compat": {
+                "requiresReasoningContentOnAssistantMessages": true,
+                "thinkingFormat": "deepseek",
+                "reasoningEffortMap": { "minimal": "high", "low": "high", "medium": "high", "high": "high", "xhigh": "max" }
+              }
+            }
+          ]
+        }
+        {{- end }}
+      }
+    }

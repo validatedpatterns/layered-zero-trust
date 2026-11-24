@@ -1,0 +1,33 @@
+{{- if .Values.keycloak.enabled }}
+apiVersion: k8s.keycloak.org/v2alpha1
+kind: KeycloakRealmImport
+metadata:
+  name: openshell-oidc-client
+  namespace: {{ .Values.keycloak.namespace }}
+  labels:
+    {{- include "ztm.labels" . | nindent 4 }}
+spec:
+  keycloakCRName: keycloak
+  realm:
+    realm: {{ .Values.keycloak.realm }}
+    enabled: true
+    clients:
+      - clientId: {{ .Values.keycloak.clientId }}
+        name: OpenShell Gateway
+        enabled: true
+        publicClient: true
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: true
+        rootUrl: https://{{ include "ztm.routeHostname" . }}
+        redirectUris:
+          - https://{{ include "ztm.routeHostname" . }}/*
+          - http://localhost:*/*
+        webOrigins:
+          - https://{{ include "ztm.routeHostname" . }}
+          - http://localhost:*
+        protocol: openid-connect
+        defaultClientScopes:
+          - openid
+          - profile
+          - email
+{{- end }}

@@ -55,6 +55,8 @@ clusterGroup:
     vault:
     qtodo:
     qtodo-db:
+    # Layer 2: AI Agent Sandbox (OpenShell)
+    # openshell-system:
     external-secrets-operator:
       operatorGroup: true
       targetNamespaces: []
@@ -845,6 +847,23 @@ clusterGroup:
   #          values:
   #            - OpenShift
   # End of Pipeline/DevSecOps configuration
+
+    # ── Layer 2: AI Agent Sandbox (OpenShell) ──────────────────────────
+    # Deploys NVIDIA OpenShell with a Pi coding agent in a zero-trust sandbox.
+    # Integrates with Vault (secret storage), ESO (secret sync), Keycloak (OIDC),
+    # SPIFFE/SPIRE (workload identity), and ACS (image scanning).
+    # Requires: MAAS API key in values-secret.yaml.template
+    #
+    # openshell-ztm:
+    #   name: openshell-ztm
+    #   namespace: openshell-system
+    #   argoProject: hub
+    #   path: charts/openshell-ztm
+    #   annotations:
+    #     argocd.argoproj.io/sync-wave: "40"
+    #   overrides:
+    #     - name: openshell.server.oidc.issuer
+    #       value: "https://keycloak.{{ .Values.global.localClusterDomain }}/realms/ztvp"
 
     # exampleRegion:
     #   name: group-one
