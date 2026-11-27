@@ -203,6 +203,10 @@ The consolidated Argo CD instance (namespace `vp-gitops`) manages all pattern ap
 
 If all of the Argo CD applications are reporting healthy, the pattern has been deployed successfully.
 
+### Uninstall the pattern
+
+See the [Uninstall Procedure](docs/uninstall.md) for safe, auditable removal, including the workflow for an existing installation without a pre-install baseline.
+
 ### Use cases
 
 * [Secure Multi-tier Application](./docs/multi-tier.md)

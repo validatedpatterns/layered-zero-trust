@@ -14,6 +14,7 @@ This directory contains the engineering documentation for the Layered Zero Trust
 | Document | Description |
 | --- | --- |
 | [Development](DEVELOPMENT.md) | Supported OCP versions, development workflow, credential access, and testing practices |
+| [Uninstall Procedure](uninstall.md) | Safely remove ZTVP, protect shared resources, and audit retained cluster resources |
 | [Support Matrix](support-matrix.md) | Validated combinations of OCP and pattern component versions |
 | [Sync-Wave Inventory](SYNC-WAVE-INVENTORY.md) | Argo CD sync-wave assignments for all pattern components |
 
