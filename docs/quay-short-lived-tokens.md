@@ -211,7 +211,9 @@ Identity names, ServiceAccounts and namespaces must be the same in the Vault con
    oc logs -n vp-gitops job/quay-robot-provisioner-seed
    ```
 
-   A successful run ends with `Quay robots are up to date`. The Sync hook Job exits successfully with a warning if Vault or Quay are not ready yet, so it does not block the Argo CD sync; the CronJob completes the provisioning later. TLS verification errors always fail the Job.
+   A successful run ends with `Quay robots are up to date`. The Sync hook Job exits successfully with a warning if Vault or Quay are not ready yet, so it does not block the Argo CD sync; the CronJob completes the provisioning later. Quay TLS verification errors fail the Job immediately, other errors are retried within the Job's budget.
+
+   The provisioner verifies Quay with the container's system trust store plus the `ztvp-trusted-ca` bundle (`quayTokenGenerator.caBundle`), so both publicly signed certificates such as Let's Encrypt and the cluster's ingress CA are trusted. The bundle ConfigMap is mounted as optional: when it is not distributed to the supply-chain namespace, only the system trust store is used. Kubernetes API requests always use the pod's service account CA.
 
 4. Check the registry Secrets and confirm they contain robot credentials, not the administrator:
 

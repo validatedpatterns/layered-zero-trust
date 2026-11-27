@@ -158,6 +158,13 @@ registry:
 # ===========================================================================
 quayTokenGenerator:
   enabled: false
+  # Cluster CA bundle from ztvp-certificates, mounted into the robot
+  # provisioner. The script adds it to the system trust store, so both
+  # publicly signed and cluster-CA-signed Quay endpoints verify. The mount
+  # is optional: without the ConfigMap only the system trust store is used.
+  caBundle:
+    configMap: ztvp-trusted-ca
+    key: tls-ca-bundle.pem
   vault:
     # Defaults to the Vault route: https://vault-vault.<global.hubClusterDomain>
     url: ""

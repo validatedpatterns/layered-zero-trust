@@ -223,14 +223,29 @@ containers:
       value: /app/robots.json
     - name: SOFT_FAIL
       value: {{ $softFail | quote }}
+    - name: CA_CERT
+      value: /etc/quay-ca/ca-bundle.crt
   volumeMounts:
     - name: script-volume
       readOnly: true
       mountPath: /app
+    - name: quay-ca-bundle
+      readOnly: true
+      mountPath: /etc/quay-ca
 volumes:
   - name: script-volume
     configMap:
       name: quay-robot-provisioner
       defaultMode: 0755
+  # Cluster CA bundle from ztvp-certificates (service, ingress and custom
+  # CAs). Optional: the script falls back to the system trust store alone,
+  # which verifies publicly signed (e.g. Let's Encrypt) endpoints
+  - name: quay-ca-bundle
+    configMap:
+      name: {{ .Values.quayTokenGenerator.caBundle.configMap | quote }}
+      optional: true
+      items:
+        - key: {{ .Values.quayTokenGenerator.caBundle.key | quote }}
+          path: ca-bundle.crt
 {{- end }}
 {{- end }}

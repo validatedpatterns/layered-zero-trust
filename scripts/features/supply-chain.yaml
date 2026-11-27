@@ -31,7 +31,7 @@ clusterGroup:
         - name: "distribution.targetNamespaces[0]"
           value: "qtodo"
         - name: "distribution.targetNamespaces[1]"
-          value: "vp-gitops"
+          value: "{{ if $.Values.global.singleArgoCD }}{{ $.Values.global.vpArgoNamespace }}{{ else }}{{ $.Values.global.pattern }}-{{ $.Values.clusterGroup.name }}{{ end }}"
     vault:
       jwt:
         roles:

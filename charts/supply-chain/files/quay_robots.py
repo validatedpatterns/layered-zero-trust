@@ -31,7 +31,10 @@ ADMIN_PASSWORD = os.getenv("QUAY_ADMIN_PASSWORD")
 REPOSITORY = os.getenv("QUAY_REPOSITORY", "")
 ROBOTS_FILE = os.getenv("ROBOTS_FILE", "/config/robots.json")
 SA_DIR = "/var/run/secrets/kubernetes.io/serviceaccount"
-CA_CERT = os.getenv("CA_CERT", f"{SA_DIR}/ca.crt")
+# Optional CA bundle (e.g. the ztvp-trusted-ca ConfigMap) added on top of
+# the system trust store, so both publicly signed (Let's Encrypt) and
+# cluster-CA-signed Quay endpoints verify
+CA_CERT = os.getenv("CA_CERT")
 KUBE_API = "https://kubernetes.default.svc"
 # Total retry budget; keep it below the Job activeDeadlineSeconds (900)
 TIMEOUT_SECONDS = int(os.getenv("TIMEOUT_SECONDS", "780"))
@@ -71,10 +74,12 @@ def retry_or_give_up(err, msg):
 
 
 def tls_context():
-    # Never fall back to an unverified connection
-    if not os.path.exists(CA_CERT):
-        sys.exit(f"ERROR: CA certificate not found at {CA_CERT}")
-    return ssl.create_default_context(cafile=CA_CERT)
+    # System trust store plus the optional CA bundle, never an unverified
+    # connection and never system trust replaced by the bundle alone
+    context = ssl.create_default_context()
+    if CA_CERT and os.path.isfile(CA_CERT):
+        context.load_verify_locations(cafile=CA_CERT)
+    return context
 
 
 TLS = tls_context()
@@ -116,11 +121,21 @@ def read_identity_claims(namespace, secret):
         headers={"Authorization": f"Bearer {sa_token}"},
     )
     try:
-        with urllib.request.urlopen(req, context=TLS, timeout=30) as resp:
+        # The Kubernetes API is signed by the service CA, which is always
+        # available in the pod regardless of the Quay CA bundle. Connection
+        # and certificate errors are retried, they do not fail fast like
+        # Quay TLS verification errors
+        kube_tls = ssl.create_default_context(cafile=f"{SA_DIR}/ca.crt")
+        with urllib.request.urlopen(req, context=kube_tls, timeout=30) as resp:
             data = json.loads(resp.read().decode()).get("data", {})
     except urllib.error.HTTPError as err:
         raise RetryableError(
             f"identity JWT secret {namespace}/{secret} not available (HTTP {err.code})"
+        ) from err
+    except OSError as err:
+        raise RetryableError(
+            f"unable to read identity JWT secret {namespace}/{secret} "
+            f"from Kubernetes: {err}"
         ) from err
     if "token" not in data:
         raise RetryableError(f"identity JWT secret {namespace}/{secret} has no token")
