@@ -57,8 +57,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any
-
+from typing import Any, Literal, overload
 
 PATTERN_RESOURCE = "patterns.gitops.hybrid-cloud-patterns.io"
 MIN_OPERATOR_VERSION = (0, 0, 65)
@@ -97,21 +96,48 @@ def oc(args: list[str], *, allow_missing: bool = False) -> str:
     message = result.stderr or result.stdout
     missing = any(
         phrase in message.lower()
-        for phrase in ("not found", "doesn't have a resource type", "no matches for kind")
+        for phrase in (
+            "not found",
+            "doesn't have a resource type",
+            "no matches for kind",
+        )
     )
     if allow_missing and missing:
         return ""
     raise OcError(args, result.returncode, message)
 
 
-def oc_json(args: list[str], *, allow_missing: bool = False) -> Any | None:
+@overload
+def oc_json(
+    args: list[str], *, allow_missing: Literal[False] = False
+) -> dict[str, Any]: ...
+
+
+@overload
+def oc_json(
+    args: list[str], *, allow_missing: Literal[True]
+) -> dict[str, Any] | None: ...
+
+
+@overload
+def oc_json(args: list[str], *, allow_missing: bool) -> dict[str, Any] | None: ...
+
+
+def oc_json(args: list[str], *, allow_missing: bool = False) -> dict[str, Any] | None:
     output = oc([*args, "-o", "json"], allow_missing=allow_missing)
     if not output:
-        return None
+        if allow_missing:
+            return None
+        raise RuntimeError(f"oc returned empty JSON output for {' '.join(args)}.")
     try:
-        return json.loads(output)
+        document = json.loads(output)
     except json.JSONDecodeError as error:
-        raise RuntimeError(f"oc returned invalid JSON for {' '.join(args)}: {error}") from error
+        raise RuntimeError(
+            f"oc returned invalid JSON for {' '.join(args)}: {error}"
+        ) from error
+    if not isinstance(document, dict):
+        raise RuntimeError(f"oc returned non-object JSON for {' '.join(args)}.")
+    return document
 
 
 def items(document: Any | None) -> list[dict[str, Any]]:
@@ -122,7 +148,9 @@ def items(document: Any | None) -> list[dict[str, Any]]:
     return [document]
 
 
-def get_collection(resource: str, *, all_namespaces: bool) -> tuple[list[dict[str, Any]], str | None]:
+def get_collection(
+    resource: str, *, all_namespaces: bool
+) -> tuple[list[dict[str, Any]], str | None]:
     args = ["get", resource]
     if all_namespaces:
         args.append("-A")
@@ -178,7 +206,8 @@ def app_summary(obj: dict[str, Any]) -> dict[str, Any]:
         },
         "trackingId": annotations.get("argocd.argoproj.io/tracking-id"),
         "finalizers": meta.get("finalizers", []) or [],
-        "automatedSync": automated is not None and automated.get("enabled", True) is not False,
+        "automatedSync": automated is not None
+        and automated.get("enabled", True) is not False,
         "syncStatus": obj.get("status", {}).get("sync", {}).get("status"),
         "healthStatus": obj.get("status", {}).get("health", {}).get("status"),
         "resources": tracked,
@@ -278,7 +307,9 @@ def cluster_identity() -> dict[str, str]:
 def require_admin() -> None:
     answer = oc(["auth", "can-i", "*", "*", "--all-namespaces"]).strip().lower()
     if answer != "yes":
-        raise RuntimeError("The current identity does not have cluster-admin-equivalent permissions.")
+        raise RuntimeError(
+            "The current identity does not have cluster-admin-equivalent permissions."
+        )
 
 
 def get_singleton(resource: str, name: str) -> dict[str, Any] | None:
@@ -309,9 +340,17 @@ def scan_custom_resources(
         names = spec.get("names", {})
         group, plural = spec.get("group"), names.get("plural")
         if group and plural:
-            jobs.append((crd.get("metadata", {}).get("name", ""), f"{plural}.{group}", spec.get("scope") == "Namespaced"))
+            jobs.append(
+                (
+                    crd.get("metadata", {}).get("name", ""),
+                    f"{plural}.{group}",
+                    spec.get("scope") == "Namespaced",
+                )
+            )
 
-    def scan(job: tuple[str, str, bool]) -> tuple[str, list[dict[str, Any]], str | None]:
+    def scan(
+        job: tuple[str, str, bool],
+    ) -> tuple[str, list[dict[str, Any]], str | None]:
         crd_name, resource, namespaced = job
         args = ["get", resource]
         if namespaced:
@@ -363,13 +402,23 @@ def inventory(*, workers: int) -> dict[str, Any]:
         }
         for obj in raw["patterns"]
     ]
-    result["resources"]["applications"] = [app_summary(obj) for obj in raw["applications"]]
-    result["resources"]["subscriptions"] = [subscription_summary(obj) for obj in raw["subscriptions"]]
+    result["resources"]["applications"] = [
+        app_summary(obj) for obj in raw["applications"]
+    ]
+    result["resources"]["subscriptions"] = [
+        subscription_summary(obj) for obj in raw["subscriptions"]
+    ]
     result["resources"]["csvs"] = [csv_summary(obj) for obj in raw["csvs"]]
-    result["resources"]["operatorgroups"] = [meta_summary(obj) for obj in raw["operatorgroups"]]
-    result["resources"]["namespaces"] = [namespace_summary(obj) for obj in raw["namespaces"]]
+    result["resources"]["operatorgroups"] = [
+        meta_summary(obj) for obj in raw["operatorgroups"]
+    ]
+    result["resources"]["namespaces"] = [
+        namespace_summary(obj) for obj in raw["namespaces"]
+    ]
     result["resources"]["crds"] = [crd_summary(obj) for obj in raw["crds"]]
-    result["resources"]["apiservices"] = [apiservice_summary(obj) for obj in raw["apiservices"]]
+    result["resources"]["apiservices"] = [
+        apiservice_summary(obj) for obj in raw["apiservices"]
+    ]
     result["resources"]["pvcs"] = [pvc_summary(obj) for obj in raw["pvcs"]]
     result["resources"]["pvs"] = [pv_summary(obj) for obj in raw["pvs"]]
     result["resources"]["managedclusters"] = [
@@ -384,7 +433,10 @@ def inventory(*, workers: int) -> dict[str, Any]:
         for obj in raw["managedclusters"]
     ]
 
-    for name, resource in (("proxy", "proxies.config.openshift.io"), ("image", "images.config.openshift.io")):
+    for name, resource in (
+        ("proxy", "proxies.config.openshift.io"),
+        ("image", "images.config.openshift.io"),
+    ):
         try:
             obj = get_singleton(resource, "cluster")
             spec = (obj or {}).get("spec", {})
@@ -413,9 +465,12 @@ def write_json(path: Path, document: Any, *, exclusive: bool = False) -> None:
     os.chmod(path, 0o600)
 
 
-def read_json(path: Path) -> Any:
+def read_json(path: Path) -> dict[str, Any]:
     with path.open(encoding="utf-8") as handle:
-        return json.load(handle)
+        document = json.load(handle)
+    if not isinstance(document, dict):
+        raise RuntimeError(f"Expected a JSON object in {path}.")
+    return document
 
 
 def parse_version(value: str | None) -> tuple[int, int, int] | None:
@@ -430,7 +485,9 @@ def parse_version(value: str | None) -> tuple[int, int, int] | None:
 def operator_version(override: str | None) -> str | None:
     if override:
         return override
-    csvs, _ = get_collection("clusterserviceversions.operators.coreos.com", all_namespaces=True)
+    csvs, _ = get_collection(
+        "clusterserviceversions.operators.coreos.com", all_namespaces=True
+    )
     for obj in csvs:
         meta = obj.get("metadata", {})
         name = meta.get("name", "")
@@ -444,7 +501,12 @@ def operator_version(override: str | None) -> str | None:
             meta = deployment.get("metadata", {})
             if "patterns-operator" not in meta.get("name", "").lower():
                 continue
-            for container in deployment.get("spec", {}).get("template", {}).get("spec", {}).get("containers", []):
+            for container in (
+                deployment.get("spec", {})
+                .get("template", {})
+                .get("spec", {})
+                .get("containers", [])
+            ):
                 image = container.get("image", "")
                 if "patterns-operator" in image.lower():
                     tag = image.rsplit(":", 1)[-1]
@@ -457,10 +519,13 @@ def ensure_operator_version(value: str | None) -> None:
     version = parse_version(value)
     if version is None:
         raise RuntimeError(
-            "Could not determine the Patterns Operator version. Supply --operator-version after checking the controller image/CSV."
+            "Could not determine the Patterns Operator version. Supply --operator-version after "
+            "checking the controller image/CSV."
         )
     if version < MIN_OPERATOR_VERSION:
-        raise RuntimeError(f"Patterns Operator {value} is older than required 0.0.65; upgrade it before uninstalling.")
+        raise RuntimeError(
+            f"Patterns Operator {value} is older than required 0.0.65; upgrade it before uninstalling."
+        )
 
 
 def key(summary: dict[str, Any]) -> str:
@@ -468,10 +533,14 @@ def key(summary: dict[str, Any]) -> str:
     return f"{namespace}/{name}" if namespace else str(name)
 
 
-def app_tree(apps: list[dict[str, Any]], root: str, *, allow_missing_root: bool = False) -> list[dict[str, Any]]:
+def app_tree(
+    apps: list[dict[str, Any]], root: str, *, allow_missing_root: bool = False
+) -> list[dict[str, Any]]:
     by_key = {key(app): app for app in apps}
     if root not in by_key and not allow_missing_root:
-        raise RuntimeError(f"Root Argo CD Application {root!r} was not found; specify --root-application namespace/name.")
+        raise RuntimeError(
+            f"Root Argo CD Application {root!r} was not found; specify --root-application namespace/name."
+        )
     selected = {root}
     selected_names = {root.split("/", 1)[-1]}
     changed = True
@@ -497,28 +566,52 @@ def app_tree(apps: list[dict[str, Any]], root: str, *, allow_missing_root: bool 
     return [app for app in apps if key(app) in selected]
 
 
-def find_pattern(patterns: list[dict[str, Any]], name: str | None, namespace: str | None) -> dict[str, Any]:
-    candidates = [obj for obj in patterns if (name is None or obj.get("name") == name) and (namespace is None or obj.get("namespace") == namespace)]
+def find_pattern(
+    patterns: list[dict[str, Any]], name: str | None, namespace: str | None
+) -> dict[str, Any]:
+    candidates = [
+        obj
+        for obj in patterns
+        if (name is None or obj.get("name") == name)
+        and (namespace is None or obj.get("namespace") == namespace)
+    ]
     if len(candidates) != 1:
-        raise RuntimeError(f"Expected exactly one target Pattern, found {len(candidates)}. Specify --pattern and --namespace.")
+        raise RuntimeError(
+            f"Expected exactly one target Pattern, found {len(candidates)}. Specify --pattern and --namespace."
+        )
     return candidates[0]
 
 
 def check_baseline_cluster(baseline: dict[str, Any], current: dict[str, str]) -> None:
     if baseline.get("cluster", {}).get("server") != current.get("server"):
-        raise RuntimeError("Saved inventory API server does not match the current oc context; refusing to continue.")
+        raise RuntimeError(
+            "Saved inventory API server does not match the current oc context; refusing to continue."
+        )
 
 
-def added(before: list[dict[str, Any]], after: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def added(
+    before: list[dict[str, Any]], after: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     before_ids = {item.get("uid") or key(item) for item in before}
     return [item for item in after if (item.get("uid") or key(item)) not in before_ids]
 
 
-def inventory_comparison(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
+def inventory_comparison(
+    before: dict[str, Any], after: dict[str, Any]
+) -> dict[str, Any]:
     """Summarize inventory-to-post-uninstall changes without claiming ownership."""
     categories = (
-        "patterns", "applications", "subscriptions", "csvs", "operatorgroups", "namespaces",
-        "crds", "apiservices", "pvcs", "pvs", "managedclusters",
+        "patterns",
+        "applications",
+        "subscriptions",
+        "csvs",
+        "operatorgroups",
+        "namespaces",
+        "crds",
+        "apiservices",
+        "pvcs",
+        "pvs",
+        "managedclusters",
     )
     result: dict[str, Any] = {}
     for category in categories:
@@ -531,8 +624,12 @@ def inventory_comparison(before: dict[str, Any], after: dict[str, Any]) -> dict[
             "stillPresent": len(old_ids & new_ids),
             "removed": len(old_ids - new_ids),
             "appearedSinceInventory": [
-                {key_name: item.get(key_name) for key_name in ("name", "namespace", "uid", "creationTimestamp")}
-                for item in new if (item.get("uid") or key(item)) not in old_ids
+                {
+                    key_name: item.get(key_name)
+                    for key_name in ("name", "namespace", "uid", "creationTimestamp")
+                }
+                for item in new
+                if (item.get("uid") or key(item)) not in old_ids
             ],
         }
 
@@ -540,11 +637,13 @@ def inventory_comparison(before: dict[str, Any], after: dict[str, Any]) -> dict[
     new_crs = after.get("customResourceInstances", {}) or {}
     old_ids = {
         (crd, item.get("uid") or resource_ref(item))
-        for crd, entries in old_crs.items() for item in entries
+        for crd, entries in old_crs.items()
+        for item in entries
     }
     new_ids = {
         (crd, item.get("uid") or resource_ref(item))
-        for crd, entries in new_crs.items() for item in entries
+        for crd, entries in new_crs.items()
+        for item in entries
     }
     appeared = []
     for crd, entries in new_crs.items():
@@ -565,7 +664,11 @@ def app_resource_probe(
 ) -> dict[str, Any]:
     kind, name = resource.get("kind"), resource.get("name")
     if not kind or not name:
-        return {**resource, "state": "unknown", "error": "missing kind/name in Argo status"}
+        return {
+            **resource,
+            "state": "unknown",
+            "error": "missing kind/name in Argo status",
+        }
     try:
         api_resource = api_resource_name(
             resource.get("group") or "", kind, resource.get("version")
@@ -577,7 +680,11 @@ def app_resource_probe(
                 "state": "absent",
                 "verification": "owning CRD was removed since the pre-uninstall inventory",
             }
-        return {**resource, "state": "unknown", "error": f"could not resolve API resource: {error}"}
+        return {
+            **resource,
+            "state": "unknown",
+            "error": f"could not resolve API resource: {error}",
+        }
     args = ["get", api_resource, name]
     if resource.get("namespace"):
         args.extend(["-n", resource["namespace"]])
@@ -591,7 +698,9 @@ def app_resource_probe(
             metadata = obj.get("metadata", {})
             annotations = metadata.get("annotations", {}) or {}
             tracking_id = annotations.get("argocd.argoproj.io/tracking-id")
-            last_applied = annotations.get("kubectl.kubernetes.io/last-applied-configuration", "")
+            last_applied = annotations.get(
+                "kubectl.kubernetes.io/last-applied-configuration", ""
+            )
             return {
                 **resource,
                 "state": "present",
@@ -600,8 +709,12 @@ def app_resource_probe(
                 "creationTimestamp": metadata.get("creationTimestamp"),
                 "trackingId": tracking_id,
                 "syncOptions": annotations.get("argocd.argoproj.io/sync-options"),
-                "managedBy": (metadata.get("labels", {}) or {}).get("argocd.argoproj.io/managed-by"),
-                "lastAppliedContainsTrackingId": bool(tracking_id and tracking_id in last_applied),
+                "managedBy": (metadata.get("labels", {}) or {}).get(
+                    "argocd.argoproj.io/managed-by"
+                ),
+                "lastAppliedContainsTrackingId": bool(
+                    tracking_id and tracking_id in last_applied
+                ),
                 "finalizers": metadata.get("finalizers", []) or [],
             }
         except Exception:
@@ -617,7 +730,9 @@ def api_resource_name(group: str, kind: str, version: str | None) -> str:
     try:
         resources = json.loads(output).get("resources", [])
     except json.JSONDecodeError as error:
-        raise RuntimeError(f"invalid api-resources JSON for group {group!r}: {error}") from error
+        raise RuntimeError(
+            f"invalid api-resources JSON for group {group!r}: {error}"
+        ) from error
     matches = [
         item
         for item in resources
@@ -633,7 +748,9 @@ def api_resource_name(group: str, kind: str, version: str | None) -> str:
     return f"{name}.{group}" if group else name
 
 
-def removed_crd_kinds(before: dict[str, Any], after: dict[str, Any]) -> set[tuple[str, str]]:
+def removed_crd_kinds(
+    before: dict[str, Any], after: dict[str, Any]
+) -> set[tuple[str, str]]:
     """Return served CRD kinds that were present before uninstall and are gone now."""
     before_kinds = {
         (item.get("group") or "", item.get("kind") or "")
@@ -657,7 +774,11 @@ def probe_app_resources(
     resources: dict[tuple[str, str | None, str], dict[str, Any]] = {}
     for app in apps:
         for item in app.get("resources", []):
-            identity = (item.get("kind", ""), item.get("namespace"), item.get("name", ""))
+            identity = (
+                item.get("kind", ""),
+                item.get("namespace"),
+                item.get("name", ""),
+            )
             if identity[0] and identity[2]:
                 entry = resources.setdefault(identity, {**item, "trackedByApps": []})
                 app_key = key(app)
@@ -682,7 +803,9 @@ def parse_timestamp(value: str | None) -> dt.datetime | None:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=dt.timezone.utc)
 
 
-def baseline_resource_uids(baseline: dict[str, Any]) -> dict[tuple[str, str | None, str], str]:
+def baseline_resource_uids(
+    baseline: dict[str, Any],
+) -> dict[tuple[str, str | None, str], str]:
     """Index resources present in the pre-install inventory by Kubernetes identity."""
     collections = {
         "patterns": "Pattern",
@@ -710,14 +833,16 @@ def baseline_resource_uids(baseline: dict[str, Any]) -> dict[tuple[str, str | No
         for item in resources.get("crds", []) or []
         if item.get("name") and item.get("kind")
     }
-    for crd_name, instances in (baseline.get("customResourceInstances", {}) or {}).items():
-        kind = kind_by_crd.get(crd_name)
-        if not kind:
+    for crd_name, instances in (
+        baseline.get("customResourceInstances", {}) or {}
+    ).items():
+        crd_kind = kind_by_crd.get(crd_name)
+        if not crd_kind:
             continue
         for item in instances or []:
             name = item.get("name")
             if name and item.get("uid"):
-                result[(kind, item.get("namespace"), name)] = item["uid"]
+                result[(crd_kind, item.get("namespace"), name)] = item["uid"]
     return result
 
 
@@ -744,7 +869,9 @@ def find_preexisting_tracked_resources(
         baseline_uid = baseline_uids.get(identity)
         same_baseline_object = bool(baseline_uid and baseline_uid == item.get("uid"))
         item_created = parse_timestamp(item.get("creationTimestamp"))
-        created_before_pattern = bool(created_at and item_created and item_created < created_at)
+        created_before_pattern = bool(
+            created_at and item_created and item_created < created_at
+        )
         if not same_baseline_object and not created_before_pattern:
             continue
 
@@ -754,7 +881,9 @@ def find_preexisting_tracked_resources(
             if token.strip()
         }
         owners = [apps_by_key.get(owner) for owner in item.get("trackedByApps", [])]
-        automated_owners = [key(owner) for owner in owners if owner and owner.get("automatedSync")]
+        automated_owners = [
+            key(owner) for owner in owners if owner and owner.get("automatedSync")
+        ]
         found.append(
             {
                 "kind": item.get("kind"),
@@ -769,8 +898,11 @@ def find_preexisting_tracked_resources(
                 "trackedByApps": item.get("trackedByApps", []),
                 "matchedPreinstallUid": same_baseline_object,
                 "createdBeforePattern": created_before_pattern,
-                "preinstallManagedBy": baseline_namespaces.get(item.get("name"), {}).get("argocdManagedBy"),
-                "preinstallManagedByKnown": "argocdManagedBy" in baseline_namespaces.get(item.get("name"), {}),
+                "preinstallManagedBy": baseline_namespaces.get(
+                    item.get("name"), {}
+                ).get("argocdManagedBy"),
+                "preinstallManagedByKnown": "argocdManagedBy"
+                in baseline_namespaces.get(item.get("name"), {}),
                 "deleteProtected": "Delete=false" in sync_options,
                 "automatedSyncOwners": automated_owners,
             }
@@ -789,9 +921,13 @@ def record_preexisting_resource_state(
     if path.exists():
         prior = read_json(path)
         if prior.get("cluster", {}).get("server") != cluster.get("server"):
-            raise RuntimeError("Pre-existing-resource state belongs to a different cluster.")
+            raise RuntimeError(
+                "Pre-existing-resource state belongs to a different cluster."
+            )
         if prior.get("targetPattern") != target_pattern:
-            raise RuntimeError("Pre-existing-resource state belongs to a different Pattern.")
+            raise RuntimeError(
+                "Pre-existing-resource state belongs to a different Pattern."
+            )
 
     previous = {
         (item.get("kind"), item.get("namespace"), item.get("name")): item
@@ -810,9 +946,12 @@ def record_preexisting_resource_state(
             continue
 
         current_options = item.get("syncOptions")
-        if "Delete=false" in {token.strip() for token in (current_options or "").split(",")}:
+        if "Delete=false" in {
+            token.strip() for token in (current_options or "").split(",")
+        }:
             raise RuntimeError(
-                f"{item.get('kind')} {resource_ref(item)} already has Delete=false, but its original sync options were not recorded."
+                f"{item.get('kind')} {resource_ref(item)} already has Delete=false, but its "
+                "original sync options were not recorded."
             )
         state = {
             "kind": item.get("kind"),
@@ -852,7 +991,13 @@ def release_preexisting_resources(
         api_resource = item.get("apiResource")
         namespace = item.get("namespace")
         if not name or not api_resource:
-            outcomes.append({**item, "cleanupState": "unknown", "reason": "missing API resource identity"})
+            outcomes.append(
+                {
+                    **item,
+                    "cleanupState": "unknown",
+                    "reason": "missing API resource identity",
+                }
+            )
             continue
 
         args = ["get", api_resource, name]
@@ -870,7 +1015,11 @@ def release_preexisting_resources(
         metadata = live.get("metadata", {})
         if metadata.get("uid") != item.get("uid"):
             outcomes.append(
-                {**item, "cleanupState": "conflict", "reason": "live UID differs from the pre-uninstall UID"}
+                {
+                    **item,
+                    "cleanupState": "conflict",
+                    "reason": "live UID differs from the pre-uninstall UID",
+                }
             )
             continue
 
@@ -884,22 +1033,25 @@ def release_preexisting_resources(
         current_sync = annotations.get(sync_key)
         original_sync = item.get("syncOptionsBeforeProtection")
         current_sync_values = {
-            token.strip()
-            for token in (current_sync or "").split(",")
-            if token.strip()
+            token.strip() for token in (current_sync or "").split(",") if token.strip()
         }
         original_sync_values = {
-            token.strip()
-            for token in (original_sync or "").split(",")
-            if token.strip()
+            token.strip() for token in (original_sync or "").split(",") if token.strip()
         }
         if current_sync != original_sync:
             expected_protected_values = original_sync_values | {"Delete=false"}
-            if "Delete=false" in current_sync_values and current_sync_values == expected_protected_values:
+            if (
+                "Delete=false" in current_sync_values
+                and current_sync_values == expected_protected_values
+            ):
                 annotation_patch[sync_key] = original_sync
             else:
                 outcomes.append(
-                    {**item, "cleanupState": "conflict", "reason": "sync-options changed after the preflight plan"}
+                    {
+                        **item,
+                        "cleanupState": "conflict",
+                        "reason": "sync-options changed after the preflight plan",
+                    }
                 )
                 continue
 
@@ -966,7 +1118,13 @@ def restore_known_cluster_fields(
         original = baseline.get("resources", {}).get(area)
         current = post.get("resources", {}).get(area)
         if original is None or current is None:
-            outcomes.append({"resource": area, "state": "unknown", "reason": "baseline or live object unavailable"})
+            outcomes.append(
+                {
+                    "resource": area,
+                    "state": "unknown",
+                    "reason": "baseline or live object unavailable",
+                }
+            )
             continue
         original_value = original.get(field)
         current_value = current.get(field)
@@ -986,8 +1144,24 @@ def restore_known_cluster_fields(
             continue
         patch = {"spec": {field: original_value}}
         try:
-            oc(["patch", resource, "cluster", "--type=merge", "-p", json.dumps(patch, separators=(",", ":"))])
-            outcomes.append({"resource": area, "state": "restored", "from": current_value, "to": original_value})
+            oc(
+                [
+                    "patch",
+                    resource,
+                    "cluster",
+                    "--type=merge",
+                    "-p",
+                    json.dumps(patch, separators=(",", ":")),
+                ]
+            )
+            outcomes.append(
+                {
+                    "resource": area,
+                    "state": "restored",
+                    "from": current_value,
+                    "to": original_value,
+                }
+            )
         except OcError as error:
             outcomes.append({"resource": area, "state": "error", "reason": str(error)})
     return outcomes
@@ -1013,7 +1187,12 @@ def cleanup_known_trust_configmaps(
         original = baseline.get("resources", {}).get(area) or {}
         live_config = post.get("resources", {}).get(area) or {}
         if (original.get(field) or {}).get("name") == name:
-            outcomes.append({"resource": f"ConfigMap/openshift-config/{name}", "state": "pre-existing"})
+            outcomes.append(
+                {
+                    "resource": f"ConfigMap/openshift-config/{name}",
+                    "state": "pre-existing",
+                }
+            )
             continue
         if (live_config.get(field) or {}).get("name") == name:
             outcomes.append(
@@ -1026,13 +1205,22 @@ def cleanup_known_trust_configmaps(
             continue
         try:
             configmap = oc_json(
-                ["get", "configmaps", name, "-n", "openshift-config"], allow_missing=True
+                ["get", "configmaps", name, "-n", "openshift-config"],
+                allow_missing=True,
             )
         except OcError as error:
-            outcomes.append({"resource": f"ConfigMap/openshift-config/{name}", "state": "error", "reason": error.stderr})
+            outcomes.append(
+                {
+                    "resource": f"ConfigMap/openshift-config/{name}",
+                    "state": "error",
+                    "reason": error.stderr,
+                }
+            )
             continue
         if not configmap:
-            outcomes.append({"resource": f"ConfigMap/openshift-config/{name}", "state": "absent"})
+            outcomes.append(
+                {"resource": f"ConfigMap/openshift-config/{name}", "state": "absent"}
+            )
             continue
 
         metadata = configmap.get("metadata", {})
@@ -1042,7 +1230,12 @@ def cleanup_known_trust_configmaps(
             and labels.get("app.kubernetes.io/managed-by") == "ztvp-certificate-manager"
         )
         created = parse_timestamp(metadata.get("creationTimestamp"))
-        if not pattern_created or not created or created < pattern_created or not owned_labels:
+        if (
+            not pattern_created
+            or not created
+            or created < pattern_created
+            or not owned_labels
+        ):
             outcomes.append(
                 {
                     "resource": f"ConfigMap/openshift-config/{name}",
@@ -1053,9 +1246,17 @@ def cleanup_known_trust_configmaps(
             continue
         try:
             oc(["delete", "configmaps", name, "-n", "openshift-config", "--wait=true"])
-            outcomes.append({"resource": f"ConfigMap/openshift-config/{name}", "state": "deleted"})
+            outcomes.append(
+                {"resource": f"ConfigMap/openshift-config/{name}", "state": "deleted"}
+            )
         except OcError as error:
-            outcomes.append({"resource": f"ConfigMap/openshift-config/{name}", "state": "error", "reason": error.stderr})
+            outcomes.append(
+                {
+                    "resource": f"ConfigMap/openshift-config/{name}",
+                    "state": "error",
+                    "reason": error.stderr,
+                }
+            )
     return outcomes
 
 
@@ -1066,24 +1267,45 @@ def disable_automatic_sync(apps: list[dict[str, Any]], root: str) -> None:
     earlier manual patch, so do this only after the expensive inventory checks
     and immediately before starting Pattern deletion.
     """
-    patch = json.dumps({"spec": {"syncPolicy": {"automated": None}}}, separators=(",", ":"))
+    patch = json.dumps(
+        {"spec": {"syncPolicy": {"automated": None}}}, separators=(",", ":")
+    )
 
     def disable_one(app: dict[str, Any]) -> None:
         name, namespace = app.get("name"), app.get("namespace")
         if not name or not namespace:
-            raise RuntimeError("Cannot disable automatic sync for an Application with an incomplete identity.")
+            raise RuntimeError(
+                "Cannot disable automatic sync for an Application with an incomplete identity."
+            )
         live = oc_json(["get", "applications.argoproj.io", name, "-n", namespace])
-        if (live.get("spec", {}).get("syncPolicy", {}) or {}).get("automated") is not None:
-            oc(["patch", "applications.argoproj.io", name, "-n", namespace, "--type=merge", "-p", patch])
+        if (live.get("spec", {}).get("syncPolicy", {}) or {}).get(
+            "automated"
+        ) is not None:
+            oc(
+                [
+                    "patch",
+                    "applications.argoproj.io",
+                    name,
+                    "-n",
+                    namespace,
+                    "--type=merge",
+                    "-p",
+                    patch,
+                ]
+            )
 
     def disable_many(group: list[dict[str, Any]]) -> None:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, max(1, len(group)))) as pool:
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(8, max(1, len(group)))
+        ) as pool:
             list(pool.map(disable_one, group))
 
     root_apps = [app for app in apps if key(app) == root]
     child_apps = sorted((app for app in apps if key(app) != root), key=key)
     if len(root_apps) != 1:
-        raise RuntimeError(f"Expected one root Application {root}; found {len(root_apps)}.")
+        raise RuntimeError(
+            f"Expected one root Application {root}; found {len(root_apps)}."
+        )
 
     for _attempt in range(3):
         # The root can reapply child Application specs while it remains active.
@@ -1095,11 +1317,17 @@ def disable_automatic_sync(apps: list[dict[str, Any]], root: str) -> None:
         time.sleep(2)
         still_automated = []
         for app in apps:
-            live = oc_json(["get", "applications.argoproj.io", app["name"], "-n", app["namespace"]])
-            if (live.get("spec", {}).get("syncPolicy", {}) or {}).get("automated") is not None:
+            live = oc_json(
+                ["get", "applications.argoproj.io", app["name"], "-n", app["namespace"]]
+            )
+            if (live.get("spec", {}).get("syncPolicy", {}) or {}).get(
+                "automated"
+            ) is not None:
                 still_automated.append(key(app))
         if not still_automated:
-            print(f"Automatic sync disabled and verified on {len(apps)} target Applications.")
+            print(
+                f"Automatic sync disabled and verified on {len(apps)} target Applications."
+            )
             return
     raise RuntimeError(
         "Automatic sync was restored while freezing the Argo tree; Pattern deletion was not started: "
@@ -1112,7 +1340,9 @@ def enable_pattern_pruning(name: str, namespace: str) -> None:
     annotation = "patterns.gitops.hybrid-cloud-patterns.io/prune"
     live = get_pattern(name, namespace)
     if live is None:
-        raise RuntimeError("Pattern disappeared before the prune annotation could be set.")
+        raise RuntimeError(
+            "Pattern disappeared before the prune annotation could be set."
+        )
     metadata = live.get("metadata", {})
     uid = metadata.get("uid")
     if (metadata.get("annotations") or {}).get(annotation) != "true":
@@ -1133,9 +1363,12 @@ def enable_pattern_pruning(name: str, namespace: str) -> None:
     if (
         verified is None
         or verified.get("metadata", {}).get("uid") != uid
-        or (verified.get("metadata", {}).get("annotations") or {}).get(annotation) != "true"
+        or (verified.get("metadata", {}).get("annotations") or {}).get(annotation)
+        != "true"
     ):
-        raise RuntimeError("Could not verify the Pattern prune opt-in; Pattern deletion was not started.")
+        raise RuntimeError(
+            "Could not verify the Pattern prune opt-in; Pattern deletion was not started."
+        )
     print("Pattern prune opt-in enabled and verified.")
 
 
@@ -1150,7 +1383,9 @@ def ensure_private_dir(path: Path) -> None:
     if not existed:
         os.chmod(path, 0o700)
     if stat.S_IMODE(path.stat().st_mode) & 0o077:
-        raise RuntimeError(f"Artifact directory {path} must not be accessible by group/other; chmod it to 700.")
+        raise RuntimeError(
+            f"Artifact directory {path} must not be accessible by group/other; chmod it to 700."
+        )
 
 
 def make_report(
@@ -1169,7 +1404,11 @@ def make_report(
     after_resources = after.get("resources", {})
     baseline_resources = (baseline or {}).get("resources", {})
     target_app_keys = {key(app) for app in target_apps}
-    remaining_apps = [app for app in after_resources.get("applications", []) if key(app) in target_app_keys]
+    remaining_apps = [
+        app
+        for app in after_resources.get("applications", [])
+        if key(app) in target_app_keys
+    ]
     pre_namespaces = baseline_resources.get("namespaces", [])
     post_namespaces = after_resources.get("namespaces", [])
     pre_crds = baseline_resources.get("crds", [])
@@ -1188,20 +1427,30 @@ def make_report(
     after_crs = after.get("customResourceInstances", {})
     if comparison_mode == "pre-install-baseline":
         for crd_name, post_items in after_crs.items():
-            old_ids = {item.get("uid") or resource_ref(item) for item in baseline_crs.get(crd_name, [])}
+            old_ids = {
+                item.get("uid") or resource_ref(item)
+                for item in baseline_crs.get(crd_name, [])
+            }
             for item in post_items:
                 if (item.get("uid") or resource_ref(item)) not in old_ids:
                     cr_instance_deltas.append({"crd": crd_name, **item})
 
     unavailable_spokes = [
-        item for item in before.get("resources", {}).get("managedclusters", []) if item.get("available") is False
+        item
+        for item in before.get("resources", {}).get("managedclusters", [])
+        if item.get("available") is False
     ]
     preexisting_ids = {
         (item.get("kind"), item.get("namespace"), item.get("name"), item.get("uid"))
         for item in (preexisting_tracked or [])
     }
     for item in app_probe:
-        identity = (item.get("kind"), item.get("namespace"), item.get("name"), item.get("uid"))
+        identity = (
+            item.get("kind"),
+            item.get("namespace"),
+            item.get("name"),
+            item.get("uid"),
+        )
         if item.get("state") == "present" and identity in preexisting_ids:
             item["state"] = "pre-existing-preserved"
             item["reason"] = (
@@ -1215,8 +1464,12 @@ def make_report(
         current = after_resources.get(area)
         trust_checks[area] = {
             "matchesPreinstall": (
-                None if comparison_mode == "current-install-inventory" else bool(
-                    original is not None and current is not None and original.get(field) == current.get(field)
+                None
+                if comparison_mode == "current-install-inventory"
+                else bool(
+                    original is not None
+                    and current is not None
+                    and original.get(field) == current.get(field)
                 )
             ),
             "preinstall": original.get(field) if original is not None else None,
@@ -1232,10 +1485,15 @@ def make_report(
             "operatorgroups": added(pre_groups, post_groups),
             "crds": added(pre_crds, post_crds),
             "apiservices": added(pre_apiservices, post_apiservices),
-            "pvcs": added(baseline_resources.get("pvcs", []), after_resources.get("pvcs", [])),
-            "pvs": added(baseline_resources.get("pvs", []), after_resources.get("pvs", [])),
+            "pvcs": added(
+                baseline_resources.get("pvcs", []), after_resources.get("pvcs", [])
+            ),
+            "pvs": added(
+                baseline_resources.get("pvs", []), after_resources.get("pvs", [])
+            ),
             "managedclusters": added(
-                baseline_resources.get("managedclusters", []), after_resources.get("managedclusters", [])
+                baseline_resources.get("managedclusters", []),
+                after_resources.get("managedclusters", []),
             ),
             "customResourceInstances": cr_instance_deltas,
         }
@@ -1245,7 +1503,9 @@ def make_report(
         "cluster": after.get("cluster"),
         "comparisonMode": comparison_mode,
         "targetPattern": target_pattern,
-        "patternAbsent": not any(key(item) == target_pattern for item in after_resources.get("patterns", [])),
+        "patternAbsent": not any(
+            key(item) == target_pattern for item in after_resources.get("patterns", [])
+        ),
         "targetApplicationsRemaining": [key(app) for app in remaining_apps],
         "patternManagedResources": app_probe,
         "preexistingTrackedResources": preexisting_tracked or [],
@@ -1254,9 +1514,13 @@ def make_report(
         "clusterTrust": trust_checks,
         "newSincePreinstall": new_since_preinstall,
         "clusterTrustRestoration": trust_actions,
-        "scanErrors": sorted(set(
-            (baseline or {}).get("scanErrors", []) + before.get("scanErrors", []) + after.get("scanErrors", [])
-        )),
+        "scanErrors": sorted(
+            set(
+                (baseline or {}).get("scanErrors", [])
+                + before.get("scanErrors", [])
+                + after.get("scanErrors", [])
+            )
+        ),
         "strictZeroResidue": False,
         "strictZeroResidueNote": "",
     }
@@ -1264,7 +1528,8 @@ def make_report(
         report["inventoryComparison"] = inventory_comparison(before, after)
         report["strictZeroResidueNote"] = (
             "No pre-install baseline was available. Review inventoryComparison and all remaining OLM/shared resources; "
-            "pre-install deltas and original Proxy/Image trust values are unknown. The ownership assessment is heuristic, "
+            "pre-install deltas and original Proxy/Image trust values are unknown. "
+            "The ownership assessment is heuristic, "
             "and the script leaves ambiguous cluster-wide resources for administrator review."
         )
     else:
@@ -1277,9 +1542,15 @@ def make_report(
 
 
 def require_delete_permission(namespace: str) -> None:
-    answer = oc(["auth", "can-i", "delete", PATTERN_RESOURCE, "-n", namespace]).strip().lower()
+    answer = (
+        oc(["auth", "can-i", "delete", PATTERN_RESOURCE, "-n", namespace])
+        .strip()
+        .lower()
+    )
     if answer != "yes":
-        raise RuntimeError(f"Current identity cannot delete {PATTERN_RESOURCE} in namespace {namespace!r}.")
+        raise RuntimeError(
+            f"Current identity cannot delete {PATTERN_RESOURCE} in namespace {namespace!r}."
+        )
 
 
 def capture_operator_logs(outdir: Path, *, since: str = "1h") -> list[str]:
@@ -1292,11 +1563,22 @@ def capture_operator_logs(outdir: Path, *, since: str = "1h") -> list[str]:
         meta = deployment.get("metadata", {})
         name = meta.get("name", "")
         namespace = meta.get("namespace", "")
-        if "patterns-operator" in name.lower() or ("central" == name and namespace == "stackrox"):
+        if "patterns-operator" in name.lower() or (
+            "central" == name and namespace == "stackrox"
+        ):
             targets.append((namespace, name))
     for namespace, name in targets:
         try:
-            output = oc(["logs", "-n", namespace, f"deployment/{name}", f"--since={since}", "--all-containers=true"])
+            output = oc(
+                [
+                    "logs",
+                    "-n",
+                    namespace,
+                    f"deployment/{name}",
+                    f"--since={since}",
+                    "--all-containers=true",
+                ]
+            )
             safe_name = re.sub(r"[^A-Za-z0-9_.-]", "_", f"{namespace}-{name}")
             path = outdir / f"{safe_name}.log"
             path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -1309,14 +1591,18 @@ def capture_operator_logs(outdir: Path, *, since: str = "1h") -> list[str]:
     return failures
 
 
-def save_stalled_diagnostics(outdir: Path, apps: list[dict[str, Any]], workers: int) -> None:
+def save_stalled_diagnostics(
+    outdir: Path, apps: list[dict[str, Any]], workers: int
+) -> None:
     probe = probe_app_resources(apps, workers)
     write_json(outdir / "stalled-managed-resources.json", probe)
     failures = capture_operator_logs(outdir)
     write_json(outdir / "diagnostic-errors.json", failures)
 
 
-def discover_root(pattern_name: str, apps: list[dict[str, Any]], requested: str | None) -> str:
+def discover_root(
+    pattern_name: str, apps: list[dict[str, Any]], requested: str | None
+) -> str:
     if requested:
         return requested
     candidates = [app for app in apps if app.get("name") == f"{pattern_name}-hub"]
@@ -1329,7 +1615,9 @@ def discover_root(pattern_name: str, apps: list[dict[str, Any]], requested: str 
     )
 
 
-def save_progress(path: Path, pattern: dict[str, Any], started: float) -> tuple[str, str | None]:
+def save_progress(
+    path: Path, pattern: dict[str, Any], started: float
+) -> tuple[str, str | None]:
     status = pattern.get("status", {})
     phase = status.get("deletionPhase") or "Starting"
     error = status.get("lastError")
@@ -1347,23 +1635,33 @@ def save_progress(path: Path, pattern: dict[str, Any], started: float) -> tuple[
 
 def get_pattern(name: str, namespace: str) -> dict[str, Any] | None:
     try:
-        return oc_json(["get", PATTERN_RESOURCE, name, "-n", namespace], allow_missing=True)
+        return oc_json(
+            ["get", PATTERN_RESOURCE, name, "-n", namespace], allow_missing=True
+        )
     except OcError as error:
         raise RuntimeError(str(error)) from error
 
 
-def confirm_execution(args: argparse.Namespace, pattern: dict[str, Any], server: str) -> None:
+def confirm_execution(
+    args: argparse.Namespace, pattern: dict[str, Any], server: str
+) -> None:
     required = f"DELETE {pattern['metadata']['namespace']}/{pattern['metadata']['name']} on {server}"
     print(f"Type this exact confirmation to start: {required}")
     if args.confirm is not None:
         if args.confirm != required:
-            raise RuntimeError("--confirm does not match the required Pattern/cluster confirmation string.")
+            raise RuntimeError(
+                "--confirm does not match the required Pattern/cluster confirmation string."
+            )
     elif sys.stdin.isatty():
         typed = input("> ").strip()
         if typed != required:
-            raise RuntimeError("Confirmation did not match; no Pattern deletion was started.")
+            raise RuntimeError(
+                "Confirmation did not match; no Pattern deletion was started."
+            )
     else:
-        raise RuntimeError("Non-interactive execution requires --confirm with the exact string printed above.")
+        raise RuntimeError(
+            "Non-interactive execution requires --confirm with the exact string printed above."
+        )
 
 
 def do_snapshot(args: argparse.Namespace) -> int:
@@ -1376,7 +1674,10 @@ def do_snapshot(args: argparse.Namespace) -> int:
     print(f"CRDs inventoried: {len(data['resources'].get('crds', []))}")
     print(f"Custom-resource API scan errors: {len(data['scanErrors'])}")
     if data["scanErrors"]:
-        print("Baseline is incomplete; strict zero-residue verification will not be possible without resolving scan errors.")
+        print(
+            "Baseline is incomplete; strict zero-residue verification will not be possible "
+            "without resolving scan errors."
+        )
     return 0
 
 
@@ -1401,8 +1702,12 @@ def do_inventory(args: argparse.Namespace) -> int:
             + ", ".join(deleting)
             + "; inventory cannot recover resources already removed."
         )
-    print(f"Argo Applications inventoried: {len(data.get('resources', {}).get('applications', []))}")
-    print(f"Tracked resources identity-checked: {len(data['trackedResourceInventory'])}")
+    print(
+        f"Argo Applications inventoried: {len(data.get('resources', {}).get('applications', []))}"
+    )
+    print(
+        f"Tracked resources identity-checked: {len(data['trackedResourceInventory'])}"
+    )
     unknown = sum(
         item.get("state") == "unknown"
         or (item.get("state") == "present" and not item.get("uid"))
@@ -1412,13 +1717,20 @@ def do_inventory(args: argparse.Namespace) -> int:
     print(f"CRDs inventoried: {len(data.get('resources', {}).get('crds', []))}")
     print(f"Custom-resource API scan errors: {len(data['scanErrors'])}")
     if data["scanErrors"]:
-        print("Inventory is incomplete; resolve scan errors or use the explicit incomplete-inventory override.")
+        print(
+            "Inventory is incomplete; resolve scan errors or use the explicit incomplete-inventory override."
+        )
     return 0
 
 
 def validate_current_inventory(
-    snapshot: dict[str, Any], current: dict[str, Any], pattern_name: str | None,
-    namespace: str | None, requested_root: str | None, *, allow_resume: bool = False,
+    snapshot: dict[str, Any],
+    current: dict[str, Any],
+    pattern_name: str | None,
+    namespace: str | None,
+    requested_root: str | None,
+    *,
+    allow_resume: bool = False,
 ) -> tuple[dict[str, Any], str, list[dict[str, Any]]]:
     if snapshot.get("inventoryType") != "current-install-inventory":
         raise RuntimeError(
@@ -1432,38 +1744,69 @@ def validate_current_inventory(
     live_pattern = find_pattern(
         current.get("resources", {}).get("patterns", []), pattern_name, namespace
     )
-    if not saved_pattern.get("uid") or saved_pattern.get("uid") != live_pattern.get("uid"):
-        raise RuntimeError("The Pattern UID differs from the saved current inventory; recapture inventory and review the plan.")
+    if not saved_pattern.get("uid") or saved_pattern.get("uid") != live_pattern.get(
+        "uid"
+    ):
+        raise RuntimeError(
+            "The Pattern UID differs from the saved current inventory; recapture inventory and review the plan."
+        )
     pattern_name = saved_pattern["name"]
-    root = discover_root(pattern_name, snapshot.get("resources", {}).get("applications", []), requested_root)
+    root = discover_root(
+        pattern_name,
+        snapshot.get("resources", {}).get("applications", []),
+        requested_root,
+    )
     saved_apps = app_tree(snapshot.get("resources", {}).get("applications", []), root)
     live_apps = app_tree(
-        current.get("resources", {}).get("applications", []), root,
+        current.get("resources", {}).get("applications", []),
+        root,
         allow_missing_root=allow_resume,
     )
     saved_by_key = {key(app): app for app in saved_apps}
     live_by_key = {key(app): app for app in live_apps}
-    if (not allow_resume and set(saved_by_key) != set(live_by_key)) or not set(live_by_key).issubset(saved_by_key):
-        raise RuntimeError("The Argo Application tree changed since the saved inventory; recapture inventory and review the plan.")
+    if (not allow_resume and set(saved_by_key) != set(live_by_key)) or not set(
+        live_by_key
+    ).issubset(saved_by_key):
+        raise RuntimeError(
+            "The Argo Application tree changed since the saved inventory; recapture inventory and review the plan."
+        )
     for app_key, live in live_by_key.items():
         saved = saved_by_key[app_key]
         if not saved.get("uid") or saved.get("uid") != live.get("uid"):
-            raise RuntimeError(f"Application {app_key} changed UID since the saved inventory; recapture inventory.")
+            raise RuntimeError(
+                f"Application {app_key} changed UID since the saved inventory; recapture inventory."
+            )
         saved_resources = {
-            (item.get("group"), item.get("version"), item.get("kind"), item.get("namespace"), item.get("name"))
+            (
+                item.get("group"),
+                item.get("version"),
+                item.get("kind"),
+                item.get("namespace"),
+                item.get("name"),
+            )
             for item in saved.get("resources", [])
         }
         live_resources = {
-            (item.get("group"), item.get("version"), item.get("kind"), item.get("namespace"), item.get("name"))
+            (
+                item.get("group"),
+                item.get("version"),
+                item.get("kind"),
+                item.get("namespace"),
+                item.get("name"),
+            )
             for item in live.get("resources", [])
         }
         if not allow_resume and saved_resources != live_resources:
-            raise RuntimeError(f"Tracked resources for {app_key} changed since the saved inventory; recapture inventory.")
+            raise RuntimeError(
+                f"Tracked resources for {app_key} changed since the saved inventory; recapture inventory."
+            )
     return live_pattern, root, (saved_apps if allow_resume else live_apps)
 
 
 def verify_tracked_resource_inventory(
-    snapshot: dict[str, Any], apps: list[dict[str, Any]], live_probe: list[dict[str, Any]]
+    snapshot: dict[str, Any],
+    apps: list[dict[str, Any]],
+    live_probe: list[dict[str, Any]],
 ) -> None:
     saved_probe = snapshot.get("trackedResourceInventory")
     if saved_probe is None:
@@ -1482,7 +1825,8 @@ def verify_tracked_resource_inventory(
     }
     if set(saved) != set(live):
         raise RuntimeError(
-            "The target Argo tree's tracked resources changed since inventory capture; recapture inventory and review the plan."
+            "The target Argo tree's tracked resources changed since inventory capture; "
+            "recapture inventory and review the plan."
         )
     for identity, saved_item in saved.items():
         live_item = live[identity]
@@ -1492,7 +1836,10 @@ def verify_tracked_resource_inventory(
             )
         if saved_item.get("state") != live_item.get("state") or (
             saved_item.get("state") == "present"
-            and (not saved_item.get("uid") or live_item.get("uid") != saved_item.get("uid"))
+            and (
+                not saved_item.get("uid")
+                or live_item.get("uid") != saved_item.get("uid")
+            )
         ):
             raise RuntimeError(
                 f"{saved_item.get('kind')} {resource_ref(saved_item)} changed or is unreadable since inventory capture."
@@ -1515,7 +1862,9 @@ def classify_inventory_tracked_resources(
             reason = "Pattern/resource creation time is missing or equal; retained conservatively"
         elif item_created < pattern_created:
             assessment = "likely-pre-existing"
-            reason = "Resource creation time predates the Pattern; retained conservatively"
+            reason = (
+                "Resource creation time predates the Pattern; retained conservatively"
+            )
         else:
             assessment = "likely-pattern-created"
             reason = "Resource creation time is after Pattern creation; ownership is still heuristic"
@@ -1539,14 +1888,18 @@ def classify_inventory_tracked_resources(
 
 
 def append_delete_false(sync_options: str | None) -> str:
-    values = [token.strip() for token in (sync_options or "").split(",") if token.strip()]
+    values = [
+        token.strip() for token in (sync_options or "").split(",") if token.strip()
+    ]
     if "Delete=false" not in values:
         values.append("Delete=false")
     return ",".join(values)
 
 
 def apply_inventory_protections(
-    path: Path, cluster: dict[str, str], target_pattern: str,
+    path: Path,
+    cluster: dict[str, str],
+    target_pattern: str,
     resources: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Record then apply Delete=false for likely pre-existing/ambiguous resources."""
@@ -1555,7 +1908,9 @@ def apply_inventory_protections(
         prior.get("cluster", {}).get("server") != cluster.get("server")
         or prior.get("targetPattern") != target_pattern
     ):
-        raise RuntimeError("Inventory protection state belongs to a different cluster or Pattern.")
+        raise RuntimeError(
+            "Inventory protection state belongs to a different cluster or Pattern."
+        )
     known = {
         (item.get("kind"), item.get("namespace"), item.get("name")): item
         for item in prior.get("resources", [])
@@ -1563,14 +1918,22 @@ def apply_inventory_protections(
     state_by_id = dict(known)
     for item in resources:
         if not item.get("uid") or not item.get("apiResource"):
-            raise RuntimeError(f"Cannot safely protect {item.get('kind')} {resource_ref(item)} without UID/API identity.")
+            raise RuntimeError(
+                f"Cannot safely protect {item.get('kind')} {resource_ref(item)} without UID/API identity."
+            )
         identity = (item.get("kind"), item.get("namespace"), item.get("name"))
         saved = known.get(identity)
         if saved:
             if saved.get("uid") != item.get("uid"):
-                raise RuntimeError(f"{item.get('kind')} {resource_ref(item)} changed UID since protection was recorded.")
-            item["syncOptionsBeforeProtection"] = saved.get("syncOptionsBeforeProtection")
-            item["protectionAddedByScript"] = saved.get("protectionAddedByScript", False)
+                raise RuntimeError(
+                    f"{item.get('kind')} {resource_ref(item)} changed UID since protection was recorded."
+                )
+            item["syncOptionsBeforeProtection"] = saved.get(
+                "syncOptionsBeforeProtection"
+            )
+            item["protectionAddedByScript"] = saved.get(
+                "protectionAddedByScript", False
+            )
             state_by_id[identity] = saved
             continue
 
@@ -1616,7 +1979,9 @@ def apply_inventory_protections(
         live = oc_json(get_args)
         metadata = live.get("metadata", {})
         if metadata.get("uid") != item.get("uid"):
-            raise RuntimeError(f"{item.get('kind')} {resource_ref(item)} changed UID before protection.")
+            raise RuntimeError(
+                f"{item.get('kind')} {resource_ref(item)} changed UID before protection."
+            )
         annotations = metadata.get("annotations", {}) or {}
         annotation_key = "argocd.argoproj.io/sync-options"
         current_options = annotations.get(annotation_key)
@@ -1625,19 +1990,36 @@ def apply_inventory_protections(
             continue
         if current_options != saved.get("syncOptionsBeforeProtection"):
             raise RuntimeError(
-                f"Sync options on {item.get('kind')} {resource_ref(item)} changed since inventory; refusing to overwrite them."
+                f"Sync options on {item.get('kind')} {resource_ref(item)} changed since inventory; "
+                "refusing to overwrite them."
             )
         patch = {"metadata": {"annotations": {annotation_key: expected}}}
-        patch_args = ["patch", api_resource, item["name"], "--type=merge", "-p", json.dumps(patch, separators=(",", ":"))]
+        patch_args = [
+            "patch",
+            api_resource,
+            item["name"],
+            "--type=merge",
+            "-p",
+            json.dumps(patch, separators=(",", ":")),
+        ]
         if item.get("namespace"):
             patch_args.extend(["-n", item["namespace"]])
         oc(patch_args)
         verified = oc_json(get_args)
-        verified_options = ((verified.get("metadata", {}).get("annotations") or {}).get(annotation_key))
-        if verified.get("metadata", {}).get("uid") != item.get("uid") or verified_options != expected:
-            raise RuntimeError(f"Could not verify Delete=false protection on {item.get('kind')} {resource_ref(item)}.")
+        verified_options = (verified.get("metadata", {}).get("annotations") or {}).get(
+            annotation_key
+        )
+        if (
+            verified.get("metadata", {}).get("uid") != item.get("uid")
+            or verified_options != expected
+        ):
+            raise RuntimeError(
+                f"Could not verify Delete=false protection on {item.get('kind')} {resource_ref(item)}."
+            )
         item["deleteProtected"] = True
-    print(f"Delete=false protection verified for {len(resources)} likely pre-existing/ambiguous tracked resources.")
+    print(
+        f"Delete=false protection verified for {len(resources)} likely pre-existing/ambiguous tracked resources."
+    )
     return resources
 
 
@@ -1648,14 +2030,25 @@ def release_inventory_protections(
     if not path.exists():
         return []
     state = read_json(path)
-    if state.get("cluster", {}).get("server") != cluster.get("server") or state.get("targetPattern") != target_pattern:
-        raise RuntimeError("Inventory protection state belongs to a different cluster or Pattern.")
+    if (
+        state.get("cluster", {}).get("server") != cluster.get("server")
+        or state.get("targetPattern") != target_pattern
+    ):
+        raise RuntimeError(
+            "Inventory protection state belongs to a different cluster or Pattern."
+        )
     app_names = {app.get("name") for app in apps if app.get("name")}
     app_keys = {key(app) for app in apps}
     outcomes: list[dict[str, Any]] = []
     for item in state.get("resources", []):
         if not item.get("name") or not item.get("apiResource"):
-            outcomes.append({**item, "cleanupState": "unknown", "reason": "missing API resource identity"})
+            outcomes.append(
+                {
+                    **item,
+                    "cleanupState": "unknown",
+                    "reason": "missing API resource identity",
+                }
+            )
             continue
         args = ["get", item["apiResource"], item["name"]]
         if item.get("namespace"):
@@ -1670,7 +2063,13 @@ def release_inventory_protections(
             continue
         metadata = live.get("metadata", {})
         if metadata.get("uid") != item.get("uid"):
-            outcomes.append({**item, "cleanupState": "conflict", "reason": "live UID differs from inventory UID"})
+            outcomes.append(
+                {
+                    **item,
+                    "cleanupState": "conflict",
+                    "reason": "live UID differs from inventory UID",
+                }
+            )
             continue
         annotations = metadata.get("annotations", {}) or {}
         patch_annotations: dict[str, Any] = {}
@@ -1682,28 +2081,45 @@ def release_inventory_protections(
             if current == expected:
                 patch_annotations[sync_key] = original
             elif current != original:
-                outcomes.append({**item, "cleanupState": "conflict", "reason": "sync options changed after protection"})
+                outcomes.append(
+                    {
+                        **item,
+                        "cleanupState": "conflict",
+                        "reason": "sync options changed after protection",
+                    }
+                )
                 continue
 
         tracking_key = "argocd.argoproj.io/tracking-id"
         current_tracking = annotations.get(tracking_key)
         saved_tracking = item.get("trackingIdBeforeProtection")
         tracking_app = (current_tracking or "").split(":", 1)[0]
-        if saved_tracking and current_tracking == saved_tracking and (
-            tracking_app in app_names or tracking_app in app_keys
+        if (
+            saved_tracking
+            and current_tracking == saved_tracking
+            and (tracking_app in app_names or tracking_app in app_keys)
         ):
             patch_annotations[tracking_key] = None
 
         if patch_annotations:
             patch = {"metadata": {"annotations": patch_annotations}}
-            patch_args = ["patch", item["apiResource"], item["name"], "--type=merge", "-p", json.dumps(patch, separators=(",", ":"))]
+            patch_args = [
+                "patch",
+                item["apiResource"],
+                item["name"],
+                "--type=merge",
+                "-p",
+                json.dumps(patch, separators=(",", ":")),
+            ]
             if item.get("namespace"):
                 patch_args.extend(["-n", item["namespace"]])
             try:
                 oc(patch_args)
                 outcomes.append({**item, "cleanupState": "released"})
             except OcError as error:
-                outcomes.append({**item, "cleanupState": "error", "reason": error.stderr})
+                outcomes.append(
+                    {**item, "cleanupState": "error", "reason": error.stderr}
+                )
         else:
             outcomes.append({**item, "cleanupState": "already-clean"})
     return outcomes
@@ -1713,18 +2129,27 @@ def verify_delete_protection(resources: list[dict[str, Any]]) -> None:
     """Recheck UID and Delete=false immediately before Pattern deletion."""
     for item in resources:
         if not item.get("apiResource") or not item.get("uid"):
-            raise RuntimeError(f"Cannot verify deletion protection for {item.get('kind')} {resource_ref(item)}.")
+            raise RuntimeError(
+                f"Cannot verify deletion protection for {item.get('kind')} {resource_ref(item)}."
+            )
         args = ["get", item["apiResource"], item["name"]]
         if item.get("namespace"):
             args.extend(["-n", item["namespace"]])
         live = oc_json(args)
         metadata = live.get("metadata", {})
         if metadata.get("uid") != item.get("uid"):
-            raise RuntimeError(f"{item.get('kind')} {resource_ref(item)} changed UID before Pattern deletion.")
-        options = ((metadata.get("annotations") or {}).get("argocd.argoproj.io/sync-options") or "")
-        if "Delete=false" not in {token.strip() for token in options.split(",") if token.strip()}:
             raise RuntimeError(
-                f"Delete=false protection is missing on {item.get('kind')} {resource_ref(item)}; Pattern deletion was not started."
+                f"{item.get('kind')} {resource_ref(item)} changed UID before Pattern deletion."
+            )
+        options = (metadata.get("annotations") or {}).get(
+            "argocd.argoproj.io/sync-options"
+        ) or ""
+        if "Delete=false" not in {
+            token.strip() for token in options.split(",") if token.strip()
+        }:
+            raise RuntimeError(
+                f"Delete=false protection is missing on {item.get('kind')} {resource_ref(item)}; "
+                "Pattern deletion was not started."
             )
 
 
@@ -1738,31 +2163,47 @@ def do_uninstall(args: argparse.Namespace) -> int:
     current = inventory(workers=args.workers)
     current["inventoryType"] = "current-install-inventory"
     baseline = read_json(args.baseline) if args.baseline else None
-    inventory_snapshot = read_json(args.inventory) if args.inventory else None
-    comparison_mode = "pre-install-baseline" if baseline is not None else "current-install-inventory"
+    inventory_snapshot = read_json(args.inventory) if args.inventory else {}
+    comparison_mode = (
+        "pre-install-baseline" if baseline is not None else "current-install-inventory"
+    )
 
     if baseline is not None:
         if args.best_effort:
-            raise RuntimeError("--best-effort applies only with --inventory; do not use it with --baseline.")
+            raise RuntimeError(
+                "--best-effort applies only with --inventory; do not use it with --baseline."
+            )
         check_baseline_cluster(baseline, current_cluster)
-        pattern_obj = find_pattern(current["resources"]["patterns"], args.pattern, args.namespace)
+        pattern_obj = find_pattern(
+            current["resources"]["patterns"], args.pattern, args.namespace
+        )
         pattern_name = pattern_obj["name"]
         namespace = pattern_obj["namespace"]
         is_resume = bool(pattern_obj.get("deletionTimestamp"))
         try:
-            root = discover_root(pattern_name, current["resources"]["applications"], args.root_application)
+            root = discover_root(
+                pattern_name,
+                current["resources"]["applications"],
+                args.root_application,
+            )
         except RuntimeError:
             if not is_resume:
                 raise
             root = args.root_application or f"vp-gitops/{pattern_name}-hub"
         root_exists = root in {key(app) for app in current["resources"]["applications"]}
         selected_apps = app_tree(
-            current["resources"]["applications"], root, allow_missing_root=is_resume and not root_exists
+            current["resources"]["applications"],
+            root,
+            allow_missing_root=is_resume and not root_exists,
         )
     else:
         if not args.best_effort:
-            raise RuntimeError("Inventory mode requires the explicit --best-effort option.")
-        candidate_pattern = find_pattern(current["resources"]["patterns"], args.pattern, args.namespace)
+            raise RuntimeError(
+                "Inventory mode requires the explicit --best-effort option."
+            )
+        candidate_pattern = find_pattern(
+            current["resources"]["patterns"], args.pattern, args.namespace
+        )
         is_resume = bool(candidate_pattern.get("deletionTimestamp"))
         pattern_obj, root, selected_apps = validate_current_inventory(
             inventory_snapshot,
@@ -1780,10 +2221,14 @@ def do_uninstall(args: argparse.Namespace) -> int:
         report_before = read_json(pre_uninstall_path)
         check_baseline_cluster(report_before, current_cluster)
         saved_pattern = find_pattern(
-            report_before.get("resources", {}).get("patterns", []), pattern_name, namespace
+            report_before.get("resources", {}).get("patterns", []),
+            pattern_name,
+            namespace,
         )
         if saved_pattern.get("uid") != pattern_obj.get("uid"):
-            raise RuntimeError("The saved pre-uninstall inventory belongs to a different Pattern instance.")
+            raise RuntimeError(
+                "The saved pre-uninstall inventory belongs to a different Pattern instance."
+            )
         root = discover_root(
             pattern_name,
             report_before.get("resources", {}).get("applications", []),
@@ -1800,8 +2245,14 @@ def do_uninstall(args: argparse.Namespace) -> int:
         saved_by_key = {key(app): app for app in saved_apps}
         for live_app in live_apps:
             saved_app = saved_by_key.get(key(live_app))
-            if not saved_app or not saved_app.get("uid") or saved_app.get("uid") != live_app.get("uid"):
-                raise RuntimeError(f"Live Application {key(live_app)} does not match the saved uninstall inventory.")
+            if (
+                not saved_app
+                or not saved_app.get("uid")
+                or saved_app.get("uid") != live_app.get("uid")
+            ):
+                raise RuntimeError(
+                    f"Live Application {key(live_app)} does not match the saved uninstall inventory."
+                )
         if baseline is None:
             validate_current_inventory(
                 inventory_snapshot,
@@ -1825,15 +2276,25 @@ def do_uninstall(args: argparse.Namespace) -> int:
         removed_crd_kinds=removed_crd_kinds(report_before, current),
     )
     unknown_probes = [
-        item for item in preflight_probe
+        item
+        for item in preflight_probe
         if item.get("state") == "unknown"
-        or (item.get("state") == "present" and (not item.get("uid") or not item.get("apiResource")))
+        or (
+            item.get("state") == "present"
+            and (not item.get("uid") or not item.get("apiResource"))
+        )
     ]
     if baseline is None and not is_resume:
-        verify_tracked_resource_inventory(inventory_snapshot, selected_apps, preflight_probe)
+        verify_tracked_resource_inventory(
+            inventory_snapshot, selected_apps, preflight_probe
+        )
     if baseline is not None:
-        baseline_patterns = {key(item) for item in baseline.get("resources", {}).get("patterns", [])}
-        baseline_apps = {key(item) for item in baseline.get("resources", {}).get("applications", [])}
+        baseline_patterns = {
+            key(item) for item in baseline.get("resources", {}).get("patterns", [])
+        }
+        baseline_apps = {
+            key(item) for item in baseline.get("resources", {}).get("applications", [])
+        }
         if target_pattern in baseline_patterns or root in baseline_apps:
             raise RuntimeError(
                 "The supplied baseline already contains this Pattern/root Application; "
@@ -1850,8 +2311,13 @@ def do_uninstall(args: argparse.Namespace) -> int:
         )
     else:
         if inventory_snapshot.get("scanErrors") and not args.allow_incomplete_inventory:
-            raise RuntimeError("The saved current inventory has scan errors; resolve them or explicitly pass --allow-incomplete-inventory.")
-        preexisting_tracked = classify_inventory_tracked_resources(pattern_obj, selected_apps, preflight_probe)
+            raise RuntimeError(
+                "The saved current inventory has scan errors; resolve them or explicitly pass "
+                "--allow-incomplete-inventory."
+            )
+        preexisting_tracked = classify_inventory_tracked_resources(
+            pattern_obj, selected_apps, preflight_probe
+        )
         if not is_resume or not report_before.get("trackedResourceInventory"):
             report_before["trackedResourceInventory"] = preflight_probe
             write_inventory_files(args.artifacts_dir, "pre-uninstall", report_before)
@@ -1875,7 +2341,11 @@ def do_uninstall(args: argparse.Namespace) -> int:
         )
         print(heading)
         for item in preexisting_tracked:
-            protected = "Delete=false set" if item["deleteProtected"] else "Delete=false missing"
+            protected = (
+                "Delete=false set"
+                if item["deleteProtected"]
+                else "Delete=false missing"
+            )
             auto = ", ".join(item["automatedSyncOwners"]) or "automatic sync off"
             print(
                 f"  - {item['kind']} {resource_ref(item)} (UID {item['uid']}; "
@@ -1884,7 +2354,9 @@ def do_uninstall(args: argparse.Namespace) -> int:
     if unknown_probes:
         print("Argo-tracked resources whose live identity could not be verified:")
         for item in unknown_probes:
-            print(f"  - {item.get('kind')} {resource_ref(item)}: {item.get('error', 'unknown error')}")
+            print(
+                f"  - {item.get('kind')} {resource_ref(item)}: {item.get('error', 'unknown error')}"
+            )
     tracked_pvcs = sorted(
         {
             resource_ref(item)
@@ -1897,26 +2369,42 @@ def do_uninstall(args: argparse.Namespace) -> int:
         print("Pattern-tracked PVCs (back up or confirm disposable before proceeding):")
         for pvc in tracked_pvcs:
             print(f"  - {pvc}")
-    unavailable = [item for item in current["resources"]["managedclusters"] if item.get("available") is False]
+    unavailable = [
+        item
+        for item in current["resources"]["managedclusters"]
+        if item.get("available") is False
+    ]
     if unavailable:
         print("Unavailable ACM ManagedClusters:")
         for cluster in unavailable:
             print(f"  - {cluster['name']}")
     if current["scanErrors"]:
-        print(f"Warning: pre-uninstall inventory has {len(current['scanErrors'])} scan errors.")
+        print(
+            f"Warning: pre-uninstall inventory has {len(current['scanErrors'])} scan errors."
+        )
     if baseline is None:
-        print("No pre-install baseline: trust settings and cluster-wide ownership cannot be compared to their original state.")
+        print(
+            "No pre-install baseline: trust settings and cluster-wide ownership cannot be "
+            "compared to their original state."
+        )
     print(f"Artifacts directory: {args.artifacts_dir.resolve()}")
     if not args.execute:
-        print("Plan only. No cluster resources were changed. Add --execute and the exact --confirm string to start.")
-        print(f"Required confirmation: DELETE {target_pattern} on {current_cluster['server']}")
+        print(
+            "Plan only. No cluster resources were changed. Add --execute and the exact --confirm string to start."
+        )
+        print(
+            f"Required confirmation: DELETE {target_pattern} on {current_cluster['server']}"
+        )
         return 0
 
     if not args.expected_server or args.expected_server != current_cluster["server"]:
-        raise RuntimeError("--expected-server is required and must exactly match `oc whoami --show-server`.")
+        raise RuntimeError(
+            "--expected-server is required and must exactly match `oc whoami --show-server`."
+        )
     if not args.ack_preflight:
         raise RuntimeError(
-            "Before --execute, complete the procedure's backup, enabled-feature, external-integration, and shared-resource review, then pass --ack-preflight."
+            "Before --execute, complete the procedure's backup, enabled-feature, "
+            "external-integration, and shared-resource review, then pass --ack-preflight."
         )
     unsafe_preexisting = [
         item
@@ -1939,14 +2427,27 @@ def do_uninstall(args: argparse.Namespace) -> int:
         )
     if unavailable and not args.allow_unavailable_spokes:
         raise RuntimeError(
-            "One or more ACM ManagedClusters are unavailable; resolve connectivity or explicitly pass --allow-unavailable-spokes."
+            "One or more ACM ManagedClusters are unavailable; resolve connectivity or "
+            "explicitly pass --allow-unavailable-spokes."
         )
     if current["scanErrors"] and not args.allow_incomplete_inventory:
-        raise RuntimeError("Inventory has errors; resolve them or explicitly pass --allow-incomplete-inventory.")
-    if baseline is not None and baseline.get("scanErrors") and not args.allow_incomplete_inventory:
-        raise RuntimeError("The pre-install baseline has scan errors; resolve them or explicitly pass --allow-incomplete-inventory.")
+        raise RuntimeError(
+            "Inventory has errors; resolve them or explicitly pass --allow-incomplete-inventory."
+        )
+    if (
+        baseline is not None
+        and baseline.get("scanErrors")
+        and not args.allow_incomplete_inventory
+    ):
+        raise RuntimeError(
+            "The pre-install baseline has scan errors; resolve them or explicitly pass --allow-incomplete-inventory."
+        )
     require_delete_permission(namespace)
-    confirm_execution(args, {"metadata": {"name": pattern_name, "namespace": namespace}}, current_cluster["server"])
+    confirm_execution(
+        args,
+        {"metadata": {"name": pattern_name, "namespace": namespace}},
+        current_cluster["server"],
+    )
     if pattern_obj.get("deletionTimestamp"):
         if baseline is None:
             print(
@@ -1995,22 +2496,35 @@ def do_uninstall(args: argparse.Namespace) -> int:
                 print(f"phase={phase}; lastError={last_error or '<none>'}")
                 last_observed = observed
             if time.monotonic() - start > args.timeout:
-                raise TimeoutError(f"Timed out after {args.timeout}s in phase {phase}: {last_error or 'no operator error reported'}")
+                raise TimeoutError(
+                    f"Timed out after {args.timeout}s in phase {phase}: {last_error or 'no operator error reported'}"
+                )
             time.sleep(args.poll_interval)
     except KeyboardInterrupt:
-        print("Interrupted. The Pattern deletion continues in the cluster; rerun this command to resume.", file=sys.stderr)
+        print(
+            "Interrupted. The Pattern deletion continues in the cluster; rerun this command to resume.",
+            file=sys.stderr,
+        )
         return 130
     except TimeoutError as error:
         print(str(error), file=sys.stderr)
-        print("No finalizers or remaining resources were force-deleted. Inspect progress.json and operator logs.", file=sys.stderr)
+        print(
+            "No finalizers or remaining resources were force-deleted. Inspect progress.json and operator logs.",
+            file=sys.stderr,
+        )
         try:
             save_stalled_diagnostics(args.artifacts_dir, selected_apps, args.workers)
         except Exception as diagnostic_error:
-            print(f"Could not capture all stalled diagnostics: {diagnostic_error}", file=sys.stderr)
+            print(
+                f"Could not capture all stalled diagnostics: {diagnostic_error}",
+                file=sys.stderr,
+            )
         return 3
 
     post = inventory(workers=args.workers)
-    write_inventory_files(args.artifacts_dir, "post-uninstall-before-trust-restore", post)
+    write_inventory_files(
+        args.artifacts_dir, "post-uninstall-before-trust-restore", post
+    )
     # Restore only when the Argo Application tree is gone. If any app remains,
     # leave cluster-wide fields untouched and make the residue visible.
     remaining_app_keys = {key(app) for app in post["resources"]["applications"]}
@@ -2019,7 +2533,9 @@ def do_uninstall(args: argparse.Namespace) -> int:
     preexisting_cleanup: list[dict[str, Any]] = []
     if not tree_remaining:
         if baseline is not None:
-            preexisting_cleanup = release_preexisting_resources(preexisting_tracked, selected_apps, baseline)
+            preexisting_cleanup = release_preexisting_resources(
+                preexisting_tracked, selected_apps, baseline
+            )
         else:
             preexisting_cleanup = release_inventory_protections(
                 args.artifacts_dir / "inventory-protection-state.json",
@@ -2035,7 +2551,9 @@ def do_uninstall(args: argparse.Namespace) -> int:
                 if outcome.get("reason"):
                     item["cleanupReason"] = outcome["reason"]
         post = inventory(workers=args.workers)
-        write_inventory_files(args.artifacts_dir, "post-uninstall-before-trust-restore", post)
+        write_inventory_files(
+            args.artifacts_dir, "post-uninstall-before-trust-restore", post
+        )
         if baseline is not None:
             trust_actions = restore_known_cluster_fields(
                 baseline,
@@ -2054,13 +2572,23 @@ def do_uninstall(args: argparse.Namespace) -> int:
                 )
             )
         else:
-            trust_actions = [{
-                "state": "not-restored",
-                "reason": "No pre-install baseline; original Proxy/Image trust fields and ConfigMap ownership are unknown.",
-            }]
+            trust_actions = [
+                {
+                    "state": "not-restored",
+                    "reason": (
+                        "No pre-install baseline; original Proxy/Image trust fields and "
+                        "ConfigMap ownership are unknown."
+                    ),
+                }
+            ]
         write_inventory_files(args.artifacts_dir, "post-uninstall", post)
     else:
-        trust_actions = [{"state": "not-restored", "reason": "one or more target Argo Applications remain"}]
+        trust_actions = [
+            {
+                "state": "not-restored",
+                "reason": "one or more target Argo Applications remain",
+            }
+        ]
     probe = probe_app_resources(
         selected_apps,
         workers=args.workers,
@@ -2086,22 +2614,48 @@ def do_uninstall(args: argparse.Namespace) -> int:
             and report["clusterTrust"]["proxy"]["matchesPreinstall"]
         ):
             resource["state"] = "preserved-platform-object"
-            resource["reason"] = "OpenShift Proxy singleton retained; ZTVP trustedCA field matches pre-install inventory"
+            resource["reason"] = (
+                "OpenShift Proxy singleton retained; ZTVP trustedCA field matches pre-install inventory"
+            )
     write_json(args.artifacts_dir / "report.json", report)
     print(f"Report: {(args.artifacts_dir / 'report.json').resolve()}")
     print(f"Pattern absent: {report['patternAbsent']}")
-    print(f"Target Argo Applications remaining: {len(report['targetApplicationsRemaining'])}")
+    print(
+        f"Target Argo Applications remaining: {len(report['targetApplicationsRemaining'])}"
+    )
     if baseline is not None:
-        print(f"New CRDs remaining since baseline: {len(report['newSincePreinstall']['crds'])}")
-        print(f"New APIService objects remaining since baseline: {len(report['newSincePreinstall']['apiservices'])}")
-        print(f"New Subscriptions/CSVs remaining since baseline: {len(report['newSincePreinstall']['subscriptions'])}/{len(report['newSincePreinstall']['csvs'])}")
-        print(f"New OperatorGroups remaining since baseline: {len(report['newSincePreinstall']['operatorgroups'])}")
-        print(f"New namespaces remaining since baseline: {len(report['newSincePreinstall']['namespaces'])}")
-        print(f"Custom-resource instances new since baseline: {len(report['newSincePreinstall']['customResourceInstances'])}")
+        print(
+            f"New CRDs remaining since baseline: {len(report['newSincePreinstall']['crds'])}"
+        )
+        print(
+            f"New APIService objects remaining since baseline: {len(report['newSincePreinstall']['apiservices'])}"
+        )
+        print(
+            "New Subscriptions/CSVs remaining since baseline: "
+            f"{len(report['newSincePreinstall']['subscriptions'])}/"
+            f"{len(report['newSincePreinstall']['csvs'])}"
+        )
+        print(
+            f"New OperatorGroups remaining since baseline: {len(report['newSincePreinstall']['operatorgroups'])}"
+        )
+        print(
+            f"New namespaces remaining since baseline: {len(report['newSincePreinstall']['namespaces'])}"
+        )
+        print(
+            "Custom-resource instances new since baseline: "
+            f"{len(report['newSincePreinstall']['customResourceInstances'])}"
+        )
     else:
-        print("Pre-install deltas: unavailable; the report contains post-uninstall inventory and tracked-resource results.")
-    present = sum(item.get("state") == "present" for item in report["patternManagedResources"])
-    unknown = sum(item.get("state") == "unknown" for item in report["patternManagedResources"])
+        print(
+            "Pre-install deltas: unavailable; the report contains post-uninstall inventory "
+            "and tracked-resource results."
+        )
+    present = sum(
+        item.get("state") == "present" for item in report["patternManagedResources"]
+    )
+    unknown = sum(
+        item.get("state") == "unknown" for item in report["patternManagedResources"]
+    )
     cleanup_issues = sum(
         item.get("cleanupState") in {"unknown", "error", "conflict"}
         for item in report["preexistingResourceCleanup"]
@@ -2124,14 +2678,16 @@ def do_audit(args: argparse.Namespace) -> int:
     ensure_private_dir(args.artifacts_dir)
     current_cluster = cluster_identity()
     baseline = read_json(args.baseline) if args.baseline else None
-    inventory_snapshot = read_json(args.inventory) if args.inventory else None
+    inventory_snapshot = read_json(args.inventory) if args.inventory else {}
     if baseline is not None:
         check_baseline_cluster(baseline, current_cluster)
         comparison_mode = "pre-install-baseline"
     else:
         check_baseline_cluster(inventory_snapshot, current_cluster)
         if inventory_snapshot.get("inventoryType") != "current-install-inventory":
-            raise RuntimeError("--inventory must reference a file created by the `inventory` command.")
+            raise RuntimeError(
+                "--inventory must reference a file created by the `inventory` command."
+            )
         comparison_mode = "current-install-inventory"
     post = inventory(workers=args.workers)
     write_inventory_files(args.artifacts_dir, "audit-current", post)
@@ -2139,17 +2695,23 @@ def do_audit(args: argparse.Namespace) -> int:
     app_probe: list[dict[str, Any]] = []
     target_pattern = args.pattern or "<any-pattern>"
     before = read_json(args.pre_uninstall) if args.pre_uninstall else None
-    if comparison_mode == "pre-install-baseline" and before is not None:
+    if baseline is not None and before is not None:
         check_baseline_cluster(before, current_cluster)
         name = args.pattern or "layered-zero-trust"
-        root = discover_root(name, before.get("resources", {}).get("applications", []), args.root_application)
-        selected_apps = app_tree(before.get("resources", {}).get("applications", []), root)
+        root = discover_root(
+            name,
+            before.get("resources", {}).get("applications", []),
+            args.root_application,
+        )
+        selected_apps = app_tree(
+            before.get("resources", {}).get("applications", []), root
+        )
         app_probe = probe_app_resources(
             selected_apps,
             args.workers,
             removed_crd_kinds=removed_crd_kinds(before, post),
         )
-    elif comparison_mode == "pre-install-baseline":
+    elif baseline is not None:
         before = baseline
         name = args.pattern or "layered-zero-trust"
         root = args.root_application or f"vp-gitops/{name}-hub"
@@ -2173,14 +2735,24 @@ def do_audit(args: argparse.Namespace) -> int:
             allow_resume=True,
         )
         pattern_records = [
-            item for item in before.get("resources", {}).get("patterns", [])
-            if item.get("name") == name and (args.namespace is None or item.get("namespace") == args.namespace)
+            item
+            for item in before.get("resources", {}).get("patterns", [])
+            if item.get("name") == name
+            and (args.namespace is None or item.get("namespace") == args.namespace)
         ]
         if len(pattern_records) != 1:
-            raise RuntimeError(f"Expected one Pattern {name!r} in the saved current inventory; found {len(pattern_records)}.")
+            raise RuntimeError(
+                f"Expected one Pattern {name!r} in the saved current inventory; found {len(pattern_records)}."
+            )
         pattern_record = pattern_records[0]
-        root = discover_root(name, before.get("resources", {}).get("applications", []), args.root_application)
-        selected_apps = app_tree(before.get("resources", {}).get("applications", []), root)
+        root = discover_root(
+            name,
+            before.get("resources", {}).get("applications", []),
+            args.root_application,
+        )
+        selected_apps = app_tree(
+            before.get("resources", {}).get("applications", []), root
+        )
         target_pattern = f"{pattern_record['namespace']}/{name}"
         app_probe = probe_app_resources(
             selected_apps,
@@ -2188,7 +2760,7 @@ def do_audit(args: argparse.Namespace) -> int:
             removed_crd_kinds=removed_crd_kinds(before, post),
         )
     preexisting_tracked: list[dict[str, Any]] = []
-    if comparison_mode == "pre-install-baseline":
+    if baseline is not None:
         pattern_record = next(
             (
                 item
@@ -2207,19 +2779,25 @@ def do_audit(args: argparse.Namespace) -> int:
         if state_path.exists():
             protection_state = read_json(state_path)
             if (
-                protection_state.get("cluster", {}).get("server") != current_cluster.get("server")
+                protection_state.get("cluster", {}).get("server")
+                != current_cluster.get("server")
                 or protection_state.get("targetPattern") != target_pattern
             ):
-                raise RuntimeError("Inventory protection state belongs to a different cluster or Pattern.")
+                raise RuntimeError(
+                    "Inventory protection state belongs to a different cluster or Pattern."
+                )
             preexisting_tracked = protection_state.get("resources", [])
         else:
             app_keys = {key(app) for app in selected_apps}
             saved_probe = [
-                item for item in before.get("trackedResourceInventory", []) or []
+                item
+                for item in before.get("trackedResourceInventory", []) or []
                 if set(item.get("trackedByApps", [])) & app_keys
             ]
             if any("protectFromCascade" in item for item in saved_probe):
-                preexisting_tracked = [item for item in saved_probe if item.get("protectFromCascade")]
+                preexisting_tracked = [
+                    item for item in saved_probe if item.get("protectFromCascade")
+                ]
             else:
                 preexisting_tracked = classify_inventory_tracked_resources(
                     pattern_record, selected_apps, saved_probe or app_probe
@@ -2242,21 +2820,29 @@ def do_audit(args: argparse.Namespace) -> int:
     )
     write_json(args.artifacts_dir / "report.json", report)
     print(f"Audit report: {(args.artifacts_dir / 'report.json').resolve()}")
-    print(f"Pre-existing Argo-tracked resources: {len(report['preexistingTrackedResources'])}")
+    print(
+        f"Pre-existing Argo-tracked resources: {len(report['preexistingTrackedResources'])}"
+    )
     if comparison_mode == "pre-install-baseline":
         print(f"New CRDs: {len(report['newSincePreinstall']['crds'])}")
         print(f"New APIServices: {len(report['newSincePreinstall']['apiservices'])}")
-        print(f"New custom-resource instances: {len(report['newSincePreinstall']['customResourceInstances'])}")
+        print(
+            f"New custom-resource instances: {len(report['newSincePreinstall']['customResourceInstances'])}"
+        )
     else:
-        print("Pre-install deltas are unavailable; compare saved inventory and post-uninstall inventory manually.")
+        print(
+            "Pre-install deltas are unavailable; compare saved inventory and post-uninstall inventory manually."
+        )
     print(report["strictZeroResidueNote"])
     return 0
 
 
-def readiness_condition(obj: dict[str, Any] | None, condition_type: str = "Ready") -> dict[str, Any] | None:
+def readiness_condition(
+    obj: dict[str, Any] | None, condition_type: str = "Ready"
+) -> dict[str, Any] | None:
     if not obj:
         return None
-    for condition in (obj.get("status", {}).get("conditions", []) or []):
+    for condition in obj.get("status", {}).get("conditions", []) or []:
         if condition.get("type") == condition_type:
             return condition
     return None
@@ -2266,14 +2852,17 @@ def inspect_reinstall_health(
     *,
     vault_namespace: str,
     app_namespace: str,
-    external_secrets: list[str],
+    external_secrets: list[tuple[str, str]],
     applications: list[str],
 ) -> list[dict[str, Any]]:
     checks: list[dict[str, Any]] = []
 
     pod = oc_json(["get", "pod", "vault-0", "-n", vault_namespace], allow_missing=True)
     pod_conditions = (pod or {}).get("status", {}).get("conditions", []) or []
-    pod_ready = any(item.get("type") == "Ready" and item.get("status") == "True" for item in pod_conditions)
+    pod_ready = any(
+        item.get("type") == "Ready" and item.get("status") == "True"
+        for item in pod_conditions
+    )
     checks.append(
         {
             "name": f"pod/{vault_namespace}/vault-0",
@@ -2319,7 +2908,10 @@ def inspect_reinstall_health(
         )
 
     for name in applications:
-        application = oc_json(["get", "applications.argoproj.io", name, "-n", app_namespace], allow_missing=True)
+        application = oc_json(
+            ["get", "applications.argoproj.io", name, "-n", app_namespace],
+            allow_missing=True,
+        )
         status = (application or {}).get("status", {})
         sync_status = status.get("sync", {}).get("status", "Missing")
         health_status = status.get("health", {}).get("status", "Missing")
@@ -2361,9 +2953,17 @@ def do_verify_reinstall(args: argparse.Namespace) -> int:
             external_secrets=external_secrets,
             applications=applications,
         )
-        if all(item["ok"] for item in checks) or time.monotonic() - started >= args.wait_seconds:
+        if (
+            all(item["ok"] for item in checks)
+            or time.monotonic() - started >= args.wait_seconds
+        ):
             break
-        time.sleep(min(args.poll_interval, max(0.0, args.wait_seconds - (time.monotonic() - started))))
+        time.sleep(
+            min(
+                args.poll_interval,
+                max(0.0, args.wait_seconds - (time.monotonic() - started)),
+            )
+        )
 
     passed = all(item["ok"] for item in checks)
     report = {
@@ -2374,7 +2974,8 @@ def do_verify_reinstall(args: argparse.Namespace) -> int:
         "checks": checks,
         "note": (
             "Read-only check. A Valid ClusterSecretStore does not prove every Vault path is readable. "
-            "For SecretSyncedError, use the listed Vault path and External Secrets controller logs to diagnose policy access."
+            "For SecretSyncedError, use the listed Vault path and External Secrets "
+            "controller logs to diagnose policy access."
         ),
     }
     write_json(args.output, report)
@@ -2385,10 +2986,13 @@ def do_verify_reinstall(args: argparse.Namespace) -> int:
         detail = ", ".join(
             f"{key}={value}"
             for key, value in item.items()
-            if key not in {"name", "ok", "vaultPaths", "conditions"} and value is not None
+            if key not in {"name", "ok", "vaultPaths", "conditions"}
+            and value is not None
         )
         if item.get("vaultPaths"):
-            detail += (", " if detail else "") + "vaultPaths=" + ",".join(item["vaultPaths"])
+            detail += (
+                (", " if detail else "") + "vaultPaths=" + ",".join(item["vaultPaths"])
+            )
         print(f"{state} {item['name']}: {detail or 'ready'}")
     return 0 if passed else 3
 
@@ -2405,7 +3009,7 @@ def do_finalize(args: argparse.Namespace) -> int:
     ensure_private_dir(args.artifacts_dir)
     current_cluster = cluster_identity()
     baseline = read_json(args.baseline) if args.baseline else None
-    inventory_snapshot = read_json(args.inventory) if args.inventory else None
+    inventory_snapshot = read_json(args.inventory) if args.inventory else {}
     before = read_json(args.pre_uninstall) if args.pre_uninstall else inventory_snapshot
     if baseline is not None:
         check_baseline_cluster(baseline, current_cluster)
@@ -2414,7 +3018,9 @@ def do_finalize(args: argparse.Namespace) -> int:
         check_baseline_cluster(inventory_snapshot, current_cluster)
         check_baseline_cluster(before, current_cluster)
         if inventory_snapshot.get("inventoryType") != "current-install-inventory":
-            raise RuntimeError("--inventory must reference a file created by the `inventory` command.")
+            raise RuntimeError(
+                "--inventory must reference a file created by the `inventory` command."
+            )
         _, _, _ = validate_current_inventory(
             inventory_snapshot,
             before,
@@ -2449,9 +3055,12 @@ def do_finalize(args: argparse.Namespace) -> int:
     write_inventory_files(args.artifacts_dir, "finalize-before", current)
 
     pattern_still_exists = any(
-        key(item) == target_pattern for item in current.get("resources", {}).get("patterns", [])
+        key(item) == target_pattern
+        for item in current.get("resources", {}).get("patterns", [])
     )
-    live_app_keys = {key(item) for item in current.get("resources", {}).get("applications", [])}
+    live_app_keys = {
+        key(item) for item in current.get("resources", {}).get("applications", [])
+    }
     remaining_apps = [app for app in selected_apps if key(app) in live_app_keys]
     probe = probe_app_resources(
         selected_apps,
@@ -2463,20 +3072,28 @@ def do_finalize(args: argparse.Namespace) -> int:
             baseline, pattern_record, selected_apps, probe
         )
     else:
-        state_path = args.preexisting_state or args.artifacts_dir / "inventory-protection-state.json"
+        state_path = (
+            args.preexisting_state
+            or args.artifacts_dir / "inventory-protection-state.json"
+        )
         if state_path.exists():
             state = read_json(state_path)
             if state.get("cluster", {}).get("server") != current_cluster.get("server"):
-                raise RuntimeError("Inventory protection state belongs to a different cluster.")
+                raise RuntimeError(
+                    "Inventory protection state belongs to a different cluster."
+                )
             preexisting_tracked = state.get("resources", [])
         else:
             app_keys = {key(app) for app in selected_apps}
             saved_probe = [
-                item for item in before.get("trackedResourceInventory", []) or []
+                item
+                for item in before.get("trackedResourceInventory", []) or []
                 if set(item.get("trackedByApps", [])) & app_keys
             ]
             if any("protectFromCascade" in item for item in saved_probe):
-                preexisting_tracked = [item for item in saved_probe if item.get("protectFromCascade")]
+                preexisting_tracked = [
+                    item for item in saved_probe if item.get("protectFromCascade")
+                ]
             else:
                 preexisting_tracked = classify_inventory_tracked_resources(
                     pattern_record, selected_apps, saved_probe or probe
@@ -2496,21 +3113,34 @@ def do_finalize(args: argparse.Namespace) -> int:
         )
         write_json(args.artifacts_dir / "report.json", report)
         print(f"Pattern absent: {report['patternAbsent']}")
-        print(f"Target Argo Applications remaining: {len(report['targetApplicationsRemaining'])}")
-        print("Post-deletion finalization was not run; finish the Pattern or Argo deletion first.", file=sys.stderr)
+        print(
+            f"Target Argo Applications remaining: {len(report['targetApplicationsRemaining'])}"
+        )
+        print(
+            "Post-deletion finalization was not run; finish the Pattern or Argo deletion first.",
+            file=sys.stderr,
+        )
         return 3
 
     if baseline is not None:
-        state_path = args.preexisting_state or args.artifacts_dir / "preexisting-resource-state.json"
+        state_path = (
+            args.preexisting_state
+            or args.artifacts_dir / "preexisting-resource-state.json"
+        )
         preexisting_tracked = record_preexisting_resource_state(
             state_path,
             current_cluster,
             target_pattern,
             preexisting_tracked,
         )
-        preexisting_cleanup = release_preexisting_resources(preexisting_tracked, selected_apps, baseline)
+        preexisting_cleanup = release_preexisting_resources(
+            preexisting_tracked, selected_apps, baseline
+        )
     else:
-        state_path = args.preexisting_state or args.artifacts_dir / "inventory-protection-state.json"
+        state_path = (
+            args.preexisting_state
+            or args.artifacts_dir / "inventory-protection-state.json"
+        )
         preexisting_cleanup = release_inventory_protections(
             state_path,
             current_cluster,
@@ -2526,7 +3156,9 @@ def do_finalize(args: argparse.Namespace) -> int:
                 item["cleanupReason"] = outcome["reason"]
 
     post = inventory(workers=args.workers)
-    write_inventory_files(args.artifacts_dir, "post-uninstall-before-trust-restore", post)
+    write_inventory_files(
+        args.artifacts_dir, "post-uninstall-before-trust-restore", post
+    )
     if baseline is not None:
         trust_actions = restore_known_cluster_fields(
             baseline,
@@ -2545,10 +3177,15 @@ def do_finalize(args: argparse.Namespace) -> int:
             )
         )
     else:
-        trust_actions = [{
-            "state": "not-restored",
-            "reason": "No pre-install baseline; original Proxy/Image trust fields and ConfigMap ownership are unknown.",
-        }]
+        trust_actions = [
+            {
+                "state": "not-restored",
+                "reason": (
+                    "No pre-install baseline; original Proxy/Image trust fields and "
+                    "ConfigMap ownership are unknown."
+                ),
+            }
+        ]
     post = inventory(workers=args.workers)
     write_inventory_files(args.artifacts_dir, "post-uninstall", post)
     probe = probe_app_resources(
@@ -2575,20 +3212,38 @@ def do_finalize(args: argparse.Namespace) -> int:
             and report["clusterTrust"]["proxy"]["matchesPreinstall"]
         ):
             resource["state"] = "preserved-platform-object"
-            resource["reason"] = "OpenShift Proxy singleton retained; ZTVP trustedCA field matches pre-install inventory"
+            resource["reason"] = (
+                "OpenShift Proxy singleton retained; ZTVP trustedCA field matches pre-install inventory"
+            )
     write_json(args.artifacts_dir / "report.json", report)
 
     print(f"Report: {(args.artifacts_dir / 'report.json').resolve()}")
     print(f"Pattern absent: {report['patternAbsent']}")
-    print(f"Target Argo Applications remaining: {len(report['targetApplicationsRemaining'])}")
-    print(f"Pre-existing resources released: {sum(item.get('cleanupState') == 'released' for item in preexisting_cleanup)}")
+    print(
+        f"Target Argo Applications remaining: {len(report['targetApplicationsRemaining'])}"
+    )
+    print(
+        "Pre-existing resources released: "
+        f"{sum(item.get('cleanupState') == 'released' for item in preexisting_cleanup)}"
+    )
     if baseline is not None:
-        print(f"Proxy trust matches pre-install: {report['clusterTrust']['proxy']['matchesPreinstall']}")
-        print(f"Image trust matches pre-install: {report['clusterTrust']['image']['matchesPreinstall']}")
+        print(
+            f"Proxy trust matches pre-install: {report['clusterTrust']['proxy']['matchesPreinstall']}"
+        )
+        print(
+            f"Image trust matches pre-install: {report['clusterTrust']['image']['matchesPreinstall']}"
+        )
     else:
-        print("Proxy/Image trust restoration: unavailable without a pre-install baseline; original values were not changed.")
-    present = sum(item.get("state") == "present" for item in report["patternManagedResources"])
-    unknown = sum(item.get("state") == "unknown" for item in report["patternManagedResources"])
+        print(
+            "Proxy/Image trust restoration: unavailable without a pre-install baseline; "
+            "original values were not changed."
+        )
+    present = sum(
+        item.get("state") == "present" for item in report["patternManagedResources"]
+    )
+    unknown = sum(
+        item.get("state") == "unknown" for item in report["patternManagedResources"]
+    )
     cleanup_issues = sum(
         item.get("cleanupState") in {"unknown", "error", "conflict"}
         for item in report["preexistingResourceCleanup"]
@@ -2600,7 +3255,12 @@ def do_finalize(args: argparse.Namespace) -> int:
         report["targetApplicationsRemaining"]
         or present
         or unknown
-        or (baseline is not None and not all(value["matchesPreinstall"] for value in report["clusterTrust"].values()))
+        or (
+            baseline is not None
+            and not all(
+                value["matchesPreinstall"] for value in report["clusterTrust"].values()
+            )
+        )
         or cleanup_issues
         or report["scanErrors"]
     ):
@@ -2609,11 +3269,17 @@ def do_finalize(args: argparse.Namespace) -> int:
 
 
 def make_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Inventory, uninstall, and audit a ZTVP installation using oc.")
+    parser = argparse.ArgumentParser(
+        description="Inventory, uninstall, and audit a ZTVP installation using oc."
+    )
     subparsers = parser.add_subparsers(dest="mode", required=True)
 
-    snapshot = subparsers.add_parser("snapshot", help="capture the cluster baseline before ZTVP installation")
-    snapshot.add_argument("--output", type=Path, default=Path("ztvp-preinstall-baseline.json"))
+    snapshot = subparsers.add_parser(
+        "snapshot", help="capture the cluster baseline before ZTVP installation"
+    )
+    snapshot.add_argument(
+        "--output", type=Path, default=Path("ztvp-preinstall-baseline.json")
+    )
     snapshot.add_argument("--overwrite", action="store_true")
     snapshot.add_argument("--workers", type=int, default=4)
     snapshot.set_defaults(func=do_snapshot)
@@ -2621,50 +3287,107 @@ def make_parser() -> argparse.ArgumentParser:
     current_inventory = subparsers.add_parser(
         "inventory", help="capture the current state of an already-installed Pattern"
     )
-    current_inventory.add_argument("--output", type=Path, default=Path("ztvp-current-inventory.json"))
+    current_inventory.add_argument(
+        "--output", type=Path, default=Path("ztvp-current-inventory.json")
+    )
     current_inventory.add_argument("--overwrite", action="store_true")
     current_inventory.add_argument("--workers", type=int, default=4)
     current_inventory.set_defaults(func=do_inventory)
 
-    uninstall = subparsers.add_parser("uninstall", help="plan or execute phased Pattern deletion and audit")
+    uninstall = subparsers.add_parser(
+        "uninstall", help="plan or execute phased Pattern deletion and audit"
+    )
     source = uninstall.add_mutually_exclusive_group(required=True)
-    source.add_argument("--baseline", type=Path, help="JSON created by snapshot before ZTVP install")
-    source.add_argument("--inventory", type=Path, help="current-install inventory captured before uninstall")
+    source.add_argument(
+        "--baseline", type=Path, help="JSON created by snapshot before ZTVP install"
+    )
+    source.add_argument(
+        "--inventory",
+        type=Path,
+        help="current-install inventory captured before uninstall",
+    )
     uninstall.add_argument(
-        "--best-effort", action="store_true",
+        "--best-effort",
+        action="store_true",
         help="explicitly accept heuristic ownership decisions when using --inventory without a pre-install baseline",
     )
-    uninstall.add_argument("--pattern", help="Pattern CR name; required if more than one exists")
+    uninstall.add_argument(
+        "--pattern", help="Pattern CR name; required if more than one exists"
+    )
     uninstall.add_argument("--namespace", help="Pattern CR namespace")
-    uninstall.add_argument("--root-application", help="Argo root Application as namespace/name")
-    uninstall.add_argument("--operator-version", help="explicit version when it cannot be discovered automatically")
-    uninstall.add_argument("--proxy-ca-configmap", default=KNOWN_ZTVP_TRUST_CONFIGMAPS["proxy"])
-    uninstall.add_argument("--image-ca-configmap", default=KNOWN_ZTVP_TRUST_CONFIGMAPS["image"])
-    uninstall.add_argument("--artifacts-dir", type=Path, default=Path("ztvp-uninstall-artifacts"))
-    uninstall.add_argument("--execute", action="store_true", help="delete the Pattern CR after all preflight checks")
+    uninstall.add_argument(
+        "--root-application", help="Argo root Application as namespace/name"
+    )
+    uninstall.add_argument(
+        "--operator-version",
+        help="explicit version when it cannot be discovered automatically",
+    )
+    uninstall.add_argument(
+        "--proxy-ca-configmap", default=KNOWN_ZTVP_TRUST_CONFIGMAPS["proxy"]
+    )
+    uninstall.add_argument(
+        "--image-ca-configmap", default=KNOWN_ZTVP_TRUST_CONFIGMAPS["image"]
+    )
+    uninstall.add_argument(
+        "--artifacts-dir", type=Path, default=Path("ztvp-uninstall-artifacts")
+    )
+    uninstall.add_argument(
+        "--execute",
+        action="store_true",
+        help="delete the Pattern CR after all preflight checks",
+    )
     uninstall.add_argument(
         "--ack-preflight",
         action="store_true",
         help="confirm backups, feature/external integration inventory, spoke reachability, and shared-resource review",
     )
-    uninstall.add_argument("--allow-unavailable-spokes", action="store_true", help="proceed despite unavailable ACM ManagedClusters; residue may remain")
-    uninstall.add_argument("--expected-server", help="required with --execute; exact output of oc whoami --show-server")
-    uninstall.add_argument("--confirm", help="exact confirmation string printed by the plan")
+    uninstall.add_argument(
+        "--allow-unavailable-spokes",
+        action="store_true",
+        help="proceed despite unavailable ACM ManagedClusters; residue may remain",
+    )
+    uninstall.add_argument(
+        "--expected-server",
+        help="required with --execute; exact output of oc whoami --show-server",
+    )
+    uninstall.add_argument(
+        "--confirm", help="exact confirmation string printed by the plan"
+    )
     uninstall.add_argument("--allow-incomplete-inventory", action="store_true")
-    uninstall.add_argument("--timeout", type=int, default=4 * 60 * 60, help="phase monitoring timeout in seconds")
+    uninstall.add_argument(
+        "--timeout",
+        type=int,
+        default=4 * 60 * 60,
+        help="phase monitoring timeout in seconds",
+    )
     uninstall.add_argument("--poll-interval", type=int, default=15)
     uninstall.add_argument("--workers", type=int, default=4)
     uninstall.set_defaults(func=do_uninstall)
 
-    audit = subparsers.add_parser("audit", help="compare the cluster with a baseline or current-install inventory")
+    audit = subparsers.add_parser(
+        "audit", help="compare the cluster with a baseline or current-install inventory"
+    )
     audit_source = audit.add_mutually_exclusive_group(required=True)
     audit_source.add_argument("--baseline", type=Path)
-    audit_source.add_argument("--inventory", type=Path, help="current-install inventory captured before uninstall")
+    audit_source.add_argument(
+        "--inventory",
+        type=Path,
+        help="current-install inventory captured before uninstall",
+    )
     audit.add_argument("--pattern", default="layered-zero-trust")
     audit.add_argument("--namespace")
-    audit.add_argument("--root-application", help="root Application as namespace/name; used with --pre-uninstall")
-    audit.add_argument("--pre-uninstall", type=Path, help="pre-uninstall.json from an earlier run, for app-resource checks")
-    audit.add_argument("--artifacts-dir", type=Path, default=Path("ztvp-uninstall-audit"))
+    audit.add_argument(
+        "--root-application",
+        help="root Application as namespace/name; used with --pre-uninstall",
+    )
+    audit.add_argument(
+        "--pre-uninstall",
+        type=Path,
+        help="pre-uninstall.json from an earlier run, for app-resource checks",
+    )
+    audit.add_argument(
+        "--artifacts-dir", type=Path, default=Path("ztvp-uninstall-audit")
+    )
     audit.add_argument("--workers", type=int, default=4)
     audit.set_defaults(func=do_audit)
 
@@ -2672,7 +3395,9 @@ def make_parser() -> argparse.ArgumentParser:
         "verify-reinstall",
         help="read-only smoke check for Vault, qtodo ExternalSecrets, and Argo health after reinstall",
     )
-    reinstall_check.add_argument("--expected-server", help="fail if oc is connected to a different API server")
+    reinstall_check.add_argument(
+        "--expected-server", help="fail if oc is connected to a different API server"
+    )
     reinstall_check.add_argument("--vault-namespace", default="vault")
     reinstall_check.add_argument("--app-namespace", default="vp-gitops")
     reinstall_check.add_argument(
@@ -2686,10 +3411,14 @@ def make_parser() -> argparse.ArgumentParser:
         action="append",
         help="Argo Application to check; defaults to qtodo and qtodo-db",
     )
-    reinstall_check.add_argument("--wait-seconds", type=int, default=0, help="poll until ready or this timeout")
+    reinstall_check.add_argument(
+        "--wait-seconds", type=int, default=0, help="poll until ready or this timeout"
+    )
     reinstall_check.add_argument("--poll-interval", type=int, default=15)
     reinstall_check.add_argument(
-        "--output", type=Path, default=Path("ztvp-uninstall-artifacts/reinstall-check.json")
+        "--output",
+        type=Path,
+        default=Path("ztvp-uninstall-artifacts/reinstall-check.json"),
     )
     reinstall_check.set_defaults(func=do_verify_reinstall)
 
@@ -2699,15 +3428,36 @@ def make_parser() -> argparse.ArgumentParser:
     )
     finalize_source = finalize.add_mutually_exclusive_group(required=True)
     finalize_source.add_argument("--baseline", type=Path)
-    finalize_source.add_argument("--inventory", type=Path, help="current-install inventory captured before uninstall")
-    finalize.add_argument("--pre-uninstall", type=Path, required=True, help="pre-uninstall.json from the uninstall run")
+    finalize_source.add_argument(
+        "--inventory",
+        type=Path,
+        help="current-install inventory captured before uninstall",
+    )
+    finalize.add_argument(
+        "--pre-uninstall",
+        type=Path,
+        required=True,
+        help="pre-uninstall.json from the uninstall run",
+    )
     finalize.add_argument("--pattern", default="layered-zero-trust")
     finalize.add_argument("--namespace")
-    finalize.add_argument("--root-application", help="root Application as namespace/name")
-    finalize.add_argument("--preexisting-state", type=Path, help="saved retention state; defaults under --artifacts-dir")
-    finalize.add_argument("--proxy-ca-configmap", default=KNOWN_ZTVP_TRUST_CONFIGMAPS["proxy"])
-    finalize.add_argument("--image-ca-configmap", default=KNOWN_ZTVP_TRUST_CONFIGMAPS["image"])
-    finalize.add_argument("--artifacts-dir", type=Path, default=Path("ztvp-uninstall-artifacts"))
+    finalize.add_argument(
+        "--root-application", help="root Application as namespace/name"
+    )
+    finalize.add_argument(
+        "--preexisting-state",
+        type=Path,
+        help="saved retention state; defaults under --artifacts-dir",
+    )
+    finalize.add_argument(
+        "--proxy-ca-configmap", default=KNOWN_ZTVP_TRUST_CONFIGMAPS["proxy"]
+    )
+    finalize.add_argument(
+        "--image-ca-configmap", default=KNOWN_ZTVP_TRUST_CONFIGMAPS["image"]
+    )
+    finalize.add_argument(
+        "--artifacts-dir", type=Path, default=Path("ztvp-uninstall-artifacts")
+    )
     finalize.add_argument("--workers", type=int, default=4)
     finalize.set_defaults(func=do_finalize)
     return parser
@@ -2738,7 +3488,9 @@ def main() -> int:
         or (hasattr(args, "timeout") and args.timeout < 1)
         or (hasattr(args, "wait_seconds") and args.wait_seconds < 0)
     ):
-        parser.error("--workers, --poll-interval, and --timeout must be positive; --wait-seconds must be non-negative")
+        parser.error(
+            "--workers, --poll-interval, and --timeout must be positive; --wait-seconds must be non-negative"
+        )
     try:
         return args.func(args)
     except (OcError, RuntimeError, OSError, json.JSONDecodeError) as error:
