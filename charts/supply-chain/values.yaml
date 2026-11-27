@@ -12,6 +12,10 @@ global:
     user: ""
     vaultPath: ""
     passwordVaultKey: ""
+    # Short-lived Quay robot tokens (built-in Quay registry only).
+    # Setting it here enables it for every chart that consumes global.registry.
+    quayTokenGenerator:
+      enabled: false
 
 rhtas:
   enabled: false
@@ -130,6 +134,71 @@ registry:
       enabled: false
       schedule: "0 */6 * * *"
       tokenDuration: "172800"
+
+# ===========================================================================
+# SHORT-LIVED QUAY ROBOT TOKENS (built-in Quay registry only)
+# Instead of rendering the Quay admin password into registry.authSecretName,
+# External Secrets Operator generators chain two short-lived credentials:
+#   1. VaultDynamicSecret: ESO logs in to Vault with a token of a dedicated
+#      ServiceAccount (Kubernetes auth / TokenReview) and gets a JWT signed by
+#      the Vault identity OIDC provider (~15 min, aud=quay).
+#   2. Webhook: ESO exchanges that JWT for a one-hour Quay robot token
+#      (Quay robot account federation trusting the Vault OIDC issuer).
+# The pipeline pushes with a robot that only has "write" on the repository;
+# qtodo pulls with a "read" robot. The Quay admin password is then only used
+# by the robot provisioner Job.
+# Also enabled when global.registry.quayTokenGenerator.enabled=true.
+#
+# PREREQUISITES (see docs/quay-short-lived-tokens.md):
+#   - Red Hat Quay 3.13 or later (robot account federation)
+#   - Vault identity OIDC configured by the configure-vault-quay-federation
+#     imperative job (overrides/values-vault-quay-federation.yaml). The
+#     identity names/ServiceAccounts below must match that file.
+#   - Quay trusts the ingress CA (ztvp-certificates proxyCA.enabled)
+# ===========================================================================
+quayTokenGenerator:
+  enabled: false
+  # Cluster CA bundle from ztvp-certificates, mounted into the robot
+  # provisioner. The script adds it to the system trust store, so both
+  # publicly signed and cluster-CA-signed Quay endpoints verify. The mount
+  # is optional: without the ConfigMap only the system trust store is used.
+  caBundle:
+    configMap: ztvp-trusted-ca
+    key: tls-ca-bundle.pem
+  vault:
+    # Defaults to the Vault route: https://vault-vault.<global.hubClusterDomain>
+    url: ""
+    # Kubernetes auth mount used by the VaultDynamicSecret generators
+    authMount: "hub"
+    # Audience of the ServiceAccount tokens presented to Vault
+    audience: "vault"
+  # How often ESO requests a new Vault identity JWT (must be lower than the
+  # Vault identity token TTL, 15 min by default)
+  federationTokenRefreshInterval: "10m"
+  # How often ESO exchanges a new robot token (Quay tokens last one hour)
+  refreshInterval: "55m"
+  # Robot used by the pipeline to push (role "write" on the repository).
+  # Robots are created in the organization of registry.repository
+  # (e.g. "ztvp" from "ztvp/qtodo"): <org>+<robot>
+  pusher:
+    robot: "pipeline"
+    # ServiceAccount of the identity (no pods use it)
+    serviceAccount: "quay-push-token"
+    # Vault Kubernetes auth role and identity OIDC role (same name)
+    vaultRole: "quay-pipeline-pusher"
+    # Secret holding the short-lived Vault identity JWT
+    federationSecret: "quay-push-federation-jwt"
+  # Robots used by workloads that run the image (role "read").
+  # Their generators live in the workload chart (e.g. qtodo); the provisioner
+  # reads federationSecret in <namespace> to learn the Vault entity (sub).
+  pullers:
+    - robot: "qtodo"
+      namespace: "qtodo"
+      federationSecret: "quay-pull-federation-jwt"
+  # Job/CronJob that creates the robots, their federation and permissions
+  provisioner:
+    serviceAccount: "quay-robot-provisioner"
+    schedule: "*/15 * * * *"
 
 # Container images used by Jobs and CronJobs (externalized for overridability)
 images:

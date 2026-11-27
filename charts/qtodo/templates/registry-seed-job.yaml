@@ -2,6 +2,9 @@
 {{- $regDomain := .Values.global.registry.domain }}
 {{- $regRepository := .Values.global.registry.repository }}
 {{- $isEmbedded := and (hasKey .Values.global.registry "user") (eq (default "" .Values.global.registry.user) "_token") }}
+{{- if and (not $isEmbedded) (include "qtodo.quayTokenGenerator.enabled" .) }}
+{{- fail "app.seedImage.enabled is not supported with the Quay token generator: the qtodo pull secret only holds a read-only robot token and cannot push the seed image" }}
+{{- end }}
 ---
 apiVersion: v1
 kind: ServiceAccount

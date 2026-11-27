@@ -6,6 +6,13 @@
 # 2. Uncomment and update additionalCertificates below
 # 3. Trigger ArgoCD sync
 
+# Distribute the CA bundle to qtodo and the supply-chain chart's namespace
+# (pipeline), so the Quay robot provisioner can mount it
+distribution:
+  targetNamespaces:
+    - qtodo
+    - pipeline
+
 # Additional CA certificates (uncomment and configure as needed)
 # customCA:
 #   additionalCertificates:

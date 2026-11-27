@@ -158,3 +158,94 @@ Sigstore params descriptions used in Pipeline Tasks
   type: string
 {{- end }}
 {{- end }}
+{{/*
+Whether the short-lived Quay robot token generator is enabled
+(quayTokenGenerator.enabled or global.registry.quayTokenGenerator.enabled)
+*/}}
+{{- define "supply-chain.quayTokenGenerator.enabled" -}}
+{{- $local := dig "enabled" false (.Values.quayTokenGenerator | default dict) -}}
+{{- $global := dig "registry" "quayTokenGenerator" "enabled" false (.Values.global | default dict) -}}
+{{- if or $local $global -}}true{{- end -}}
+{{- end }}
+
+{{/*
+Quay registry repository (namespace/name) used by the robot token generator
+*/}}
+{{- define "supply-chain.quayTokenGenerator.repository" -}}
+{{- $repository := .Values.registry.repository | default .Values.global.registry.repository -}}
+{{- if not (contains "/" ($repository | default "")) }}
+{{- fail "quayTokenGenerator requires registry.repository (or global.registry.repository) in the form <organization>/<name>" }}
+{{- end }}
+{{- $repository -}}
+{{- end }}
+
+{{/*
+Quay organization that owns the robots (first component of the repository)
+*/}}
+{{- define "supply-chain.quayTokenGenerator.organization" -}}
+{{- index (splitList "/" (include "supply-chain.quayTokenGenerator.repository" .)) 0 -}}
+{{- end }}
+
+{{/*
+Vault URL used by the Quay token generator (Vault route by default)
+*/}}
+{{- define "supply-chain.quayTokenGenerator.vaultUrl" -}}
+{{- .Values.quayTokenGenerator.vault.url | default (printf "https://vault-vault.%s" .Values.global.hubClusterDomain) }}
+{{- end }}
+
+{{/*
+Pod spec shared by the Quay robot provisioner Job and CronJob
+Usage: include "supply-chain.quayRobotProvisioner.podSpec" (dict "ctx" . "softFail" false)
+*/}}
+{{- define "supply-chain.quayRobotProvisioner.podSpec" -}}
+{{- $softFail := .softFail | default false }}
+{{- with .ctx }}
+{{- $gen := .Values.quayTokenGenerator }}
+serviceAccountName: {{ $gen.provisioner.serviceAccount }}
+restartPolicy: Never
+containers:
+- name: provision-robots
+  image: {{ .Values.images.ubi }}
+  command: ["python3", "/app/quay_robots.py"]
+  env:
+    - name: QUAY_HOST
+      value: {{ tpl (required "registry.domain (or global.registry.domain) is required" (.Values.registry.domain | default .Values.global.registry.domain)) . | quote }}
+    - name: QUAY_ADMIN_USER
+      value: {{ required "registry.user (or global.registry.user) is required" (.Values.registry.user | default .Values.global.registry.user) | quote }}
+    - name: QUAY_ADMIN_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: quay-robot-provisioner-credentials
+          key: password
+    - name: QUAY_REPOSITORY
+      value: {{ include "supply-chain.quayTokenGenerator.repository" . | quote }}
+    - name: ROBOTS_FILE
+      value: /app/robots.json
+    - name: SOFT_FAIL
+      value: {{ $softFail | quote }}
+    - name: CA_CERT
+      value: /etc/quay-ca/ca-bundle.crt
+  volumeMounts:
+    - name: script-volume
+      readOnly: true
+      mountPath: /app
+    - name: quay-ca-bundle
+      readOnly: true
+      mountPath: /etc/quay-ca
+volumes:
+  - name: script-volume
+    configMap:
+      name: quay-robot-provisioner
+      defaultMode: 0755
+  # Cluster CA bundle from ztvp-certificates (service, ingress and custom
+  # CAs). Optional: the script falls back to the system trust store alone,
+  # which verifies publicly signed (e.g. Let's Encrypt) endpoints
+  - name: quay-ca-bundle
+    configMap:
+      name: {{ .Values.quayTokenGenerator.caBundle.configMap | quote }}
+      optional: true
+      items:
+        - key: {{ .Values.quayTokenGenerator.caBundle.key | quote }}
+          path: ca-bundle.crt
+{{- end }}
+{{- end }}

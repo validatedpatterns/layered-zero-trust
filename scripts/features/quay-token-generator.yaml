@@ -1,0 +1,15 @@
+# Short-lived Quay robot tokens for the secure supply chain
+# Requires --registry-option 1 (built-in Quay registry).
+#
+# The pipeline pushes and qtodo pulls with one-hour Quay robot tokens instead
+# of the Quay admin password. External Secrets Operator generators chain a
+# short-lived Vault identity JWT (VaultDynamicSecret) and the Quay robot
+# federation exchange (Webhook). The Vault side is configured by the
+# configure-vault-quay-federation imperative job with
+# overrides/values-vault-quay-federation.yaml; both are already referenced
+# in the base values-hub.yaml and only act when this flag is true.
+# See docs/quay-short-lived-tokens.md.
+global:
+  registry:
+    quayTokenGenerator:
+      enabled: true
